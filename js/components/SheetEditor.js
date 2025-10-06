@@ -1,4 +1,4 @@
-// Sheet Editor Component - COMPLETO
+// Sheet Editor Component - COMPLETO E FUNZIONANTE
 const SheetEditor = ({ 
     sheet, 
     onSave, 
@@ -28,13 +28,13 @@ const SheetEditor = ({
         'bg-gray-700 border-gray-600 text-white' : 
         'bg-white border-gray-300 text-gray-900';
 
- React.useEffect(() => {
+    // Initialize canvas responsabile
+    React.useEffect(() => {
         console.log('🔄 SheetEditor: Inizializzo canvas responsabile...');
         if (respCanvasRef.current) {
             initCanvas(respCanvasRef.current);
         }
     }, [respCanvasRef.current]);
-    }, [darkMode]);
 
     const saveSheet = async () => {
         if (!currentSheet.titoloAzienda || !currentSheet.responsabile) {
@@ -75,7 +75,7 @@ const SheetEditor = ({
             setCurrentSheet(prev => ({ ...prev, firmaResponsabile: firma }));
             
             if (addAuditLog) {
-                await addAuditLog('SIGNATURE_ADD', `Firma responsabile aggiunta: ${currentSheet.responsabile}`);
+                await addAuditLog('SIGNATURE_ADD', `Firma responsabile: ${currentSheet.responsabile}`);
             }
             
             showToast('✅ Firma salvata!', 'success');
@@ -222,14 +222,12 @@ const SheetEditor = ({
                     {/* Header */}
                     <div className="flex justify-between items-center mb-6">
                         <h1 className="text-2xl font-bold">✏️ Gestione Foglio Ore</h1>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={onBack}
-                                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold"
-                            >
-                                ← Indietro
-                            </button>
-                        </div>
+                        <button
+                            onClick={onBack}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold"
+                        >
+                            ← Indietro
+                        </button>
                     </div>
 
                     {/* Sheet Info */}
@@ -257,7 +255,7 @@ const SheetEditor = ({
                         <input
                             type="text"
                             placeholder="Località"
-                            value={currentSheet.location}
+                            value={currentSheet.location || ''}
                             onChange={(e) => setCurrentSheet({...currentSheet, location: e.target.value})}
                             className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                         />
@@ -279,18 +277,16 @@ const SheetEditor = ({
                             </h3>
                             
                             {currentSheet.lavoratori?.length > 0 && (
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setBulkEditMode(!bulkEditMode)}
-                                        className={`px-4 py-2 rounded-lg font-semibold ${
-                                            bulkEditMode 
-                                                ? 'bg-indigo-600 text-white' 
-                                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                                        }`}
-                                    >
-                                        {bulkEditMode ? '✓ Modifica Multipla' : '📝 Modifica Multipla'}
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={() => setBulkEditMode(!bulkEditMode)}
+                                    className={`px-4 py-2 rounded-lg font-semibold ${
+                                        bulkEditMode 
+                                            ? 'bg-indigo-600 text-white' 
+                                            : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                                    }`}
+                                >
+                                    {bulkEditMode ? '✓ Modifica Multipla' : '📝 Modifica Multipla'}
+                                </button>
                             )}
                         </div>
 
@@ -417,8 +413,8 @@ const SheetEditor = ({
                                                     <div className="flex-1">
                                                         {isInBlacklist && (
                                                             <div className="bg-red-600 text-white px-3 py-1 rounded-lg mb-2 text-sm font-semibold">
-                                                                ⚠️ {t.blacklistWarning}
-                                                                <p className="text-xs mt-1">{t.reason}: {isInBlacklist.reason}</p>
+                                                                ⚠️ LAVORATORE IN BLACKLIST
+                                                                <p className="text-xs mt-1">Motivo: {isInBlacklist.reason}</p>
                                                             </div>
                                                         )}
                                                         
@@ -431,7 +427,7 @@ const SheetEditor = ({
                                                             <p className="font-semibold">⏱️ Totale: {worker.oreTotali}h</p>
                                                         </div>
                                                         {worker.firma && (
-                                                            <img src={worker.firma} alt="Firma" className="mt-2 h-12 border rounded" />
+                                                            <img src={worker.firma} alt="Firma" className="mt-2 h-12 border rounded bg-white" />
                                                         )}
                                                     </div>
                                                     
