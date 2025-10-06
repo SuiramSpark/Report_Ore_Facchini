@@ -44,28 +44,16 @@ body {
     min-width: 250px;
 }
 
-/* Canvas Firma - VERSIONE CORRETTA */
-canvas {
-    border: 2px dashed #cbd5e1;
+/* Canvas Firma - SEMPRE SFONDO BIANCO, FIRMA NERA */
+canvas.signature-canvas {
+    border: 2px solid #3b82f6;
     border-radius: 8px;
     cursor: crosshair;
     touch-action: none;
-    background: white;
+    background-color: #ffffff !important;
     display: block;
-    position: relative;
-    z-index: 10;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    user-select: none;
-}
-
-canvas.dark-mode {
-    background: #374151;
-    border-color: #4b5563;
-}
-
-canvas:active {
-    cursor: crosshair;
+    width: 100%;
+    height: auto;
 }
 
 /* Touch-friendly buttons */
