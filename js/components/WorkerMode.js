@@ -311,26 +311,58 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                             </div>
                         )}
 
-                        {/* Firma - CANVAS RESPONSIVE */}
-                        <div>
+                        {/* Firma - CANVAS SUPER-RESPONSIVE */}
+                        <div className="mb-4">
                             <label className="block font-semibold mb-2 text-sm sm:text-base">
                                 {t.signature} *
                             </label>
-                            <div className="relative w-full" style={{ paddingBottom: '37.5%' }}>
+                            
+                            <div className="w-full bg-white dark:bg-gray-700 rounded-lg p-2 border-2 border-dashed border-gray-300 dark:border-gray-600">
                                 <canvas
                                     ref={canvasRef}
                                     width={800}
                                     height={300}
-                                    className={`absolute top-0 left-0 w-full h-full ${darkMode ? 'dark-mode' : ''} rounded-lg`}
-                                    style={{ touchAction: 'none' }}
+                                    className="w-full h-auto block"
+                                    style={{ 
+                                        touchAction: 'none',
+                                        maxWidth: '100%',
+                                        height: 'auto',
+                                        aspectRatio: '8/3',
+                                        cursor: 'crosshair'
+                                    }}
                                 />
                             </div>
-                            <button
-                                onClick={() => clearCanvas(canvasRef.current)}
-                                className="mt-2 px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base"
-                            >
-                                🗑️ Cancella Firma
-                            </button>
+                            
+                            <div className="flex gap-2 mt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        clearCanvas(canvasRef.current);
+                                        showToast('🗑️ Firma cancellata', 'success');
+                                    }}
+                                    className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base transition-colors"
+                                >
+                                    🗑️ Cancella Firma
+                                </button>
+                                
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isCanvasBlank(canvasRef.current)) {
+                                            showToast('❌ Canvas vuoto!', 'error');
+                                        } else {
+                                            showToast('✅ Firma presente!', 'success');
+                                        }
+                                    }}
+                                    className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base transition-colors"
+                                >
+                                    ✓ Verifica Firma
+                                </button>
+                            </div>
+                            
+                            <p className={`text-xs mt-2 ${textClass}`}>
+                                💡 Disegna con il mouse o con il dito per firmare
+                            </p>
                         </div>
 
                         {/* Submit Button */}
