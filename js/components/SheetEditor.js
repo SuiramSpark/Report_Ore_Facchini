@@ -61,22 +61,19 @@ const SheetEditor = ({
         ) || false;
     };
 
-    const generateShareLink = (sheetId) => {
-        const baseUrl = window.location.origin;
-        const shareUrl = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
-        
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                showToast('🔗 Link copiato negli appunti!', 'success');
-            }).catch(() => {
-                // Fallback
-                prompt('Copia questo link:', shareUrl);
-            });
-        } else {
-            // Fallback per browser più vecchi
+const generateShareLink = (sheetId) => {
+    const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
+    const shareUrl = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            showToast('🔗 Link copiato negli appunti!', 'success');
+        }).catch(() => {
             prompt('Copia questo link:', shareUrl);
-        }
-    };
+        });
+    } else {
+        prompt('Copia questo link:', shareUrl);
+    }
+};
 
     // Initialize canvas responsabile
     React.useEffect(() => {
