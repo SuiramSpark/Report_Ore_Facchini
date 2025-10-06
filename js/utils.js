@@ -29,7 +29,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
     const [outH, outM] = oraOut.split(':').map(Number);
     
     let diffMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle overnight shifts
+    if (diffMinutes < 0) diffMinutes += 24 * 60;
     
     diffMinutes -= parseInt(pausaMinuti) || 0;
     
@@ -70,15 +70,29 @@ const generateShareLink = (sheetId) => {
         });
 };
 
-// Initialize Canvas for Signature - VERSIONE CORRETTA
+// Initialize Canvas for Signature - VERSIONE ULTRA-ROBUSTA
 const initCanvas = (canvas, darkMode = false) => {
-    if (!canvas) return () => {};
+    if (!canvas) {
+        console.error('Canvas is null!');
+        return () => {};
+    }
+    
+    console.log('🎨 Inizializzando canvas...', canvas);
     
     const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        console.error('Context 2d non disponibile!');
+        return () => {};
+    }
+    
+    // Setup canvas style
     ctx.strokeStyle = darkMode ? '#ffffff' : '#000000';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     let isDrawing = false;
     let lastX = 0;
@@ -91,9 +105,16 @@ const initCanvas = (canvas, darkMode = false) => {
         
         let clientX, clientY;
         
-        if (e.touches && e.touches.length > 0) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
+        if (e.type.startsWith('touch')) {
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                return { x: lastX, y: lastY };
+            }
         } else {
             clientX = e.clientX;
             clientY = e.clientY;
@@ -106,13 +127,17 @@ const initCanvas = (canvas, darkMode = false) => {
     };
 
     const startDrawing = (e) => {
+        console.log('✏️ Start drawing', e.type);
         isDrawing = true;
         const { x, y } = getCoordinates(e);
         lastX = x;
         lastY = y;
+        
         ctx.beginPath();
         ctx.moveTo(x, y);
+        
         e.preventDefault();
+        e.stopPropagation();
     };
 
     const draw = (e) => {
@@ -122,37 +147,43 @@ const initCanvas = (canvas, darkMode = false) => {
         
         ctx.lineTo(x, y);
         ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x, y);
         
         lastX = x;
         lastY = y;
         
         e.preventDefault();
+        e.stopPropagation();
     };
 
     const stopDrawing = (e) => {
         if (isDrawing) {
+            console.log('🛑 Stop drawing');
             isDrawing = false;
             ctx.beginPath();
         }
-        if (e) e.preventDefault();
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
     };
 
-    // Mouse events
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('mouseleave', stopDrawing);
+    // MOUSE EVENTS
+    canvas.addEventListener('mousedown', startDrawing, { passive: false });
+    canvas.addEventListener('mousemove', draw, { passive: false });
+    canvas.addEventListener('mouseup', stopDrawing, { passive: false });
+    canvas.addEventListener('mouseleave', stopDrawing, { passive: false });
     
-    // Touch events
-    canvas.addEventListener('touchstart', startDrawing);
-    canvas.addEventListener('touchmove', draw);
-    canvas.addEventListener('touchend', stopDrawing);
-    canvas.addEventListener('touchcancel', stopDrawing);
+    // TOUCH EVENTS
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing, { passive: false });
+    canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+    
+    console.log('✅ Canvas inizializzato con successo!');
     
     // Return cleanup function
     return () => {
+        console.log('🧹 Cleaning up canvas...');
         canvas.removeEventListener('mousedown', startDrawing);
         canvas.removeEventListener('mousemove', draw);
         canvas.removeEventListener('mouseup', stopDrawing);
@@ -196,23 +227,19 @@ const getStatistics = (sheets) => {
         sheet.lavoratori?.forEach(worker => {
             const hours = parseFloat(worker.oreTotali) || 0;
             
-            // Weekly hours
             if (sheetDate >= weekAgo) {
                 weeklyHours += hours;
             }
             
-            // Monthly hours
             if (sheetDate >= monthAgo) {
                 monthlyHours += hours;
             }
             
-            // Worker totals
             const workerName = `${worker.nome} ${worker.cognome}`;
             workerHours[workerName] = (workerHours[workerName] || 0) + hours;
         });
     });
     
-    // Top 3 workers
     const topWorkers = Object.entries(workerHours)
         .map(([name, hours]) => ({ name, hours }))
         .sort((a, b) => b.hours - a.hours)
@@ -230,11 +257,9 @@ const generatePDF = async (sheet, companyLogo = null) => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    // Header Background
     doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, 210, 40, 'F');
     
-    // Company Logo
     if (companyLogo) {
         try {
             doc.addImage(companyLogo, 'PNG', 10, 5, 30, 30);
@@ -243,13 +268,11 @@ const generatePDF = async (sheet, companyLogo = null) => {
         }
     }
     
-    // Title
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(24);
     doc.setFont(undefined, 'bold');
     doc.text(sheet.titoloAzienda || 'REGISTRO ORE', companyLogo ? 45 : 10, 25);
     
-    // Sheet Info
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.setFont(undefined, 'normal');
@@ -260,7 +283,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
     
     y += 35;
     
-    // Table Header
     doc.setFillColor(59, 130, 246);
     doc.rect(10, y, 190, 10, 'F');
     doc.setTextColor(255, 255, 255);
@@ -275,7 +297,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
     
     y += 10;
     
-    // Workers
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, 'normal');
     
@@ -285,7 +306,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
             y = 20;
         }
         
-        // Alternate row colors
         if (i % 2 === 0) {
             doc.setFillColor(243, 244, 246);
             doc.rect(10, y, 190, 25, 'F');
@@ -299,7 +319,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
         doc.text(worker.oreTotali + 'h', 150, y + 7);
         doc.setFont(undefined, 'normal');
         
-        // Worker signature
         if (worker.firma) {
             try {
                 doc.addImage(worker.firma, 'PNG', 12, y + 10, 30, 12);
@@ -311,7 +330,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
         y += 25;
     });
     
-    // Supervisor Signature
     if (sheet.firmaResponsabile) {
         if (y > 250) {
             doc.addPage();
@@ -328,7 +346,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
         }
     }
     
-    // Save PDF
     const fileName = `registro_${sheet.titoloAzienda}_${sheet.data}.pdf`;
     doc.save(fileName);
     showToast('📄 PDF generato con successo!', 'success');
