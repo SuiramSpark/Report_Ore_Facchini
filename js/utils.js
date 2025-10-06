@@ -36,8 +36,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
     doc.setFont(undefined, 'normal'); doc.setFontSize(12);
     doc.text(sheet.location || '', 38, y);
 
-    // --- Tabella: poco spazio dopo località ---
-    y += 10; // piccolo spazio, non troppo attaccato
+    y += 12;
 
     // --- Tabella header ---
     doc.setFillColor(59, 130, 246);
@@ -45,7 +44,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    const xCols = [16, 80, 108, 136, 164, 196, 240];
+    const xCols = [16, 80, 108, 136, 164, 196, 240]; // Firma spostata più a destra
     doc.text('Nome', xCols[0], y + 8);
     doc.text('Ora In', xCols[1], y + 8);
     doc.text('Ora Out', xCols[2], y + 8);
@@ -56,7 +55,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
     y += 11;
 
     // --- Tabella dati lavoratori ---
-    const rowHeight = 30;
+    const rowHeight = 30; // RIGA PIU' ALTA per la firma in fondo
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
@@ -66,6 +65,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
             doc.setFillColor(243, 244, 246);
             doc.rect(12, y, 273, rowHeight, 'F');
         }
+        // Nome e dati in alto
         doc.text(`${worker.nome} ${worker.cognome}`, xCols[0], y + 8);
         doc.text(worker.oraIn, xCols[1], y + 8);
         doc.text(worker.oraOut, xCols[2], y + 8);
@@ -73,25 +73,24 @@ const generatePDF = async (sheet, companyLogo = null) => {
         doc.setFont(undefined, 'bold');
         doc.text(worker.oreTotali + 'h', xCols[4], y + 8);
         doc.setFont(undefined, 'normal');
-        // Firma lavoratore in fondo alla cella "Firma"
+        // Firma lavoratore in fondo alla cella
         if (worker.firma) {
             try {
+                // Firma centrata in verticale nella cella "Firma"
                 doc.addImage(worker.firma, 'PNG', xCols[5], y + 14, 38, 12);
             } catch (e) { console.error('Errore firma:', e); }
         }
         y += rowHeight;
     });
 
-    // --- Firma responsabile: sotto la scritta, più piccola ---
-    y += 12;
+    // --- Firma responsabile ---
+    y += 10;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(12);
     doc.text('Firma Responsabile:', 14, y);
-
     if (sheet.firmaResponsabile) {
         try {
-            // Firma responsabile: metà larghezza, 25% meno alta
-            doc.addImage(sheet.firmaResponsabile, 'PNG', 14, y + 3, 30, 16.5);
+            doc.addImage(sheet.firmaResponsabile, 'PNG', 48, y - 8, 60, 22);
         } catch (e) { console.error('Errore firma responsabile:', e); }
     }
 
