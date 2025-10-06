@@ -1,4 +1,4 @@
-// Worker Mode Component - FIRMA SISTEMATA
+// Worker Mode Component - FIRMA FUNZIONANTE
 const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
@@ -10,7 +10,6 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
         oraIn: '',
         oraOut: '',
         pausaMinuti: '',
-        rating: 0,
         codiceFiscale: '',
         numeroIdentita: '',
         telefono: '',
@@ -47,25 +46,26 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
         return () => unsubscribe();
     }, [sheetId, db]);
 
-    // Initialize canvas - SISTEMATO
+    // Initialize canvas
     React.useEffect(() => {
+        console.log('🔄 WorkerMode: Inizializzo canvas...');
+        
         if (canvasRef.current) {
-            // Cleanup previous canvas
+            // Cleanup previous
             if (cleanupRef.current) {
                 cleanupRef.current();
             }
             
-            // Initialize new canvas
-            cleanupRef.current = initCanvas(canvasRef.current, darkMode);
+            // Initialize
+            cleanupRef.current = initCanvas(canvasRef.current);
         }
         
-        // Cleanup on unmount
         return () => {
             if (cleanupRef.current) {
                 cleanupRef.current();
             }
         };
-    }, [darkMode, canvasRef.current]);
+    }, [canvasRef.current]);
 
     const saveWorkerData = async () => {
         // Validation
@@ -82,38 +82,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
 
         setLoading(true);
         
-        // CREA UN CANVAS TEMPORANEO CON FIRMA SEMPRE NERA (per PDF)
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvasRef.current.width;
-        tempCanvas.height = canvasRef.current.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        
-        // Sfondo bianco
-        tempCtx.fillStyle = '#FFFFFF';
-        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        
-        // Ridisegna firma in NERO
-        tempCtx.drawImage(canvasRef.current, 0, 0);
-        
-        // Se era in dark mode, inverti i colori
-        if (darkMode) {
-            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-            const data = imageData.data;
-            
-            // Inverti i colori: bianco diventa nero
-            for (let i = 0; i < data.length; i += 4) {
-                // Se il pixel è bianco (o quasi), rendilo nero
-                if (data[i] > 200 && data[i + 1] > 200 && data[i + 2] > 200) {
-                    data[i] = 0;     // R
-                    data[i + 1] = 0; // G
-                    data[i + 2] = 0; // B
-                }
-            }
-            
-            tempCtx.putImageData(imageData, 0, 0);
-        }
-        
-        const firma = tempCanvas.toDataURL('image/png');
+        const firma = canvasRef.current.toDataURL('image/png');
         const oreTotali = calculateHours(workerData.oraIn, workerData.oraOut, workerData.pausaMinuti);
         
         const worker = {
@@ -156,9 +125,9 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
 
     if (error) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className={`${cardClass} p-8 rounded-lg shadow-xl text-center max-w-md mx-4`}>
-                    <h1 className="text-2xl font-bold text-red-600">{error}</h1>
+            <div className="min-h-screen flex items-center justify-center p-4">
+                <div className={`${cardClass} p-8 rounded-lg shadow-xl text-center max-w-md w-full`}>
+                    <h1 className="text-xl sm:text-2xl font-bold text-red-600">{error}</h1>
                 </div>
             </div>
         );
@@ -187,7 +156,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                     👋 Ciao, {mySubmission.nome}!
                                 </h2>
                                 <p className="mb-1 text-sm sm:text-base">
-                                    <span className="font-semibold">Ore Inserite:</span> {mySubmission.oraIn} - {mySubmission.oraOut}
+                                    <span className="font-semibold">Ore:</span> {mySubmission.oraIn} - {mySubmission.oraOut}
                                 </p>
                                 <p className="mb-3 text-sm sm:text-base">
                                     <span className="font-semibold">Totale:</span> {mySubmission.oreTotali}h
@@ -195,13 +164,13 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                 <p className="mt-2 text-sm sm:text-base">
                                     <span className="font-semibold">Stato:</span>{' '}
                                     <span className={`font-bold ${isCompleted ? 'text-green-500' : 'text-yellow-500'}`}>
-                                        {isCompleted ? '✅ Completato e Firmato dal Responsabile' : '⏳ In attesa della firma del responsabile'}
+                                        {isCompleted ? '✅ Completato' : '⏳ In attesa firma responsabile'}
                                     </span>
                                 </p>
                             </div>
                         ) : (
                             <p className="text-center text-red-500 text-sm sm:text-base">
-                                I tuoi dati non sono stati trovati. Potrebbero essere stati rimossi.
+                                Dati non trovati.
                             </p>
                         )}
                     </div>
@@ -211,7 +180,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
     }
 
     return (
-        <div className={`min-h-screen ${bgClass} p-2 sm:p-4`}>
+        <div className={`min-h-screen ${bgClass} p-3 sm:p-4`}>
             <div className="max-w-2xl mx-auto">
                 <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 mt-4`}>
                     <div className="text-center mb-6">
@@ -224,7 +193,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                             <div className="mt-4">
                                 <p className="font-semibold text-base sm:text-lg">{sheetData.titoloAzienda}</p>
                                 <p className={`${textClass} text-sm sm:text-base`}>
-                                    {formatDate(sheetData.data)} - {sheetData.location}
+                                    {formatDate(sheetData.data)} {sheetData.location && `- ${sheetData.location}`}
                                 </p>
                             </div>
                         )}
@@ -232,25 +201,25 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
 
                     <div className="space-y-4">
                         {/* Nome e Cognome */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input
                                 type="text"
                                 placeholder={`${t.name} *`}
                                 value={workerData.nome}
                                 onChange={(e) => setWorkerData({...workerData, nome: e.target.value})}
-                                className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base`}
+                                className={`w-full px-3 py-2 sm:py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-base`}
                             />
                             <input
                                 type="text"
                                 placeholder={`${t.surname} *`}
                                 value={workerData.cognome}
                                 onChange={(e) => setWorkerData({...workerData, cognome: e.target.value})}
-                                className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-sm sm:text-base`}
+                                className={`w-full px-3 py-2 sm:py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-base`}
                             />
                         </div>
 
                         {/* Orari */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                                 <label className={`block text-xs sm:text-sm font-semibold mb-1 ${textClass}`}>
                                     {t.startTime} *
@@ -259,7 +228,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                     type="time"
                                     value={workerData.oraIn}
                                     onChange={(e) => setWorkerData({...workerData, oraIn: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 sm:py-3 rounded-lg border ${inputClass} text-base`}
                                 />
                             </div>
                             <div>
@@ -270,7 +239,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                     type="time"
                                     value={workerData.oraOut}
                                     onChange={(e) => setWorkerData({...workerData, oraOut: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 sm:py-3 rounded-lg border ${inputClass} text-base`}
                                 />
                             </div>
                             <div>
@@ -281,7 +250,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                     type="number"
                                     value={workerData.pausaMinuti}
                                     onChange={(e) => setWorkerData({...workerData, pausaMinuti: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 sm:py-3 rounded-lg border ${inputClass} text-base`}
                                     placeholder="0"
                                 />
                             </div>
@@ -296,6 +265,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
 
                         {/* Campi Opzionali */}
                         <button
+                            type="button"
                             onClick={() => setShowOptionalFields(!showOptionalFields)}
                             className={`w-full py-2 px-4 rounded-lg border ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'} transition-colors text-sm sm:text-base`}
                         >
@@ -303,77 +273,68 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                         </button>
 
                         {showOptionalFields && (
-                            <div className="space-y-3 pl-2 sm:pl-4 border-l-2 border-indigo-500">
+                            <div className="space-y-3 pl-3 border-l-2 border-indigo-500">
                                 <input
                                     type="text"
                                     placeholder={t.taxCode}
                                     value={workerData.codiceFiscale}
                                     onChange={(e) => setWorkerData({...workerData, codiceFiscale: e.target.value.toUpperCase()})}
-                                    className={`w-full px-3 sm:px-4 py-2 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                 />
                                 <input
                                     type="text"
                                     placeholder={t.idNumber}
                                     value={workerData.numeroIdentita}
                                     onChange={(e) => setWorkerData({...workerData, numeroIdentita: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                 />
                                 <input
                                     type="tel"
                                     placeholder={t.phone}
                                     value={workerData.telefono}
                                     onChange={(e) => setWorkerData({...workerData, telefono: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                 />
                                 <input
                                     type="email"
                                     placeholder={t.email}
                                     value={workerData.email}
                                     onChange={(e) => setWorkerData({...workerData, email: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 rounded-lg border ${inputClass} text-sm sm:text-base`}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder={t.address}
-                                    value={workerData.indirizzo}
-                                    onChange={(e) => setWorkerData({...workerData, indirizzo: e.target.value})}
-                                    className={`w-full px-3 sm:px-4 py-2 rounded-lg border ${inputClass} text-sm sm:text-base`}
+                                    className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                 />
                             </div>
                         )}
 
-                        {/* Firma - CANVAS SUPER-RESPONSIVE */}
-                        <div className="mb-4">
-                            <label className="block font-semibold mb-2 text-sm sm:text-base">
+                        {/* Firma - CANVAS SEMPLICE */}
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-sm sm:text-base">
                                 {t.signature} *
                             </label>
                             
-                            <div className="w-full bg-white dark:bg-gray-700 rounded-lg p-2 border-2 border-dashed border-gray-300 dark:border-gray-600">
+                            <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white">
                                 <canvas
                                     ref={canvasRef}
                                     width={800}
                                     height={300}
-                                    className="w-full h-auto block"
+                                    className="signature-canvas"
                                     style={{ 
                                         touchAction: 'none',
                                         maxWidth: '100%',
-                                        height: 'auto',
-                                        aspectRatio: '8/3',
-                                        cursor: 'crosshair'
+                                        aspectRatio: '8/3'
                                     }}
                                 />
                             </div>
                             
-                            <div className="flex gap-2 mt-3">
+                            <div className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         clearCanvas(canvasRef.current);
                                         showToast('🗑️ Firma cancellata', 'success');
                                     }}
-                                    className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base transition-colors"
+                                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base transition-colors"
                                 >
-                                    🗑️ Cancella Firma
+                                    🗑️ Cancella
                                 </button>
                                 
                                 <button
@@ -385,14 +346,14 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                             showToast('✅ Firma presente!', 'success');
                                         }
                                     }}
-                                    className="px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base transition-colors"
+                                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base transition-colors"
                                 >
-                                    ✓ Verifica Firma
+                                    ✓ Verifica
                                 </button>
                             </div>
                             
-                            <p className={`text-xs mt-2 ${textClass}`}>
-                                💡 Disegna con il mouse o con il dito per firmare
+                            <p className={`text-xs ${textClass}`}>
+                                💡 Disegna con il mouse o con il dito
                             </p>
                         </div>
 
