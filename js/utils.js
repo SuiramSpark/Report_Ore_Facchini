@@ -70,128 +70,100 @@ const generateShareLink = (sheetId) => {
         });
 };
 
-// Initialize Canvas for Signature - VERSIONE ULTRA-ROBUSTA
-const initCanvas = (canvas, darkMode = false) => {
+// Initialize Canvas for Signature - VERSIONE ULTRA-SEMPLICE CHE FUNZIONA SEMPRE
+const initCanvas = (canvas) => {
     if (!canvas) {
-        console.error('Canvas is null!');
+        console.error('❌ Canvas è null!');
         return () => {};
     }
     
-    console.log('🎨 Inizializzando canvas...', canvas);
+    console.log('🎨 Inizializzo canvas...');
     
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-        console.error('Context 2d non disponibile!');
+        console.error('❌ Context non disponibile!');
         return () => {};
     }
     
-    // Setup canvas style
-    ctx.strokeStyle = darkMode ? '#ffffff' : '#000000';
+    // SETUP: Sfondo BIANCO, Linea NERA sempre
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#000000';
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
 
-    const getCoordinates = (e) => {
+    const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         
         let clientX, clientY;
         
-        if (e.type.startsWith('touch')) {
-            if (e.touches && e.touches.length > 0) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else if (e.changedTouches && e.changedTouches.length > 0) {
-                clientX = e.changedTouches[0].clientX;
-                clientY = e.changedTouches[0].clientY;
-            } else {
-                return { x: lastX, y: lastY };
-            }
+        if (e.touches && e.touches[0]) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
         } else {
             clientX = e.clientX;
             clientY = e.clientY;
         }
         
-        const x = (clientX - rect.left) * scaleX;
-        const y = (clientY - rect.top) * scaleY;
-        
-        return { x, y };
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
     };
 
-    const startDrawing = (e) => {
-        console.log('✏️ Start drawing', e.type);
+    const startDraw = (e) => {
         isDrawing = true;
-        const { x, y } = getCoordinates(e);
-        lastX = x;
-        lastY = y;
-        
+        const pos = getPos(e);
+        lastX = pos.x;
+        lastY = pos.y;
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        
+        ctx.moveTo(pos.x, pos.y);
         e.preventDefault();
-        e.stopPropagation();
+        console.log('✏️ Inizio disegno');
     };
 
     const draw = (e) => {
         if (!isDrawing) return;
-        
-        const { x, y } = getCoordinates(e);
-        
-        ctx.lineTo(x, y);
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
         ctx.stroke();
-        
-        lastX = x;
-        lastY = y;
-        
         e.preventDefault();
-        e.stopPropagation();
     };
 
-    const stopDrawing = (e) => {
+    const stopDraw = (e) => {
         if (isDrawing) {
-            console.log('🛑 Stop drawing');
             isDrawing = false;
-            ctx.beginPath();
+            console.log('🛑 Fine disegno');
         }
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+        if (e) e.preventDefault();
     };
 
-    // MOUSE EVENTS
-    canvas.addEventListener('mousedown', startDrawing, { passive: false });
-    canvas.addEventListener('mousemove', draw, { passive: false });
-    canvas.addEventListener('mouseup', stopDrawing, { passive: false });
-    canvas.addEventListener('mouseleave', stopDrawing, { passive: false });
+    // Eventi
+    canvas.addEventListener('mousedown', startDraw, false);
+    canvas.addEventListener('mousemove', draw, false);
+    canvas.addEventListener('mouseup', stopDraw, false);
+    canvas.addEventListener('mouseleave', stopDraw, false);
+    canvas.addEventListener('touchstart', startDraw, false);
+    canvas.addEventListener('touchmove', draw, false);
+    canvas.addEventListener('touchend', stopDraw, false);
     
-    // TOUCH EVENTS
-    canvas.addEventListener('touchstart', startDrawing, { passive: false });
-    canvas.addEventListener('touchmove', draw, { passive: false });
-    canvas.addEventListener('touchend', stopDrawing, { passive: false });
-    canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+    console.log('✅ Canvas OK!');
     
-    console.log('✅ Canvas inizializzato con successo!');
-    
-    // Return cleanup function
     return () => {
-        console.log('🧹 Cleaning up canvas...');
-        canvas.removeEventListener('mousedown', startDrawing);
+        canvas.removeEventListener('mousedown', startDraw);
         canvas.removeEventListener('mousemove', draw);
-        canvas.removeEventListener('mouseup', stopDrawing);
-        canvas.removeEventListener('mouseleave', stopDrawing);
-        canvas.removeEventListener('touchstart', startDrawing);
+        canvas.removeEventListener('mouseup', stopDraw);
+        canvas.removeEventListener('mouseleave', stopDraw);
+        canvas.removeEventListener('touchstart', startDraw);
         canvas.removeEventListener('touchmove', draw);
-        canvas.removeEventListener('touchend', stopDrawing);
-        canvas.removeEventListener('touchcancel', stopDrawing);
+        canvas.removeEventListener('touchend', stopDraw);
     };
 };
 
@@ -199,16 +171,27 @@ const initCanvas = (canvas, darkMode = false) => {
 const clearCanvas = (canvas) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Ridisegna sfondo bianco
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 };
 
 // Check if Canvas is Blank
 const isCanvasBlank = (canvas) => {
     if (!canvas) return true;
-    const blank = document.createElement('canvas');
-    blank.width = canvas.width;
-    blank.height = canvas.height;
-    return canvas.toDataURL() === blank.toDataURL();
+    
+    const ctx = canvas.getContext('2d');
+    const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    
+    // Controlla se tutti i pixel sono bianchi
+    for (let i = 0; i < pixelData.length; i += 4) {
+        // Se trovi un pixel non bianco, il canvas non è vuoto
+        if (pixelData[i] !== 255 || pixelData[i+1] !== 255 || pixelData[i+2] !== 255) {
+            return false;
+        }
+    }
+    
+    return true;
 };
 
 // Get Statistics from Sheets
@@ -264,7 +247,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
         try {
             doc.addImage(companyLogo, 'PNG', 10, 5, 30, 30);
         } catch (e) {
-            console.error('Errore caricamento logo:', e);
+            console.error('Errore logo:', e);
         }
     }
     
@@ -323,7 +306,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
             try {
                 doc.addImage(worker.firma, 'PNG', 12, y + 10, 30, 12);
             } catch (e) {
-                console.error('Errore firma lavoratore:', e);
+                console.error('Errore firma:', e);
             }
         }
         
