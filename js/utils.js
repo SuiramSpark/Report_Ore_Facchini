@@ -58,9 +58,10 @@ const formatDateTime = (dateString) => {
     });
 };
 
-// Generate Share Link
 const generateShareLink = (sheetId) => {
-    const link = `${window.location.origin}${window.location.pathname}?mode=worker&sheet=${sheetId}`;
+    // Costruisci sempre il link sulla repo giusta!
+    const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
+    const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
     navigator.clipboard.writeText(link)
         .then(() => {
             showToast('✅ Link copiato negli appunti!', 'success');
