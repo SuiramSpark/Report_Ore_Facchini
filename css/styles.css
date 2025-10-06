@@ -1,0 +1,130 @@
+/* Registro Ore - Custom Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Loader Animation */
+.loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3b82f6;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Toast Notifications */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    background: #10B981;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: opacity 0.3s;
+    min-width: 250px;
+}
+
+/* Canvas Firma */
+canvas {
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    cursor: crosshair;
+    touch-action: none;
+    background: white;
+}
+
+canvas.dark-mode {
+    background: #374151;
+    border-color: #4b5563;
+}
+
+/* Touch-friendly buttons */
+.touch-button {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Mobile buttons layout */
+@media (max-width: 640px) {
+    .mobile-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .mobile-buttons button {
+        width: 100%;
+    }
+}
+
+/* Scrollbar personalizzata */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Animazioni */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Blacklist card styles */
+.blacklist-card {
+    border: 2px solid #ef4444;
+    background: #fee2e2;
+}
+
+.dark .blacklist-card {
+    border-color: #dc2626;
+    background: #7f1d1d;
+}
