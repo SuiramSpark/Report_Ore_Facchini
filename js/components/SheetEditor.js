@@ -28,10 +28,12 @@ const SheetEditor = ({
         'bg-gray-700 border-gray-600 text-white' : 
         'bg-white border-gray-300 text-gray-900';
 
-    React.useEffect(() => {
+ React.useEffect(() => {
+        console.log('🔄 SheetEditor: Inizializzo canvas responsabile...');
         if (respCanvasRef.current) {
-            initCanvas(respCanvasRef.current, darkMode);
+            initCanvas(respCanvasRef.current);
         }
+    }, [respCanvasRef.current]);
     }, [darkMode]);
 
     const saveSheet = async () => {
@@ -480,7 +482,7 @@ const SheetEditor = ({
                                 <img 
                                     src={currentSheet.firmaResponsabile} 
                                     alt="Firma Responsabile" 
-                                    className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white" 
+                                    className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white max-w-md" 
                                 />
                                 <button
                                     onClick={() => {
@@ -488,29 +490,37 @@ const SheetEditor = ({
                                             setCurrentSheet({...currentSheet, firmaResponsabile: null});
                                         }
                                     }}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg"
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                                 >
                                     🗑️ Cancella Firma
                                 </button>
                             </div>
                         ) : (
                             <div>
-                                <canvas 
-                                    ref={respCanvasRef} 
-                                    width={500} 
-                                    height={150} 
-                                    className={`w-full mb-3 ${darkMode ? 'dark-mode' : ''}`}
-                                />
+                                <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
+                                    <canvas 
+                                        ref={respCanvasRef} 
+                                        width={800} 
+                                        height={300} 
+                                        className="signature-canvas"
+                                        style={{ 
+                                            touchAction: 'none',
+                                            maxWidth: '100%',
+                                            aspectRatio: '8/3'
+                                        }}
+                                    />
+                                </div>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={saveResponsabileSignature}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold"
+                                        disabled={loading}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
                                     >
                                         ✓ Salva Firma
                                     </button>
                                     <button
                                         onClick={() => clearCanvas(respCanvasRef.current)}
-                                        className="px-4 py-2 bg-gray-500 text-white rounded-lg"
+                                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                                     >
                                         🗑️ Cancella
                                     </button>
