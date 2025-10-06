@@ -63,16 +63,14 @@ const SheetEditor = ({
 
 const generateShareLink = (sheetId) => {
     const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
-    const shareUrl = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            showToast('🔗 Link copiato negli appunti!', 'success');
-        }).catch(() => {
-            prompt('Copia questo link:', shareUrl);
+    const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
+    navigator.clipboard.writeText(link)
+        .then(() => {
+            showToast('✅ Link copiato negli appunti!', 'success');
+        })
+        .catch(() => {
+            prompt('Copia questo link:', link);
         });
-    } else {
-        prompt('Copia questo link:', shareUrl);
-    }
 };
 
     // Initialize canvas responsabile
