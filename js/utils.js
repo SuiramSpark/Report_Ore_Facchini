@@ -117,3 +117,43 @@ const generatePDF = async (sheet, companyLogo = null) => {
     doc.save(fileName);
     showToast('📄 PDF generato con successo!', 'success');
 };
+// Get Statistics from Sheets
+const getStatistics = (sheets) => {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    let weeklyHours = 0;
+    let monthlyHours = 0;
+    const workerHours = {};
+
+    sheets.forEach(sheet => {
+        const sheetDate = new Date(sheet.data);
+
+        sheet.lavoratori?.forEach(worker => {
+            const hours = parseFloat(worker.oreTotali) || 0;
+
+            if (sheetDate >= weekAgo) {
+                weeklyHours += hours;
+            }
+
+            if (sheetDate >= monthAgo) {
+                monthlyHours += hours;
+            }
+
+            const workerName = `${worker.nome} ${worker.cognome}`;
+            workerHours[workerName] = (workerHours[workerName] || 0) + hours;
+        });
+    });
+
+    const topWorkers = Object.entries(workerHours)
+        .map(([name, hours]) => ({ name, hours }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 3);
+
+    return {
+        weeklyHours,
+        monthlyHours,
+        topWorkers
+    };
+};
