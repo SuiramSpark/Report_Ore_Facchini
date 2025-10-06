@@ -58,9 +58,10 @@ const formatDateTime = (dateString) => {
     });
 };
 
-// Generate Share Link
+// Generate Share Link (ALWAYS CORRECT PATH)
 const generateShareLink = (sheetId) => {
-    const link = `${window.location.origin}${window.location.pathname}?mode=worker&sheet=${sheetId}`;
+    const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
+    const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
     navigator.clipboard.writeText(link)
         .then(() => {
             showToast('✅ Link copiato negli appunti!', 'success');
@@ -235,104 +236,124 @@ const getStatistics = (sheets) => {
     };
 };
 
-// Generate PDF
+// Generate PDF 
+
 const generatePDF = async (sheet, companyLogo = null) => {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    doc.setFillColor(59, 130, 246);
-    doc.rect(0, 0, 210, 40, 'F');
-    
+    const doc = new jsPDF({ orientation: "landscape" });
+
+    // --- Header blu compatto ---
+    const HEADER_HEIGHT = 24; // era 40 o più, ora più compatto
+    doc.setFillColor(59, 130, 246); // blu
+    doc.rect(0, 0, 297, HEADER_HEIGHT, 'F');
+
+    // Logo (più basso)
     if (companyLogo) {
         try {
-            doc.addImage(companyLogo, 'PNG', 10, 5, 30, 30);
+            doc.addImage(companyLogo, 'PNG', 10, 4, 24, 16); // logo più compatto
         } catch (e) {
             console.error('Errore logo:', e);
         }
     }
-    
+    // Titolo in bold, più grande, accanto al logo
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
+    doc.setFontSize(22);
     doc.setFont(undefined, 'bold');
-    doc.text(sheet.titoloAzienda || 'REGISTRO ORE', companyLogo ? 45 : 10, 25);
-    
+    doc.text(sheet.titoloAzienda || 'REGISTRO ORE', companyLogo ? 40 : 15, 16);
+
+    // --- Info sezione DATA/RESPONSABILE/LOCALITA ---
     doc.setTextColor(0, 0, 0);
+    doc.setFontSize(13); // titoli 2px più grandi
+    doc.setFont(undefined, 'bold');
+
+    let y = HEADER_HEIGHT + 12;
+    doc.text('Data:', 12, y);
+    doc.setFont(undefined, 'normal');
     doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    let y = 50;
-    doc.text(`Data: ${formatDate(sheet.data)}`, 10, y);
-    doc.text(`Responsabile: ${sheet.responsabile}`, 10, y + 10);
-    doc.text(`Località: ${sheet.location || 'N/A'}`, 10, y + 20);
-    
-    y += 35;
-    
-    doc.setFillColor(59, 130, 246);
-    doc.rect(10, y, 190, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
+    doc.text(`${formatDate(sheet.data)}`, 35, y);
+
+    y += 8;
     doc.setFont(undefined, 'bold');
-    doc.text('Nome', 12, y + 7);
-    doc.text('Ora In', 70, y + 7);
-    doc.text('Ora Out', 95, y + 7);
-    doc.text('Pausa', 125, y + 7);
-    doc.text('Tot Ore', 150, y + 7);
-    doc.text('Firma', 175, y + 7);
-    
-    y += 10;
-    
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(13);
+    doc.text('Responsabile:', 12, y);
     doc.setFont(undefined, 'normal');
-    
+    doc.setFontSize(12);
+    doc.text(sheet.responsabile || '', 48, y);
+
+    y += 8;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(13);
+    doc.text('Località:', 12, y);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(12);
+    doc.text(sheet.location || '', 38, y);
+
+    y += 12;
+
+    // --- Tabella header ---
+    doc.setFillColor(59, 130, 246);
+    doc.rect(12, y, 273, 11, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    const xCols = [16, 80, 108, 136, 164, 196, 240]; // Firma spostata più a destra
+    doc.text('Nome', xCols[0], y + 8);
+    doc.text('Ora In', xCols[1], y + 8);
+    doc.text('Ora Out', xCols[2], y + 8);
+    doc.text('Pausa', xCols[3], y + 8);
+    doc.text('Tot Ore', xCols[4], y + 8);
+    doc.text('Firma', xCols[5], y + 8);
+
+    y += 11;
+
+    // --- Tabella dati lavoratori ---
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
     sheet.lavoratori?.forEach((worker, i) => {
-        if (y > 270) {
-            doc.addPage();
-            y = 20;
-        }
-        
+        if (y > 170) { doc.addPage(); y = 20; }
         if (i % 2 === 0) {
             doc.setFillColor(243, 244, 246);
-            doc.rect(10, y, 190, 25, 'F');
+            doc.rect(12, y, 273, 20, 'F');
         }
-        
-        doc.text(`${worker.nome} ${worker.cognome}`, 12, y + 7);
-        doc.text(worker.oraIn, 70, y + 7);
-        doc.text(worker.oraOut, 95, y + 7);
-        doc.text(`${worker.pausaMinuti || 0}min`, 125, y + 7);
+        // Nome
+        doc.text(`${worker.nome} ${worker.cognome}`, xCols[0], y + 8);
+        // Orari
+        doc.text(worker.oraIn, xCols[1], y + 8);
+        doc.text(worker.oraOut, xCols[2], y + 8);
+        doc.text(`${worker.pausaMinuti || 0}min`, xCols[3], y + 8);
         doc.setFont(undefined, 'bold');
-        doc.text(worker.oreTotali + 'h', 150, y + 7);
+        doc.text(worker.oreTotali + 'h', xCols[4], y + 8);
         doc.setFont(undefined, 'normal');
-        
+        // Firma lavoratore (più a destra, allineata)
         if (worker.firma) {
             try {
-                doc.addImage(worker.firma, 'PNG', 12, y + 10, 30, 12);
+                doc.addImage(worker.firma, 'PNG', xCols[5], y + 1, 38, 14); // più larga e nella cella giusta!
             } catch (e) {
                 console.error('Errore firma:', e);
             }
         }
-        
-        y += 25;
+        y += 20;
     });
-    
+
+    // --- Firma responsabile ---
+    y += 10;
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(12);
+    doc.text('Firma Responsabile:', 14, y);
     if (sheet.firmaResponsabile) {
-        if (y > 250) {
-            doc.addPage();
-            y = 20;
-        }
-        
-        y += 10;
-        doc.setFont(undefined, 'bold');
-        doc.text('Firma Responsabile:', 10, y);
         try {
-            doc.addImage(sheet.firmaResponsabile, 'PNG', 10, y + 5, 50, 20);
+            doc.addImage(sheet.firmaResponsabile, 'PNG', 48, y - 8, 60, 22); // più largo e ben allineato
         } catch (e) {
             console.error('Errore firma responsabile:', e);
         }
     }
-    
+
     const fileName = `registro_${sheet.titoloAzienda}_${sheet.data}.pdf`;
     doc.save(fileName);
     showToast('📄 PDF generato con successo!', 'success');
 };
+
 
 // Check Blacklist
 const checkBlacklist = (workerData, blacklist) => {
