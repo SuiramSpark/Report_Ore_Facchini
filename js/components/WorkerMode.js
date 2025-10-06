@@ -82,7 +82,38 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
 
         setLoading(true);
         
-        const firma = canvasRef.current.toDataURL('image/png');
+        // CREA UN CANVAS TEMPORANEO CON FIRMA SEMPRE NERA (per PDF)
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvasRef.current.width;
+        tempCanvas.height = canvasRef.current.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // Sfondo bianco
+        tempCtx.fillStyle = '#FFFFFF';
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        // Ridisegna firma in NERO
+        tempCtx.drawImage(canvasRef.current, 0, 0);
+        
+        // Se era in dark mode, inverti i colori
+        if (darkMode) {
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+            
+            // Inverti i colori: bianco diventa nero
+            for (let i = 0; i < data.length; i += 4) {
+                // Se il pixel è bianco (o quasi), rendilo nero
+                if (data[i] > 200 && data[i + 1] > 200 && data[i + 2] > 200) {
+                    data[i] = 0;     // R
+                    data[i + 1] = 0; // G
+                    data[i + 2] = 0; // B
+                }
+            }
+            
+            tempCtx.putImageData(imageData, 0, 0);
+        }
+        
+        const firma = tempCanvas.toDataURL('image/png');
         const oreTotali = calculateHours(workerData.oraIn, workerData.oraOut, workerData.pausaMinuti);
         
         const worker = {
