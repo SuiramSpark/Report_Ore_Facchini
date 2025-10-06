@@ -59,7 +59,6 @@ const formatDateTime = (dateString) => {
 };
 
 const generateShareLink = (sheetId) => {
-    // Costruisci sempre il link sulla repo giusta!
     const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
     const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
     navigator.clipboard.writeText(link)
