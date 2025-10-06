@@ -318,35 +318,32 @@ const generateShareLink = (sheetId) => {
         setLoading(false);
     };
 
-    const completeSheet = async () => {
-        if (!currentSheet.firmaResponsabile) {
-            showToast('❌ Firma del responsabile mancante', 'error');
-            return;
-        }
-        
-        if (!currentSheet.lavoratori || currentSheet.lavoratori.length === 0) {
-            showToast('❌ Nessun lavoratore registrato', 'error');
-            return;
-        }
+const completeSheet = async () => {
+    if (!currentSheet.firmaResponsabile) {
+        showToast('❌ Firma del responsabile mancante', 'error');
+        return;
+    }
+    if (!currentSheet.lavoratori || currentSheet.lavoratori.length === 0) {
+        showToast('❌ Nessun lavoratore registrato', 'error');
+        return;
+    }
+    setLoading(true);
+    try {
+        await onComplete(currentSheet);
+        // AGGIUNGI QUI:
+        await generatePDF(currentSheet, companyLogo);
 
-        setLoading(true);
-        try {
-            await onComplete(currentSheet);
-            
-            // PDF generation fallback
-            showToast('✅ Foglio completato!', 'success');
-            
-            if (addAuditLog) {
-                await addAuditLog('SHEET_COMPLETE', `Completato: ${currentSheet.titoloAzienda}`);
-            }
-            
-            setTimeout(() => onBack(), 1500);
-        } catch (error) {
-            console.error(error);
-            showToast('❌ Errore completamento', 'error');
+        showToast('✅ Foglio completato!', 'success');
+        if (addAuditLog) {
+            await addAuditLog('SHEET_COMPLETE', `Completato: ${currentSheet.titoloAzienda}`);
         }
-        setLoading(false);
-    };
+        setTimeout(() => onBack(), 1500);
+    } catch (error) {
+        console.error(error);
+        showToast('❌ Errore completamento', 'error');
+    }
+    setLoading(false);
+};
 
     const checkWorkerBlacklist = (worker) => {
         return checkBlacklist(worker, blacklist);
