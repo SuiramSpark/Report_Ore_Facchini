@@ -70,32 +70,43 @@ const generateShareLink = (sheetId) => {
         });
 };
 
-// Initialize Canvas for Signature
+// Initialize Canvas for Signature - VERSIONE CORRETTA
 const initCanvas = (canvas, darkMode = false) => {
-    if (!canvas) return;
+    if (!canvas) return () => {};
     
     const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = darkMode ? '#fff' : '#000';
+    ctx.strokeStyle = darkMode ? '#ffffff' : '#000000';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    let drawing = false;
+    let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
 
     const getCoordinates = (e) => {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        let clientX, clientY;
+        
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+        
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
+        
         return { x, y };
     };
 
     const startDrawing = (e) => {
-        drawing = true;
+        isDrawing = true;
         const { x, y } = getCoordinates(e);
         lastX = x;
         lastY = y;
@@ -105,17 +116,27 @@ const initCanvas = (canvas, darkMode = false) => {
     };
 
     const draw = (e) => {
-        if (!drawing) return;
+        if (!isDrawing) return;
+        
         const { x, y } = getCoordinates(e);
+        
         ctx.lineTo(x, y);
         ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
         lastX = x;
         lastY = y;
+        
         e.preventDefault();
     };
 
-    const stopDrawing = () => {
-        drawing = false;
+    const stopDrawing = (e) => {
+        if (isDrawing) {
+            isDrawing = false;
+            ctx.beginPath();
+        }
+        if (e) e.preventDefault();
     };
 
     // Mouse events
@@ -128,7 +149,9 @@ const initCanvas = (canvas, darkMode = false) => {
     canvas.addEventListener('touchstart', startDrawing);
     canvas.addEventListener('touchmove', draw);
     canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchcancel', stopDrawing);
     
+    // Return cleanup function
     return () => {
         canvas.removeEventListener('mousedown', startDrawing);
         canvas.removeEventListener('mousemove', draw);
@@ -137,6 +160,7 @@ const initCanvas = (canvas, darkMode = false) => {
         canvas.removeEventListener('touchstart', startDrawing);
         canvas.removeEventListener('touchmove', draw);
         canvas.removeEventListener('touchend', stopDrawing);
+        canvas.removeEventListener('touchcancel', stopDrawing);
     };
 };
 
