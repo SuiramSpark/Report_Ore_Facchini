@@ -44,18 +44,28 @@ body {
     min-width: 250px;
 }
 
-/* Canvas Firma */
+/* Canvas Firma - VERSIONE CORRETTA */
 canvas {
     border: 2px dashed #cbd5e1;
     border-radius: 8px;
     cursor: crosshair;
     touch-action: none;
     background: white;
+    display: block;
+    position: relative;
+    z-index: 10;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
 }
 
 canvas.dark-mode {
     background: #374151;
     border-color: #4b5563;
+}
+
+canvas:active {
+    cursor: crosshair;
 }
 
 /* Touch-friendly buttons */
