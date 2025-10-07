@@ -2,8 +2,16 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro Ore Lavoratori - Completo</title>
+    
+    <!-- META TAGS MOBILE OTTIMIZZATI -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="description" content="Sistema di gestione registro ore lavoratori">
+    
+    <title>Registro Ore Lavoratori</title>
     
     <!-- React & Firebase -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -19,8 +27,24 @@
     
     <!-- CSS Custom -->
     <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Tailwind Config per Mobile -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontSize: {
+                        'mobile-xs': '13px',
+                        'mobile-sm': '14px',
+                        'mobile-base': '15px',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
+<body class="antialiased">
     <div id="root"></div>
     <div id="toast-container"></div>
 
