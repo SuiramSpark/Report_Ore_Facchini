@@ -1,4 +1,4 @@
-// Audit Log Component - MOBILE OTTIMIZZATO + SVUOTA REGISTRO
+// Audit Log Component - 5 LINGUE COMPLETE
 const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
     const [filter, setFilter] = React.useState('all');
     const [clearing, setClearing] = React.useState(false);
@@ -22,11 +22,11 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
     // Clear audit log
     const clearAuditLog = async () => {
         if (!db) {
-            showToast('❌ Database non connesso', 'error');
+            showToast(`❌ ${t.dbNotConnected}`, 'error');
             return;
         }
 
-        if (!confirm('⚠️ Sei sicuro di voler cancellare TUTTO il registro modifiche? Questa azione è irreversibile!')) {
+        if (!confirm(`⚠️ ${t.confirmClear}`)) {
             return;
         }
 
@@ -41,10 +41,10 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
             });
 
             await batch.commit();
-            showToast('✅ Registro modifiche svuotato!', 'success');
+            showToast(`✅ ${t.registryCleared}`, 'success');
         } catch (error) {
             console.error('Errore:', error);
-            showToast('❌ Errore durante la cancellazione', 'error');
+            showToast(`❌ ${t.errorClearing}`, 'error');
         }
 
         setClearing(false);
@@ -78,7 +78,7 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
             <div className="mb-4 sm:mb-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-2">📝 {t.auditLog}</h2>
                 <p className={`${textClass} text-sm sm:text-base`}>
-                    {filteredLogs.length} {filteredLogs.length === 1 ? 'modifica' : 'modifiche'}
+                    {filteredLogs.length} {filteredLogs.length === 1 ? t.modifications : t.modificationsPlural}
                 </p>
             </div>
 
@@ -96,7 +96,7 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                                 : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
-                        📋 Tutti
+                        📋 {t.all}
                     </button>
                     <button
                         onClick={() => setFilter('create')}
@@ -108,7 +108,7 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                                 : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
-                        ➕ Aggiunte
+                        ➕ {t.additions}
                     </button>
                     <button
                         onClick={() => setFilter('edit')}
@@ -120,7 +120,7 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                                 : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
-                        ✏️ Modifiche
+                        ✏️ {t.edits}
                     </button>
                     <button
                         onClick={() => setFilter('delete')}
@@ -132,7 +132,7 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                                 : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
-                        🗑️ Elimina
+                        🗑️ {t.deletions}
                     </button>
                 </div>
 
@@ -142,7 +142,7 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                     disabled={clearing || auditLog.length === 0}
                     className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
-                    {clearing ? '⏳ Cancellazione...' : '🗑️ Svuota Registro'}
+                    {clearing ? `⏳ ${t.clearing}` : `🗑️ ${t.clearRegistry}`}
                 </button>
             </div>
 
@@ -187,8 +187,8 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                 <div className="text-center py-8 sm:py-12">
                     <p className={`${textClass} text-base sm:text-lg`}>
                         {filter === 'all' 
-                            ? 'Nessuna modifica registrata' 
-                            : 'Nessuna modifica trovata per questo filtro'}
+                            ? t.noModifications
+                            : t.noModificationsFilter}
                     </p>
                 </div>
             )}
