@@ -1,4 +1,4 @@
-// Main App Component
+// Main App Component - MOBILE OTTIMIZZATO
 const App = () => {
     const { useState, useEffect, useCallback, useMemo } = React;
     
@@ -262,7 +262,6 @@ const App = () => {
 
     const t = translations[language];
     const bgClass = darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 to-indigo-100';
-    const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
 
     // Loading state
     if (loading) {
@@ -281,128 +280,172 @@ const App = () => {
     // Admin Mode
     return (
         <div className={`min-h-screen ${bgClass}`}>
-            {/* Header */}
+            {/* Header - MOBILE OTTIMIZZATO */}
             <header className="bg-indigo-600 text-white shadow-lg sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-4 py-4">
+                <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
+                        {/* Logo e Titolo */}
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink">
                             {companyLogo && (
-                                <img src={companyLogo} alt="Logo" className="h-10 w-10 object-contain" />
+                                <img 
+                                    src={companyLogo} 
+                                    alt="Logo" 
+                                    className="h-7 w-7 sm:h-10 sm:w-10 object-contain flex-shrink-0" 
+                                />
                             )}
-                            <h1 className="text-2xl font-bold">{t.administrator}</h1>
+                            <h1 className="text-base sm:text-2xl font-bold truncate">
+                                {t.administrator}
+                            </h1>
                         </div>
                         
-                        {/* Desktop Navigation */}
-                        <nav className="hidden md:flex items-center gap-4">
+                        {/* Desktop Navigation - NASCOSTO SU MOBILE */}
+                        <nav className="hidden md:flex items-center gap-3">
                             <button
                                 onClick={() => setCurrentView('dashboard')}
-                                className={`px-4 py-2 rounded-lg transition-colors ${
-                                    currentView === 'dashboard' ? 'bg-white text-indigo-600 font-semibold' : 'hover:bg-indigo-700'
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'dashboard' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
                                 }`}
                             >
                                 📊 {t.dashboard}
                             </button>
                             <button
                                 onClick={() => setCurrentView('list')}
-                                className={`px-4 py-2 rounded-lg transition-colors ${
-                                    currentView === 'list' ? 'bg-white text-indigo-600 font-semibold' : 'hover:bg-indigo-700'
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'list' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
                                 }`}
                             >
                                 📋 Fogli
                             </button>
                             <button
                                 onClick={() => setCurrentView('blacklist')}
-                                className={`px-4 py-2 rounded-lg transition-colors ${
-                                    currentView === 'blacklist' ? 'bg-white text-indigo-600 font-semibold' : 'hover:bg-indigo-700'
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'blacklist' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
                                 }`}
                             >
                                 🚫 {t.blacklist}
                             </button>
                             <button
                                 onClick={() => setCurrentView('audit')}
-                                className={`px-4 py-2 rounded-lg transition-colors ${
-                                    currentView === 'audit' ? 'bg-white text-indigo-600 font-semibold' : 'hover:bg-indigo-700'
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'audit' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
                                 }`}
                             >
                                 📝 {t.auditLog}
                             </button>
                             <button
                                 onClick={() => setCurrentView('reports')}
-                                className={`px-4 py-2 rounded-lg transition-colors ${
-                                    currentView === 'reports' ? 'bg-white text-indigo-600 font-semibold' : 'hover:bg-indigo-700'
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'reports' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
                                 }`}
                             >
                                 📈 {t.reports}
                             </button>
                         </nav>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-2">
+                        {/* Actions - COMPATTE SU MOBILE */}
+                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                             {/* Language Selector */}
                             <select
                                 value={language}
                                 onChange={(e) => setLanguage(e.target.value)}
-                                className="px-3 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white"
+                                className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-sm"
                             >
-                                <option value="it">🇮🇹 IT</option>
-                                <option value="en">🇬🇧 EN</option>
-                                <option value="es">🇪🇸 ES</option>
+                                <option value="it">🇮🇹</option>
+                                <option value="en">🇬🇧</option>
+                                <option value="es">🇪🇸</option>
                             </select>
 
                             {/* Dark Mode Toggle */}
                             <button
                                 onClick={() => setDarkMode(!darkMode)}
-                                className="px-3 py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors"
+                                className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors"
+                                title={darkMode ? 'Light Mode' : 'Dark Mode'}
                             >
                                 {darkMode ? '☀️' : '🌙'}
                             </button>
 
                             {/* Logo Upload */}
-                            <label className="px-3 py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 cursor-pointer transition-colors">
+                            <label className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 cursor-pointer transition-colors" title="Carica Logo">
                                 🖼️
-                                <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleLogoUpload} 
+                                    className="hidden" 
+                                />
                             </label>
 
-                            {/* Mobile Menu Toggle */}
+                            {/* Mobile Menu Toggle - SOLO SU MOBILE */}
                             <button
                                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className="md:hidden px-3 py-2 rounded-lg bg-white bg-opacity-20"
+                                className="md:hidden px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors font-bold"
+                                aria-label="Menu"
                             >
-                                ☰
+                                {mobileMenuOpen ? '✕' : '☰'}
                             </button>
                         </div>
                     </div>
 
-                    {/* Mobile Navigation */}
+                    {/* Mobile Navigation - SI APRE SOTTO */}
                     {mobileMenuOpen && (
-                        <nav className="md:hidden mt-4 flex flex-col gap-2">
+                        <nav className="md:hidden mt-3 flex flex-col gap-2">
                             <button
                                 onClick={() => { setCurrentView('dashboard'); setMobileMenuOpen(false); }}
-                                className={`text-left px-4 py-2 rounded-lg ${currentView === 'dashboard' ? 'bg-white text-indigo-600' : 'hover:bg-indigo-700'}`}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'dashboard' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
                             >
                                 📊 {t.dashboard}
                             </button>
                             <button
                                 onClick={() => { setCurrentView('list'); setMobileMenuOpen(false); }}
-                                className={`text-left px-4 py-2 rounded-lg ${currentView === 'list' ? 'bg-white text-indigo-600' : 'hover:bg-indigo-700'}`}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'list' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
                             >
-                                📋 Fogli
+                                📋 Fogli Ore
                             </button>
                             <button
                                 onClick={() => { setCurrentView('blacklist'); setMobileMenuOpen(false); }}
-                                className={`text-left px-4 py-2 rounded-lg ${currentView === 'blacklist' ? 'bg-white text-indigo-600' : 'hover:bg-indigo-700'}`}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'blacklist' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
                             >
                                 🚫 {t.blacklist}
                             </button>
                             <button
                                 onClick={() => { setCurrentView('audit'); setMobileMenuOpen(false); }}
-                                className={`text-left px-4 py-2 rounded-lg ${currentView === 'audit' ? 'bg-white text-indigo-600' : 'hover:bg-indigo-700'}`}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'audit' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
                             >
                                 📝 {t.auditLog}
                             </button>
                             <button
                                 onClick={() => { setCurrentView('reports'); setMobileMenuOpen(false); }}
-                                className={`text-left px-4 py-2 rounded-lg ${currentView === 'reports' ? 'bg-white text-indigo-600' : 'hover:bg-indigo-700'}`}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'reports' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
                             >
                                 📈 {t.reports}
                             </button>
@@ -412,7 +455,7 @@ const App = () => {
             </header>
 
             {/* Main Content */}
-            <main className="p-4 md:p-6 max-w-7xl mx-auto">
+            <main className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
                 {currentView === 'dashboard' && (
                     <Dashboard sheets={sheets} darkMode={darkMode} language={language} />
                 )}
@@ -421,7 +464,7 @@ const App = () => {
                     <div>
                         <button
                             onClick={createNewSheet}
-                            className="w-full mb-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg transition-colors"
+                            className="w-full mb-4 sm:mb-6 py-3 sm:py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-base sm:text-lg transition-colors touch-button"
                         >
                             ➕ Crea Nuovo Foglio Ore
                         </button>
