@@ -1,4 +1,4 @@
-// Sheet Editor Component - COMPLETO E FUNZIONANTE
+// Sheet Editor Component - VERSIONE COMPLETA 5 LINGUE
 const SheetEditor = ({ 
     sheet, 
     onSave, 
@@ -28,14 +28,12 @@ const SheetEditor = ({
         'bg-gray-700 border-gray-600 text-white' : 
         'bg-white border-gray-300 text-gray-900';
 
-    // FUNZIONI HELPER LOCALI - PER EVITARE DIPENDENZE
-    const showToast = (message, type = 'info') => {
-        console.log(`${type}: ${message}`);
-        // Fallback semplice per toast
+    // FUNZIONI HELPER LOCALI
+    const showToastLocal = (message, type = 'info') => {
         if (typeof window.showToast === 'function') {
             window.showToast(message, type);
         } else {
-            alert(message);
+            console.log(`${type}: ${message}`);
         }
     };
 
@@ -54,29 +52,28 @@ const SheetEditor = ({
         return hours;
     };
 
-    const checkBlacklist = (worker, blacklist) => {
+    const checkWorkerBlacklist = (worker) => {
         return blacklist.find(bl => 
-            bl.nome === worker.nome && 
-            bl.cognome === worker.cognome
+            (bl.codiceFiscale && worker.codiceFiscale && bl.codiceFiscale === worker.codiceFiscale) ||
+            (bl.numeroIdentita && worker.numeroIdentita && bl.numeroIdentita === worker.numeroIdentita) ||
+            (bl.nome === worker.nome && bl.cognome === worker.cognome)
         ) || false;
     };
 
-const generateShareLink = (sheetId) => {
-    const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
-    const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
-    navigator.clipboard.writeText(link)
-        .then(() => {
-            showToast('✅ Link copiato negli appunti!', 'success');
-        })
-        .catch(() => {
-            prompt('Copia questo link:', link);
-        });
-};
+    const generateShareLink = (sheetId) => {
+        const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
+        const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
+        navigator.clipboard.writeText(link)
+            .then(() => {
+                showToastLocal(`✅ ${t.linkCopied}`, 'success');
+            })
+            .catch(() => {
+                prompt(`${t.generateLink}:`, link);
+            });
+    };
 
     // Initialize canvas responsabile
     React.useEffect(() => {
-        console.log('🔄 SheetEditor: Inizializzo canvas responsabile...');
-        
         const initCanvas = (canvas) => {
             if (!canvas) return;
             
@@ -174,7 +171,7 @@ const generateShareLink = (sheetId) => {
         if (respCanvasRef.current) {
             initCanvas(respCanvasRef.current);
             
-            // Salva le funzioni nel ref per usarle dopo
+            // Salva le funzioni nel ref
             respCanvasRef.current.clearCanvas = () => clearCanvas(respCanvasRef.current);
             respCanvasRef.current.isCanvasBlank = () => isCanvasBlank(respCanvasRef.current);
         }
@@ -182,7 +179,7 @@ const generateShareLink = (sheetId) => {
 
     const saveSheet = async () => {
         if (!currentSheet.titoloAzienda || !currentSheet.responsabile) {
-            showToast('❌ Compila almeno azienda e responsabile', 'error');
+            showToastLocal(`❌ ${t.fillRequired}`, 'error');
             return;
         }
 
@@ -190,12 +187,12 @@ const generateShareLink = (sheetId) => {
         try {
             await onSave(currentSheet);
             if (addAuditLog) {
-                await addAuditLog('SHEET_EDIT', `Modificato: ${currentSheet.titoloAzienda}`);
+                await addAuditLog('SHEET_EDIT', `${t.edit}: ${currentSheet.titoloAzienda}`);
             }
-            showToast('✅ Foglio salvato!', 'success');
+            showToastLocal(`✅ ${t.sheetSaved}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore salvataggio', 'error');
+            showToastLocal(`❌ ${t.errorSaving}`, 'error');
         }
         setLoading(false);
     };
@@ -204,7 +201,7 @@ const generateShareLink = (sheetId) => {
         if (!respCanvasRef.current) return;
         
         if (respCanvasRef.current.isCanvasBlank && respCanvasRef.current.isCanvasBlank()) {
-            showToast('❌ Firma prima di salvare', 'error');
+            showToastLocal(`❌ ${t.signBeforeSend}`, 'error');
             return;
         }
 
@@ -219,19 +216,19 @@ const generateShareLink = (sheetId) => {
             setCurrentSheet(prev => ({ ...prev, firmaResponsabile: firma }));
             
             if (addAuditLog) {
-                await addAuditLog('SIGNATURE_ADD', `Firma responsabile: ${currentSheet.responsabile}`);
+                await addAuditLog('SIGNATURE_ADD', `${t.responsibleSignature}: ${currentSheet.responsabile}`);
             }
             
-            showToast('✅ Firma salvata!', 'success');
+            showToastLocal(`✅ ${t.signatureSaved}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore salvataggio firma', 'error');
+            showToastLocal(`❌ ${t.errorSaving}`, 'error');
         }
         setLoading(false);
     };
 
     const deleteWorker = async (workerId) => {
-        if (!confirm('Eliminare questo lavoratore?')) return;
+        if (!confirm(`${t.confirm}?`)) return;
         
         setLoading(true);
         const worker = currentSheet.lavoratori.find(w => w.id === workerId);
@@ -245,13 +242,13 @@ const generateShareLink = (sheetId) => {
             setCurrentSheet(prev => ({ ...prev, lavoratori: updatedLavoratori }));
             
             if (addAuditLog) {
-                await addAuditLog('WORKER_DELETE', `Eliminato: ${worker.nome} ${worker.cognome}`);
+                await addAuditLog('WORKER_DELETE', `${t.delete}: ${worker.nome} ${worker.cognome}`);
             }
             
-            showToast('✅ Lavoratore eliminato', 'success');
+            showToastLocal(`✅ ${t.workerDeleted}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore eliminazione', 'error');
+            showToastLocal(`❌ ${t.errorDeleting}`, 'error');
         }
         setLoading(false);
     };
@@ -259,7 +256,11 @@ const generateShareLink = (sheetId) => {
     const updateWorker = async (workerId, updatedData) => {
         setLoading(true);
         const updatedLavoratori = currentSheet.lavoratori.map(w => 
-            w.id === workerId ? { ...w, ...updatedData, oreTotali: calculateHours(updatedData.oraIn, updatedData.oraOut, updatedData.pausaMinuti) } : w
+            w.id === workerId ? { 
+                ...w, 
+                ...updatedData, 
+                oreTotali: calculateHours(updatedData.oraIn, updatedData.oraOut, updatedData.pausaMinuti) 
+            } : w
         );
         
         try {
@@ -271,20 +272,20 @@ const generateShareLink = (sheetId) => {
             setEditingWorker(null);
             
             if (addAuditLog) {
-                await addAuditLog('WORKER_EDIT', `Modificato: ${updatedData.nome} ${updatedData.cognome}`);
+                await addAuditLog('WORKER_EDIT', `${t.edit}: ${updatedData.nome} ${updatedData.cognome}`);
             }
             
-            showToast('✅ Lavoratore aggiornato', 'success');
+            showToastLocal(`✅ ${t.workerUpdated}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore aggiornamento', 'error');
+            showToastLocal(`❌ ${t.errorSaving}`, 'error');
         }
         setLoading(false);
     };
 
     const bulkUpdateWorkers = async () => {
         if (selectedWorkers.length === 0) {
-            showToast('❌ Seleziona almeno un lavoratore', 'error');
+            showToastLocal(`❌ ${t.fillRequired}`, 'error');
             return;
         }
         
@@ -307,46 +308,44 @@ const generateShareLink = (sheetId) => {
             setBulkEditMode(false);
             
             if (addAuditLog) {
-                await addAuditLog('BULK_UPDATE', `${selectedWorkers.length} lavoratori modificati`);
+                await addAuditLog('BULK_UPDATE', `${selectedWorkers.length} ${t.workers.toLowerCase()}`);
             }
             
-            showToast(`✅ ${selectedWorkers.length} lavoratori aggiornati`, 'success');
+            showToastLocal(`✅ ${selectedWorkers.length} ${t.workerUpdated}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore aggiornamento multiplo', 'error');
+            showToastLocal(`❌ ${t.errorSaving}`, 'error');
         }
         setLoading(false);
     };
 
-const completeSheet = async () => {
-    if (!currentSheet.firmaResponsabile) {
-        showToast('❌ Firma del responsabile mancante', 'error');
-        return;
-    }
-    if (!currentSheet.lavoratori || currentSheet.lavoratori.length === 0) {
-        showToast('❌ Nessun lavoratore registrato', 'error');
-        return;
-    }
-    setLoading(true);
-    try {
-        await onComplete(currentSheet);
-        // AGGIUNGI QUI:
-        await generatePDF(currentSheet, companyLogo);
-
-        showToast('✅ Foglio completato!', 'success');
-        if (addAuditLog) {
-            await addAuditLog('SHEET_COMPLETE', `Completato: ${currentSheet.titoloAzienda}`);
+    const completeSheet = async () => {
+        if (!currentSheet.firmaResponsabile) {
+            showToastLocal(`❌ ${t.signatureMissing}`, 'error');
+            return;
         }
-        setTimeout(() => onBack(), 1500);
-    } catch (error) {
-        console.error(error);
-        showToast('❌ Errore completamento', 'error');
-    }
-    setLoading(false);
-};
-
-    const checkWorkerBlacklist = (worker) => {
-        return checkBlacklist(worker, blacklist);
+        if (!currentSheet.lavoratori || currentSheet.lavoratori.length === 0) {
+            showToastLocal(`❌ ${t.noWorkers}`, 'error');
+            return;
+        }
+        
+        setLoading(true);
+        try {
+            await onComplete(currentSheet);
+            await generatePDF(currentSheet, companyLogo);
+            
+            showToastLocal(`✅ ${t.sheetCompleted}`, 'success');
+            
+            if (addAuditLog) {
+                await addAuditLog('SHEET_COMPLETE', `${t.completed}: ${currentSheet.titoloAzienda}`);
+            }
+            
+            setTimeout(() => onBack(), 1500);
+        } catch (error) {
+            console.error(error);
+            showToastLocal(`❌ ${t.error}`, 'error');
+        }
+        setLoading(false);
     };
 
     const toggleWorkerSelection = (workerId) => {
@@ -360,347 +359,359 @@ const completeSheet = async () => {
     const clearSignature = () => {
         if (respCanvasRef.current && respCanvasRef.current.clearCanvas) {
             respCanvasRef.current.clearCanvas();
-            showToast('🗑️ Firma cancellata', 'success');
+            showToastLocal(`🗑️ ${t.signatureCleared}`, 'success');
         }
     };
 
     return (
-        <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'} p-4`}>
-            <div className="max-w-6xl mx-auto">
-                <div className={`${cardClass} rounded-xl shadow-lg p-6 mb-6`}>
-                    {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-2xl font-bold">✏️ Gestione Foglio Ore</h1>
-                        <button
-                            onClick={onBack}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold"
-                        >
-                            ← Indietro
-                        </button>
-                    </div>
-
-                    {/* Sheet Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        <input
-                            type="text"
-                            placeholder="Azienda Cliente *"
-                            value={currentSheet.titoloAzienda}
-                            onChange={(e) => setCurrentSheet({...currentSheet, titoloAzienda: e.target.value})}
-                            className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                        />
-                        <input
-                            type="date"
-                            value={currentSheet.data}
-                            onChange={(e) => setCurrentSheet({...currentSheet, data: e.target.value})}
-                            className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Responsabile *"
-                            value={currentSheet.responsabile}
-                            onChange={(e) => setCurrentSheet({...currentSheet, responsabile: e.target.value})}
-                            className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Località"
-                            value={currentSheet.location || ''}
-                            onChange={(e) => setCurrentSheet({...currentSheet, location: e.target.value})}
-                            className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                        />
-                    </div>
-
-                    <textarea
-                        placeholder="Note (opzionale)"
-                        value={currentSheet.note || ''}
-                        onChange={(e) => setCurrentSheet({...currentSheet, note: e.target.value})}
-                        className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 mb-4`}
-                        rows="3"
-                    />
-
-                    {/* Workers Section */}
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold">
-                                👷 Lavoratori Registrati ({currentSheet.lavoratori?.length || 0})
-                            </h3>
-                            
-                            {currentSheet.lavoratori?.length > 0 && (
-                                <button
-                                    onClick={() => setBulkEditMode(!bulkEditMode)}
-                                    className={`px-4 py-2 rounded-lg font-semibold ${
-                                        bulkEditMode 
-                                            ? 'bg-indigo-600 text-white' 
-                                            : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                                    }`}
-                                >
-                                    {bulkEditMode ? '✓ Modifica Multipla' : '📝 Modifica Multipla'}
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Bulk Edit Mode */}
-                        {bulkEditMode && (
-                            <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50'}`}>
-                                <div className="flex gap-2 mb-3">
-                                    <button
-                                        onClick={() => setSelectedWorkers(currentSheet.lavoratori.map(w => w.id))}
-                                        className="px-3 py-1 bg-green-600 text-white rounded text-sm"
-                                    >
-                                        ✓ Seleziona Tutti
-                                    </button>
-                                    <button
-                                        onClick={() => setSelectedWorkers([])}
-                                        className="px-3 py-1 bg-gray-600 text-white rounded text-sm"
-                                    >
-                                        ✗ Deseleziona Tutti
-                                    </button>
-                                    <span className={textClass}>
-                                        {selectedWorkers.length} selezionati
-                                    </span>
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                    <input
-                                        type="number"
-                                        placeholder="Pausa (minuti)"
-                                        value={bulkEditData.pausaMinuti}
-                                        onChange={(e) => setBulkEditData({...bulkEditData, pausaMinuti: e.target.value})}
-                                        className={`flex-1 px-4 py-2 rounded-lg border ${inputClass}`}
-                                    />
-                                    <button
-                                        onClick={bulkUpdateWorkers}
-                                        disabled={selectedWorkers.length === 0}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-400"
-                                    >
-                                        Aggiorna Tutti
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Workers List */}
-                        {currentSheet.lavoratori?.length > 0 ? (
-                            <div className="space-y-3">
-                                {currentSheet.lavoratori.map((worker, i) => {
-                                    const isInBlacklist = checkWorkerBlacklist(worker);
-                                    const isSelected = selectedWorkers.includes(worker.id);
-                                    const isEditing = editingWorker?.id === worker.id;
-                                    
-                                    return (
-                                        <div 
-                                            key={worker.id || i} 
-                                            className={`p-4 rounded-lg border-2 ${
-                                                isInBlacklist 
-                                                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
-                                                    : darkMode ? 'border-gray-700' : 'border-gray-200'
-                                            } ${isSelected ? 'ring-2 ring-indigo-500' : ''}`}
-                                        >
-                                            {isEditing ? (
-                                                <div className="space-y-3">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={editingWorker.nome}
-                                                            onChange={(e) => setEditingWorker({...editingWorker, nome: e.target.value})}
-                                                            className={`px-3 py-2 rounded border ${inputClass}`}
-                                                            placeholder="Nome"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={editingWorker.cognome}
-                                                            onChange={(e) => setEditingWorker({...editingWorker, cognome: e.target.value})}
-                                                            className={`px-3 py-2 rounded border ${inputClass}`}
-                                                            placeholder="Cognome"
-                                                        />
-                                                        <input
-                                                            type="time"
-                                                            value={editingWorker.oraIn}
-                                                            onChange={(e) => setEditingWorker({...editingWorker, oraIn: e.target.value})}
-                                                            className={`px-3 py-2 rounded border ${inputClass}`}
-                                                        />
-                                                        <input
-                                                            type="time"
-                                                            value={editingWorker.oraOut}
-                                                            onChange={(e) => setEditingWorker({...editingWorker, oraOut: e.target.value})}
-                                                            className={`px-3 py-2 rounded border ${inputClass}`}
-                                                        />
-                                                        <input
-                                                            type="number"
-                                                            value={editingWorker.pausaMinuti}
-                                                            onChange={(e) => setEditingWorker({...editingWorker, pausaMinuti: e.target.value})}
-                                                            className={`px-3 py-2 rounded border ${inputClass}`}
-                                                            placeholder="Pausa (min)"
-                                                        />
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => updateWorker(worker.id, editingWorker)}
-                                                            className="px-4 py-2 bg-green-600 text-white rounded"
-                                                        >
-                                                            ✓ Salva
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setEditingWorker(null)}
-                                                            className="px-4 py-2 bg-gray-600 text-white rounded"
-                                                        >
-                                                            ✗ Annulla
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-start gap-4">
-                                                    {bulkEditMode && (
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => toggleWorkerSelection(worker.id)}
-                                                            className="mt-1 w-5 h-5"
-                                                        />
-                                                    )}
-                                                    
-                                                    <div className="flex-1">
-                                                        {isInBlacklist && (
-                                                            <div className="bg-red-600 text-white px-3 py-1 rounded-lg mb-2 text-sm font-semibold">
-                                                                ⚠️ LAVORATORE IN BLACKLIST
-                                                                <p className="text-xs mt-1">Motivo: {isInBlacklist.reason}</p>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        <p className="font-semibold text-lg">
-                                                            {i + 1}. {worker.nome} {worker.cognome}
-                                                        </p>
-                                                        <div className={`text-sm ${textClass} mt-1`}>
-                                                            <p>🕐 {worker.oraIn} - {worker.oraOut}</p>
-                                                            <p>⏸️ Pausa: {worker.pausaMinuti || 0} min</p>
-                                                            <p className="font-semibold">⏱️ Totale: {worker.oreTotali}h</p>
-                                                        </div>
-                                                        {worker.firma && (
-                                                            <img src={worker.firma} alt="Firma" className="mt-2 h-12 border rounded bg-white" />
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div className="flex gap-2 mobile-buttons">
-                                                        <button
-                                                            onClick={() => setEditingWorker(worker)}
-                                                            className="px-3 py-2 bg-blue-600 text-white rounded touch-button"
-                                                        >
-                                                            ✏️
-                                                        </button>
-                                                        {!isInBlacklist && addToBlacklist && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    const reason = prompt('Motivo blacklist:');
-                                                                    if (reason) addToBlacklist(worker, reason);
-                                                                }}
-                                                                className="px-3 py-2 bg-orange-600 text-white rounded touch-button"
-                                                            >
-                                                                🚫
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => deleteWorker(worker.id)}
-                                                            className="px-3 py-2 bg-red-600 text-white rounded touch-button"
-                                                        >
-                                                            🗑️
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <p className={`text-center py-8 ${textClass}`}>
-                                Nessun lavoratore ancora registrato
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Firma Responsabile */}
-                    <div className="mb-6">
-                        <h3 className="text-xl font-bold mb-4">✍️ Firma Responsabile</h3>
-                        
-                        {currentSheet.firmaResponsabile ? (
-                            <div>
-                                <img 
-                                    src={currentSheet.firmaResponsabile} 
-                                    alt="Firma Responsabile" 
-                                    className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white max-w-md" 
-                                />
-                                <button
-                                    onClick={() => {
-                                        if (confirm('Cancellare la firma?')) {
-                                            setCurrentSheet({...currentSheet, firmaResponsabile: null});
-                                        }
-                                    }}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                                >
-                                    🗑️ Cancella Firma
-                                </button>
-                            </div>
-                        ) : (
-                            <div>
-                                <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
-                                    <canvas 
-                                        ref={respCanvasRef} 
-                                        width={800} 
-                                        height={300} 
-                                        className="signature-canvas"
-                                        style={{ 
-                                            touchAction: 'none',
-                                            maxWidth: '100%',
-                                            aspectRatio: '8/3'
-                                        }}
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={saveResponsabileSignature}
-                                        disabled={loading}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
-                                    >
-                                        ✓ Salva Firma
-                                    </button>
-                                    <button
-                                        onClick={clearSignature}
-                                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                                    >
-                                        🗑️ Cancella
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-3 flex-wrap">
-                        <button
-                            onClick={saveSheet}
-                            disabled={loading}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-                        >
-                            💾 Salva Foglio
-                        </button>
-                        
-                        <button
-                            onClick={() => generateShareLink(currentSheet.id)}
-                            className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
-                        >
-                            🔗 Genera Link Lavoratori
-                        </button>
-                        
-                        <button
-                            onClick={completeSheet}
-                            disabled={!currentSheet.firmaResponsabile || loading}
-                            className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
-                        >
-                            ✅ Completa e Genera PDF
-                        </button>
-                    </div>
+        <div className="space-y-4 sm:space-y-6">
+            {/* Header */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h1 className="text-xl sm:text-2xl font-bold">✏️ {t.sheetManagement}</h1>
+                    <button
+                        onClick={onBack}
+                        className="w-full sm:w-auto px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                    >
+                        ← {t.back}
+                    </button>
                 </div>
             </div>
+
+            {/* Sheet Info */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+                    <input
+                        type="text"
+                        placeholder={`${t.company} *`}
+                        value={currentSheet.titoloAzienda}
+                        onChange={(e) => setCurrentSheet({...currentSheet, titoloAzienda: e.target.value})}
+                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                    />
+                    <input
+                        type="date"
+                        value={currentSheet.data}
+                        onChange={(e) => setCurrentSheet({...currentSheet, data: e.target.value})}
+                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                    />
+                    <input
+                        type="text"
+                        placeholder={`${t.responsible} *`}
+                        value={currentSheet.responsabile}
+                        onChange={(e) => setCurrentSheet({...currentSheet, responsabile: e.target.value})}
+                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                    />
+                    <input
+                        type="text"
+                        placeholder={t.location}
+                        value={currentSheet.location || ''}
+                        onChange={(e) => setCurrentSheet({...currentSheet, location: e.target.value})}
+                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                    />
+                </div>
+
+                <textarea
+                    placeholder={t.notes}
+                    value={currentSheet.note || ''}
+                    onChange={(e) => setCurrentSheet({...currentSheet, note: e.target.value})}
+                    className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 mb-4`}
+                    rows="3"
+                />
+
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <button
+                        onClick={saveSheet}
+                        disabled={loading}
+                        className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                    >
+                        {loading ? `⏳ ${t.loading}...` : `💾 ${t.saveSheet}`}
+                    </button>
+                    
+                    <button
+                        onClick={() => generateShareLink(currentSheet.id)}
+                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors text-sm sm:text-base"
+                    >
+                        🔗 {t.generateLink}
+                    </button>
+                </div>
+            </div>
+
+            {/* Workers Section */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <h3 className="text-lg sm:text-xl font-bold">
+                        👷 {t.workers} ({currentSheet.lavoratori?.length || 0})
+                    </h3>
+                    
+                    {currentSheet.lavoratori?.length > 0 && (
+                        <button
+                            onClick={() => setBulkEditMode(!bulkEditMode)}
+                            className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                                bulkEditMode 
+                                    ? 'bg-indigo-600 text-white' 
+                                    : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                            }`}
+                        >
+                            {bulkEditMode ? `✓ ${t.bulkEdit}` : `📝 ${t.bulkEdit}`}
+                        </button>
+                    )}
+                </div>
+
+                {/* Bulk Edit Panel */}
+                {bulkEditMode && (
+                    <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50'}`}>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            <button
+                                onClick={() => setSelectedWorkers(currentSheet.lavoratori.map(w => w.id))}
+                                className="px-3 py-1 bg-green-600 text-white rounded text-xs sm:text-sm font-semibold"
+                            >
+                                ✓ {t.selectAll}
+                            </button>
+                            <button
+                                onClick={() => setSelectedWorkers([])}
+                                className="px-3 py-1 bg-gray-600 text-white rounded text-xs sm:text-sm font-semibold"
+                            >
+                                ✗ {t.deselectAll}
+                            </button>
+                            <span className={`${textClass} text-xs sm:text-sm`}>
+                                {selectedWorkers.length} {t.selected}
+                            </span>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                                type="number"
+                                placeholder={t.break}
+                                value={bulkEditData.pausaMinuti}
+                                onChange={(e) => setBulkEditData({...bulkEditData, pausaMinuti: e.target.value})}
+                                className={`flex-1 px-4 py-2 rounded-lg border ${inputClass}`}
+                            />
+                            <button
+                                onClick={bulkUpdateWorkers}
+                                disabled={selectedWorkers.length === 0}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-400 text-sm sm:text-base"
+                            >
+                                {t.updateAll}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Workers List */}
+                {currentSheet.lavoratori?.length > 0 ? (
+                    <div className="space-y-3">
+                        {currentSheet.lavoratori.map((worker, i) => {
+                            const isInBlacklist = checkWorkerBlacklist(worker);
+                            const isSelected = selectedWorkers.includes(worker.id);
+                            const isEditing = editingWorker?.id === worker.id;
+                            
+                            return (
+                                <div 
+                                    key={worker.id || i} 
+                                    className={`p-3 sm:p-4 rounded-lg border-2 ${
+                                        isInBlacklist 
+                                            ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
+                                            : isSelected
+                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                                            : darkMode ? 'border-gray-700 bg-gray-700' : 'border-gray-200 bg-gray-50'
+                                    }`}
+                                >
+                                    {isEditing ? (
+                                        // EDIT MODE
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={editingWorker.nome}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, nome: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.name}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={editingWorker.cognome}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, cognome: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.surname}
+                                                />
+                                                <input
+                                                    type="time"
+                                                    value={editingWorker.oraIn}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, oraIn: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                />
+                                                <input
+                                                    type="time"
+                                                    value={editingWorker.oraOut}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, oraOut: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                />
+                                                <input
+                                                    type="number"
+                                                    value={editingWorker.pausaMinuti}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, pausaMinuti: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.break}
+                                                />
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <button
+                                                    onClick={() => updateWorker(worker.id, editingWorker)}
+                                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded font-semibold text-sm"
+                                                >
+                                                    ✓ {t.save}
+                                                </button>
+                                                <button
+                                                    onClick={() => setEditingWorker(null)}
+                                                    className="flex-1 px-4 py-2 bg-gray-600 text-white rounded font-semibold text-sm"
+                                                >
+                                                    ✗ {t.cancel}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // VIEW MODE
+                                        <div className="flex items-start gap-3">
+                                            {bulkEditMode && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleWorkerSelection(worker.id)}
+                                                    className="mt-1 w-5 h-5 flex-shrink-0"
+                                                />
+                                            )}
+                                            
+                                            <div className="flex-1 min-w-0">
+                                                {isInBlacklist && (
+                                                    <div className="bg-red-600 text-white px-3 py-2 rounded-lg mb-2 text-xs sm:text-sm font-semibold">
+                                                        ⚠️ {t.blacklistWarning}
+                                                        <p className="text-xs mt-1">{t.reason}: {isInBlacklist.reason}</p>
+                                                    </div>
+                                                )}
+                                                
+                                                <p className="font-semibold text-sm sm:text-base mb-1">
+                                                    {t.workerNumber} #{i + 1}: {worker.nome} {worker.cognome}
+                                                </p>
+                                                <div className={`text-xs sm:text-sm ${textClass} space-y-1`}>
+                                                    <p>🕐 {worker.oraIn} - {worker.oraOut}</p>
+                                                    <p>⏸️ {t.pause}: {worker.pausaMinuti || 0} {t.min}</p>
+                                                    <p className="font-semibold">⏱️ {t.total}: {worker.oreTotali}{t.hours_short}</p>
+                                                </div>
+                                                {worker.firma && (
+                                                    <img 
+                                                        src={worker.firma} 
+                                                        alt={t.signature} 
+                                                        className="mt-2 h-12 sm:h-16 border rounded bg-white" 
+                                                    />
+                                                )}
+                                            </div>
+                                            
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    onClick={() => setEditingWorker(worker)}
+                                                    className="px-3 py-2 bg-blue-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-blue-700"
+                                                >
+                                                    ✏️
+                                                </button>
+                                                {!isInBlacklist && addToBlacklist && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const reason = prompt(`${t.reason}:`);
+                                                            if (reason) addToBlacklist(worker, reason);
+                                                        }}
+                                                        className="px-3 py-2 bg-orange-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-orange-700"
+                                                    >
+                                                        🚫
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => deleteWorker(worker.id)}
+                                                    className="px-3 py-2 bg-red-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-red-700"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 sm:py-12">
+                        <p className="text-3xl sm:text-4xl mb-3">👷</p>
+                        <p className={`${textClass} text-sm sm:text-base`}>{t.noWorkers}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Firma Responsabile */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className="text-lg sm:text-xl font-bold mb-4">✍️ {t.responsibleSignature}</h3>
+                
+                {currentSheet.firmaResponsabile ? (
+                    <div>
+                        <img 
+                            src={currentSheet.firmaResponsabile} 
+                            alt={t.responsibleSignature}
+                            className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white max-w-md w-full" 
+                        />
+                        <button
+                            onClick={() => {
+                                if (confirm(`${t.confirm}?`)) {
+                                    setCurrentSheet({...currentSheet, firmaResponsabile: null});
+                                }
+                            }}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base"
+                        >
+                            🗑️ {t.deleteSignature}
+                        </button>
+                    </div>
+                ) : (
+                    <div>
+                        <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
+                            <canvas 
+                                ref={respCanvasRef} 
+                                width={800} 
+                                height={300} 
+                                className="signature-canvas"
+                                style={{ 
+                                    touchAction: 'none',
+                                    width: '100%',
+                                    height: 'auto',
+                                    maxHeight: '150px',
+                                    aspectRatio: '8/3',
+                                    display: 'block'
+                                }}
+                            />
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <button
+                                onClick={saveResponsabileSignature}
+                                disabled={loading}
+                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 text-sm sm:text-base"
+                            >
+                                ✓ {t.saveSignature}
+                            </button>
+                            <button
+                                onClick={clearSignature}
+                                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold text-sm sm:text-base"
+                            >
+                                🗑️ {t.clear}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Complete Button */}
+            <button
+                onClick={completeSheet}
+                disabled={!currentSheet.firmaResponsabile || loading}
+                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-base sm:text-lg transition-colors disabled:bg-gray-400 shadow-lg"
+            >
+                {loading ? `⏳ ${t.loading}...` : `✅ ${t.completePDF}`}
+            </button>
         </div>
     );
 };
