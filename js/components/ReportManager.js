@@ -1,292 +1,426 @@
-// Report Manager Component
+// Report Manager Component - 5 LINGUE COMPLETE
 const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
-    const t = translations[language];
     const [reportType, setReportType] = React.useState('weekly'); // weekly, monthly, custom
-    const [dateRange, setDateRange] = React.useState({
-        start: '',
-        end: ''
-    });
+    const [startDate, setStartDate] = React.useState('');
+    const [endDate, setEndDate] = React.useState('');
+    const [generating, setGenerating] = React.useState(false);
     
+    const t = translations[language];
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
     const inputClass = darkMode ? 
         'bg-gray-700 border-gray-600 text-white' : 
         'bg-white border-gray-300 text-gray-900';
 
-    const generateReport = () => {
-        let filteredSheets = [];
-        const now = new Date();
+    // Set default dates based on report type
+    React.useEffect(() => {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
         
         if (reportType === 'weekly') {
-            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            filteredSheets = sheets.filter(s => new Date(s.data) >= weekAgo);
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            setStartDate(weekAgo.toISOString().split('T')[0]);
+            setEndDate(todayStr);
         } else if (reportType === 'monthly') {
-            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            filteredSheets = sheets.filter(s => new Date(s.data) >= monthAgo);
-        } else if (reportType === 'custom' && dateRange.start && dateRange.end) {
-            const start = new Date(dateRange.start);
-            const end = new Date(dateRange.end);
-            filteredSheets = sheets.filter(s => {
-                const sheetDate = new Date(s.data);
-                return sheetDate >= start && sheetDate <= end;
-            });
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            setStartDate(monthAgo.toISOString().split('T')[0]);
+            setEndDate(todayStr);
         }
-        
-        if (filteredSheets.length === 0) {
-            showToast('❌ Nessun foglio nel periodo selezionato', 'error');
-            return;
-        }
-        
-        generateAggregateReport(filteredSheets, reportType);
-    };
+    }, [reportType]);
 
-    const generateAggregateReport = (filteredSheets, type) => {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+    // Filter sheets by date range
+    const filteredSheets = React.useMemo(() => {
+        if (!startDate || !endDate) return [];
         
-        // Header
-        doc.setFillColor(99, 102, 241);
-        doc.rect(0, 0, 210, 40, 'F');
-        
-        if (companyLogo) {
-            try {
-                doc.addImage(companyLogo, 'PNG', 10, 5, 30, 30);
-            } catch (e) {
-                console.error('Errore logo:', e);
-            }
-        }
-        
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(24);
-        doc.setFont(undefined, 'bold');
-        const title = type === 'weekly' ? 'REPORT SETTIMANALE' : 
-                     type === 'monthly' ? 'REPORT MENSILE' : 'REPORT PERSONALIZZATO';
-        doc.text(title, companyLogo ? 45 : 10, 25);
-        
-        // Period info
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'normal');
-        let y = 50;
-        
-        if (type === 'custom') {
-            doc.text(`Periodo: ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`, 10, y);
-        } else {
-            doc.text(`Periodo: ${type === 'weekly' ? 'Ultimi 7 giorni' : 'Ultimi 30 giorni'}`, 10, y);
-        }
-        doc.text(`Data generazione: ${formatDate(new Date().toISOString())}`, 10, y + 8);
-        
-        y += 25;
-        
-        // Summary statistics
-        let totalHours = 0;
-        let totalWorkers = 0;
-        const workerHours = {};
-        const companyHours = {};
-        
+        return sheets.filter(sheet => {
+            const sheetDate = new Date(sheet.data);
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999); // Include end date
+            
+            return sheetDate >= start && sheetDate <= end;
+        });
+    }, [sheets, startDate, endDate]);
+
+    // Calculate report statistics
+    const reportStats = React.useMemo(() => {
+        const stats = {
+            totalSheets: filteredSheets.length,
+            completedSheets: filteredSheets.filter(s => s.status === 'completed').length,
+            totalWorkers: 0,
+            totalHours: 0,
+            workerBreakdown: {},
+            companyBreakdown: {}
+        };
+
         filteredSheets.forEach(sheet => {
+            // Count workers
+            const workersCount = sheet.lavoratori?.length || 0;
+            stats.totalWorkers += workersCount;
+
+            // Calculate hours
             sheet.lavoratori?.forEach(worker => {
                 const hours = parseFloat(worker.oreTotali) || 0;
-                totalHours += hours;
-                totalWorkers++;
-                
-                const workerName = `${worker.nome} ${worker.cognome}`;
-                workerHours[workerName] = (workerHours[workerName] || 0) + hours;
-                
-                companyHours[sheet.titoloAzienda] = (companyHours[sheet.titoloAzienda] || 0) + hours;
+                stats.totalHours += hours;
+
+                // Worker breakdown
+                const workerKey = `${worker.nome} ${worker.cognome}`;
+                if (!stats.workerBreakdown[workerKey]) {
+                    stats.workerBreakdown[workerKey] = {
+                        name: workerKey,
+                        hours: 0,
+                        days: 0
+                    };
+                }
+                stats.workerBreakdown[workerKey].hours += hours;
+                stats.workerBreakdown[workerKey].days += 1;
+
+                // Company breakdown
+                const companyKey = sheet.titoloAzienda || t.company;
+                if (!stats.companyBreakdown[companyKey]) {
+                    stats.companyBreakdown[companyKey] = {
+                        name: companyKey,
+                        hours: 0,
+                        workers: new Set()
+                    };
+                }
+                stats.companyBreakdown[companyKey].hours += hours;
+                stats.companyBreakdown[companyKey].workers.add(workerKey);
             });
         });
-        
-        // Statistics box
-        doc.setFillColor(243, 244, 246);
-        doc.rect(10, y, 190, 35, 'F');
-        
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text('STATISTICHE PERIODO', 15, y + 10);
-        
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Fogli: ${filteredSheets.length}`, 15, y + 20);
-        doc.text(`Lavoratori: ${totalWorkers}`, 70, y + 20);
-        doc.text(`Ore Totali: ${totalHours.toFixed(1)}h`, 130, y + 20);
-        
-        y += 45;
-        
-        // Top workers table
-        doc.setFont(undefined, 'bold');
-        doc.text('TOP 10 LAVORATORI', 10, y);
-        y += 10;
-        
-        doc.setFillColor(99, 102, 241);
-        doc.rect(10, y, 190, 10, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        doc.text('Nome', 15, y + 7);
-        doc.text('Ore Totali', 150, y + 7);
-        y += 10;
-        
-        doc.setTextColor(0, 0, 0);
-        const topWorkers = Object.entries(workerHours)
-            .sort(([, a], [, b]) => b - a)
+
+        // Convert to arrays and sort
+        stats.topWorkers = Object.values(stats.workerBreakdown)
+            .sort((a, b) => b.hours - a.hours)
             .slice(0, 10);
-        
-        topWorkers.forEach(([name, hours], i) => {
-            if (y > 270) {
-                doc.addPage();
-                y = 20;
+
+        stats.companyList = Object.values(stats.companyBreakdown)
+            .map(c => ({
+                name: c.name,
+                hours: c.hours,
+                workers: c.workers.size
+            }))
+            .sort((a, b) => b.hours - a.hours);
+
+        return stats;
+    }, [filteredSheets, language]);
+
+    // Generate PDF Report
+    const generateReportPDF = async () => {
+        setGenerating(true);
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let yPos = 20;
+
+            // Header
+            if (companyLogo) {
+                try {
+                    doc.addImage(companyLogo, 'PNG', 15, yPos, 30, 30);
+                    yPos += 35;
+                } catch (e) {
+                    console.error('Error adding logo:', e);
+                }
             }
-            
-            if (i % 2 === 0) {
-                doc.setFillColor(243, 244, 246);
-                doc.rect(10, y, 190, 8, 'F');
+
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text(t.reports, 15, yPos);
+            yPos += 10;
+
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${formatDate(startDate)} - ${formatDate(endDate)}`, 15, yPos);
+            yPos += 15;
+
+            // Summary Stats
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(`${t.total}:`, 15, yPos);
+            yPos += 8;
+
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${t.sheets}: ${reportStats.totalSheets}`, 20, yPos);
+            yPos += 6;
+            doc.text(`${t.completed}: ${reportStats.completedSheets}`, 20, yPos);
+            yPos += 6;
+            doc.text(`${t.workers}: ${reportStats.totalWorkers}`, 20, yPos);
+            yPos += 6;
+            doc.text(`${t.totalHours}: ${reportStats.totalHours.toFixed(2)}${t.hours_short}`, 20, yPos);
+            yPos += 12;
+
+            // Top Workers
+            if (reportStats.topWorkers.length > 0) {
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text(t.topWorkers, 15, yPos);
+                yPos += 8;
+
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                reportStats.topWorkers.slice(0, 5).forEach((worker, i) => {
+                    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                    doc.text(`${medal} ${worker.name}: ${worker.hours.toFixed(2)}${t.hours_short} (${worker.days} ${t.sheets.toLowerCase()})`, 20, yPos);
+                    yPos += 6;
+                });
+                yPos += 8;
             }
+
+            // Company Breakdown
+            if (reportStats.companyList.length > 0) {
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text(`${t.company}:`, 15, yPos);
+                yPos += 8;
+
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                reportStats.companyList.forEach(company => {
+                    if (yPos > 270) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    doc.text(`• ${company.name}: ${company.hours.toFixed(2)}${t.hours_short} (${company.workers} ${t.workers.toLowerCase()})`, 20, yPos);
+                    yPos += 6;
+                });
+            }
+
+            // Save
+            const filename = `report_${startDate}_${endDate}.pdf`;
+            doc.save(filename);
             
-            doc.text(name, 15, y + 6);
-            doc.text(hours.toFixed(1) + 'h', 150, y + 6);
-            y += 8;
-        });
-        
-        y += 10;
-        
-        // Companies breakdown
-        if (y > 240) {
-            doc.addPage();
-            y = 20;
+            showToast(`✅ ${t.downloadPDF}`, 'success');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            showToast(`❌ ${t.error}`, 'error');
         }
-        
-        doc.setFont(undefined, 'bold');
-        doc.text('RIPARTIZIONE PER AZIENDA', 10, y);
-        y += 10;
-        
-        doc.setFillColor(99, 102, 241);
-        doc.rect(10, y, 190, 10, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.text('Azienda', 15, y + 7);
-        doc.text('Ore', 150, y + 7);
-        y += 10;
-        
-        doc.setTextColor(0, 0, 0);
-        Object.entries(companyHours)
-            .sort(([, a], [, b]) => b - a)
-            .forEach(([company, hours], i) => {
-                if (y > 270) {
-                    doc.addPage();
-                    y = 20;
-                }
-                
-                if (i % 2 === 0) {
-                    doc.setFillColor(243, 244, 246);
-                    doc.rect(10, y, 190, 8, 'F');
-                }
-                
-                doc.text(company, 15, y + 6);
-                doc.text(hours.toFixed(1) + 'h', 150, y + 6);
-                y += 8;
+
+        setGenerating(false);
+    };
+
+    // Export CSV
+    const exportCSV = () => {
+        let csv = `${t.name},${t.surname},${t.company},${t.date},${t.startTime},${t.endTime},${t.break},${t.totalHours}\n`;
+
+        filteredSheets.forEach(sheet => {
+            sheet.lavoratori?.forEach(worker => {
+                csv += `"${worker.nome}","${worker.cognome}","${sheet.titoloAzienda}","${sheet.data}","${worker.oraIn}","${worker.oraOut}","${worker.pausaMinuti || 0}","${worker.oreTotali}"\n`;
             });
-        
-        // Save
-        const fileName = `report_${type}_${new Date().toISOString().split('T')[0]}.pdf`;
-        doc.save(fileName);
-        showToast('✅ Report PDF generato!', 'success');
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `report_${startDate}_${endDate}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('✅ CSV exported', 'success');
     };
 
     return (
-        <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-            <h2 className="text-2xl font-bold mb-6">
-                📊 {t.manageReports}
-            </h2>
-            
-            <div className="space-y-6">
-                {/* Report Type Selection */}
-                <div>
-                    <label className="block font-semibold mb-3">Tipo di Report</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <button
-                            onClick={() => setReportType('weekly')}
-                            className={`p-4 rounded-lg border-2 transition-colors ${
-                                reportType === 'weekly'
-                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
-                                    : darkMode ? 'border-gray-600' : 'border-gray-300'
-                            }`}
-                        >
-                            <p className="font-semibold text-lg">📅 Settimanale</p>
-                            <p className={`text-sm ${textClass}`}>Ultimi 7 giorni</p>
-                        </button>
-                        
-                        <button
-                            onClick={() => setReportType('monthly')}
-                            className={`p-4 rounded-lg border-2 transition-colors ${
-                                reportType === 'monthly'
-                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
-                                    : darkMode ? 'border-gray-600' : 'border-gray-300'
-                            }`}
-                        >
-                            <p className="font-semibold text-lg">📆 Mensile</p>
-                            <p className={`text-sm ${textClass}`}>Ultimi 30 giorni</p>
-                        </button>
-                        
-                        <button
-                            onClick={() => setReportType('custom')}
-                            className={`p-4 rounded-lg border-2 transition-colors ${
-                                reportType === 'custom'
-                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
-                                    : darkMode ? 'border-gray-600' : 'border-gray-300'
-                            }`}
-                        >
-                            <p className="font-semibold text-lg">🗓️ Personalizzato</p>
-                            <p className={`text-sm ${textClass}`}>Scegli periodo</p>
-                        </button>
+        <div className="space-y-4 sm:space-y-6">
+            {/* Header */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl sm:text-3xl">📈</span>
+                    <h1 className="text-xl sm:text-2xl font-bold">{t.reports}</h1>
+                </div>
+
+                {/* Report Type Selector */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
+                    <button
+                        onClick={() => setReportType('weekly')}
+                        className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                            reportType === 'weekly'
+                                ? 'bg-indigo-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        📅 {t.reportWeekly}
+                    </button>
+                    <button
+                        onClick={() => setReportType('monthly')}
+                        className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                            reportType === 'monthly'
+                                ? 'bg-indigo-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        📆 {t.reportMonthly}
+                    </button>
+                    <button
+                        onClick={() => setReportType('custom')}
+                        className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                            reportType === 'custom'
+                                ? 'bg-indigo-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        🔧 Custom
+                    </button>
+                </div>
+
+                {/* Date Range */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label className={`block text-sm font-semibold mb-1 ${textClass}`}>
+                            {t.startTime}
+                        </label>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                        />
+                    </div>
+                    <div>
+                        <label className={`block text-sm font-semibold mb-1 ${textClass}`}>
+                            {t.endTime}
+                        </label>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                        />
                     </div>
                 </div>
 
-                {/* Custom Date Range */}
-                {reportType === 'custom' && (
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className={`block text-sm font-semibold mb-1 ${textClass}`}>
-                                    Data Inizio
-                                </label>
-                                <input
-                                    type="date"
-                                    value={dateRange.start}
-                                    onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-                                    className={`w-full px-4 py-3 rounded-lg border ${inputClass}`}
-                                />
-                            </div>
-                            <div>
-                                <label className={`block text-sm font-semibold mb-1 ${textClass}`}>
-                                    Data Fine
-                                </label>
-                                <input
-                                    type="date"
-                                    value={dateRange.end}
-                                    onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-                                    className={`w-full px-4 py-3 rounded-lg border ${inputClass}`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Generate Button */}
-                <button
-                    onClick={generateReport}
-                    disabled={reportType === 'custom' && (!dateRange.start || !dateRange.end)}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-lg font-bold text-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                    📄 {t.generateReport}
-                </button>
-
-                {/* Info Box */}
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-blue-900/30' : 'bg-blue-50'}`}>
-                    <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                        💡 <strong>Suggerimento:</strong> I report PDF includono statistiche dettagliate, 
-                        top lavoratori del periodo e ripartizione ore per azienda.
-                    </p>
+                {/* Actions */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                    <button
+                        onClick={generateReportPDF}
+                        disabled={generating || filteredSheets.length === 0}
+                        className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                    >
+                        {generating ? `⏳ ${t.loading}...` : `📄 ${t.generateReport} PDF`}
+                    </button>
+                    <button
+                        onClick={exportCSV}
+                        disabled={filteredSheets.length === 0}
+                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                    >
+                        📊 Export CSV
+                    </button>
                 </div>
             </div>
+
+            {/* Statistics */}
+            {filteredSheets.length > 0 && (
+                <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                        <div className={`${cardClass} rounded-xl shadow-lg p-3 sm:p-4`}>
+                            <p className={`text-xs sm:text-sm ${textClass} mb-1`}>{t.sheets}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                                {reportStats.totalSheets}
+                            </p>
+                        </div>
+                        <div className={`${cardClass} rounded-xl shadow-lg p-3 sm:p-4`}>
+                            <p className={`text-xs sm:text-sm ${textClass} mb-1`}>{t.completed}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
+                                {reportStats.completedSheets}
+                            </p>
+                        </div>
+                        <div className={`${cardClass} rounded-xl shadow-lg p-3 sm:p-4`}>
+                            <p className={`text-xs sm:text-sm ${textClass} mb-1`}>{t.workers}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
+                                {reportStats.totalWorkers}
+                            </p>
+                        </div>
+                        <div className={`${cardClass} rounded-xl shadow-lg p-3 sm:p-4`}>
+                            <p className={`text-xs sm:text-sm ${textClass} mb-1`}>{t.totalHours}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
+                                {reportStats.totalHours.toFixed(1)}{t.hours_short}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Top Workers */}
+                    {reportStats.topWorkers.length > 0 && (
+                        <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                            <h2 className="text-lg sm:text-xl font-bold mb-4">🏆 {t.topWorkers}</h2>
+                            <div className="space-y-2 sm:space-y-3">
+                                {reportStats.topWorkers.map((worker, i) => (
+                                    <div
+                                        key={i}
+                                        className={`flex items-center justify-between p-3 rounded-lg ${
+                                            darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <span className="text-xl sm:text-2xl flex-shrink-0">
+                                                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-sm sm:text-base truncate">{worker.name}</p>
+                                                <p className={`text-xs sm:text-sm ${textClass}`}>
+                                                    {worker.days} {worker.days === 1 ? t.sheets.slice(0, -1).toLowerCase() : t.sheets.toLowerCase()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <p className="font-bold text-base sm:text-lg text-indigo-600 dark:text-indigo-400 flex-shrink-0">
+                                            {worker.hours.toFixed(1)}{t.hours_short}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Company Breakdown */}
+                    {reportStats.companyList.length > 0 && (
+                        <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                            <h2 className="text-lg sm:text-xl font-bold mb-4">🏢 {t.company}</h2>
+                            <div className="space-y-2 sm:space-y-3">
+                                {reportStats.companyList.map((company, i) => (
+                                    <div
+                                        key={i}
+                                        className={`flex items-center justify-between p-3 rounded-lg ${
+                                            darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                                        }`}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-sm sm:text-base truncate">{company.name}</p>
+                                            <p className={`text-xs sm:text-sm ${textClass}`}>
+                                                {company.workers} {company.workers === 1 ? t.workers.slice(0, -1).toLowerCase() : t.workers.toLowerCase()}
+                                            </p>
+                                        </div>
+                                        <p className="font-bold text-base sm:text-lg text-green-600 dark:text-green-400 flex-shrink-0">
+                                            {company.hours.toFixed(1)}{t.hours_short}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* No Data */}
+            {filteredSheets.length === 0 && startDate && endDate && (
+                <div className={`${cardClass} rounded-xl shadow-lg p-8 sm:p-12 text-center`}>
+                    <p className="text-4xl sm:text-5xl mb-4">📊</p>
+                    <p className={`${textClass} text-base sm:text-lg`}>
+                        {t.noSheets}
+                    </p>
+                    <p className={`${textClass} text-sm mt-2`}>
+                        {formatDate(startDate)} - {formatDate(endDate)}
+                    </p>
+                </div>
+            )}
         </div>
     );
 };
