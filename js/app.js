@@ -1,4 +1,4 @@
-// Main App Component - MOBILE OTTIMIZZATO
+// Main App Component - 5 LINGUE COMPLETE
 const App = () => {
     const { useState, useEffect, useCallback, useMemo } = React;
     
@@ -108,7 +108,7 @@ const App = () => {
     // Create New Sheet
     const createNewSheet = useCallback(async () => {
         if (!db) {
-            showToast('❌ Database non connesso', 'error');
+            showToast(`❌ ${t.dbNotConnected}`, 'error');
             return;
         }
         
@@ -131,15 +131,15 @@ const App = () => {
             const docRef = await db.collection('timesheets').add(newSheet);
             setCurrentSheet({ id: docRef.id, ...newSheet });
             setCurrentView('sheet');
-            await addAuditLog('SHEET_CREATE', `Nuovo foglio creato: ${docRef.id}`);
-            showToast('✅ Nuovo foglio creato!', 'success');
+            await addAuditLog('SHEET_CREATE', `${t.createNewSheet}: ${docRef.id}`);
+            showToast(`✅ ${t.sheetSaved}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore creazione foglio', 'error');
+            showToast(`❌ ${t.errorSaving}`, 'error');
         }
         
         setLoading(false);
-    }, [db, addAuditLog]);
+    }, [db, addAuditLog, language]);
 
     // Save Sheet
     const saveSheet = useCallback(async (sheet) => {
@@ -179,13 +179,13 @@ const App = () => {
         
         try {
             await db.collection('timesheets').doc(sheetId).delete();
-            await addAuditLog('SHEET_DELETE', `Eliminato: ${sheet?.titoloAzienda || sheetId}`);
-            showToast('✅ Foglio eliminato', 'success');
+            await addAuditLog('SHEET_DELETE', `${t.delete}: ${sheet?.titoloAzienda || sheetId}`);
+            showToast(`✅ ${t.sheetDeleted}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore eliminazione', 'error');
+            showToast(`❌ ${t.errorDeleting}`, 'error');
         }
-    }, [db, sheets, addAuditLog]);
+    }, [db, sheets, addAuditLog, language]);
 
     // Archive/Restore Sheet
     const archiveSheet = useCallback(async (sheetId, archive = true) => {
@@ -195,14 +195,14 @@ const App = () => {
             await db.collection('timesheets').doc(sheetId).update({ archived: archive });
             await addAuditLog(
                 archive ? 'SHEET_ARCHIVE' : 'SHEET_RESTORE', 
-                `${archive ? 'Archiviato' : 'Ripristinato'}: ${sheetId}`
+                `${archive ? t.archive : t.restore}: ${sheetId}`
             );
-            showToast(archive ? '📦 Foglio archiviato' : '↩️ Foglio ripristinato', 'success');
+            showToast(archive ? `📦 ${t.sheetArchived}` : `↩️ ${t.sheetRestored}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore', 'error');
+            showToast(`❌ ${t.error}`, 'error');
         }
-    }, [db, addAuditLog]);
+    }, [db, addAuditLog, language]);
 
     // Add to Blacklist
     const addToBlacklist = useCallback(async (worker, reason) => {
@@ -222,12 +222,12 @@ const App = () => {
         try {
             await db.collection('blacklist').add(blacklistEntry);
             await addAuditLog('BLACKLIST_ADD', `${worker.nome} ${worker.cognome} - ${reason}`);
-            showToast('🚫 Aggiunto alla blacklist', 'success');
+            showToast(`🚫 ${t.blacklistAdded}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore blacklist', 'error');
+            showToast(`❌ ${t.error}`, 'error');
         }
-    }, [db, addAuditLog]);
+    }, [db, addAuditLog, language]);
 
     // Remove from Blacklist
     const removeFromBlacklist = useCallback(async (blacklistId) => {
@@ -238,12 +238,12 @@ const App = () => {
             const data = doc.data();
             await db.collection('blacklist').doc(blacklistId).delete();
             await addAuditLog('BLACKLIST_REMOVE', `${data.nome} ${data.cognome}`);
-            showToast('✅ Rimosso dalla blacklist', 'success');
+            showToast(`✅ ${t.blacklistRemoved}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore rimozione', 'error');
+            showToast(`❌ ${t.errorDeleting}`, 'error');
         }
-    }, [db, addAuditLog]);
+    }, [db, addAuditLog, language]);
 
     // Handle Logo Upload
     const handleLogoUpload = useCallback((e) => {
@@ -254,11 +254,11 @@ const App = () => {
                 const logoData = e.target.result;
                 setCompanyLogo(logoData);
                 localStorage.setItem('companyLogo', logoData);
-                showToast('✅ Logo caricato!', 'success');
+                showToast(`✅ ${t.logoUploaded}`, 'success');
             };
             reader.readAsDataURL(file);
         }
-    }, []);
+    }, [language]);
 
     const t = translations[language];
     const bgClass = darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 to-indigo-100';
@@ -318,7 +318,7 @@ const App = () => {
                                         : 'hover:bg-indigo-700'
                                 }`}
                             >
-                                📋 Fogli
+                                📋 {t.sheets}
                             </button>
                             <button
                                 onClick={() => setCurrentView('blacklist')}
@@ -354,15 +354,17 @@ const App = () => {
 
                         {/* Actions - COMPATTE SU MOBILE */}
                         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                            {/* Language Selector */}
+                            {/* Language Selector - 5 LINGUE */}
                             <select
                                 value={language}
                                 onChange={(e) => setLanguage(e.target.value)}
                                 className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-sm"
                             >
-                                <option value="it">🇮🇹</option>
-                                <option value="en">🇬🇧</option>
-                                <option value="es">🇪🇸</option>
+                                <option value="it">🇮🇹 IT</option>
+                                <option value="en">🇬🇧 EN</option>
+                                <option value="es">🇪🇸 ES</option>
+                                <option value="fr">🇫🇷 FR</option>
+                                <option value="ro">🇷🇴 RO</option>
                             </select>
 
                             {/* Dark Mode Toggle */}
@@ -375,7 +377,7 @@ const App = () => {
                             </button>
 
                             {/* Logo Upload */}
-                            <label className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 cursor-pointer transition-colors" title="Carica Logo">
+                            <label className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 cursor-pointer transition-colors" title={t.uploadLogo}>
                                 🖼️
                                 <input 
                                     type="file" 
@@ -417,7 +419,7 @@ const App = () => {
                                         : 'bg-white bg-opacity-10 hover:bg-opacity-20'
                                 }`}
                             >
-                                📋 Fogli Ore
+                                📋 {t.sheets}
                             </button>
                             <button
                                 onClick={() => { setCurrentView('blacklist'); setMobileMenuOpen(false); }}
@@ -466,7 +468,7 @@ const App = () => {
                             onClick={createNewSheet}
                             className="w-full mb-4 sm:mb-6 py-3 sm:py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-base sm:text-lg transition-colors touch-button"
                         >
-                            ➕ Crea Nuovo Foglio Ore
+                            ➕ {t.createNewSheet}
                         </button>
                         <SheetList
                             sheets={sheets}
