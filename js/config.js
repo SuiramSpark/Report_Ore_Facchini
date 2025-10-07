@@ -1,12 +1,12 @@
 // Firebase Configuration
-const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyCg3TOQ1vfqcZ1UTXK3NCMbsjf4_z9zvFc",
-    authDomain: "registroore-963c6.firebaseapp.com",
-    projectId: "registroore-963c6",
-    storageBucket: "registroore-963c6.appspot.com",
-    messagingSenderId: "413364101167",
-    appId: "1:413364101167:web:a83f8023868a717a5fe6da",
-    measurementId: "G-J9SX458Z83"
+const firebaseConfig = {
+  apiKey: "AIzaSyBFxjiGpmD9bjzaXQ4hp7Do9C0_Gp1fOoA",
+  authDomain: "reportorefacchinispark.firebaseapp.com",
+  projectId: "reportorefacchinispark",
+  storageBucket: "reportorefacchinispark.firebasestorage.app",
+  messagingSenderId: "630520690479",
+  appId: "1:630520690479:web:f2a3e8e5a9604b93fed3da",
+  measurementId: "G-TQKXJR4TML"
 };
 
 // Initialize Firebase
