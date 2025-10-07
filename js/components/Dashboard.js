@@ -1,139 +1,110 @@
-// Dashboard Component
+// Dashboard Component - 5 LINGUE COMPLETE
 const Dashboard = ({ sheets, darkMode, language = 'it' }) => {
     const t = translations[language];
-    const stats = getStatistics(sheets || []);
-    
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
 
+    // Calculate statistics
+    const stats = React.useMemo(() => {
+        return getStatistics(sheets);
+    }, [sheets]);
+
+    const activeSheets = sheets.filter(s => !s.archived).length;
+
     return (
-        <div className="space-y-6">
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <h3 className={`text-sm font-medium ${textClass}`}>
-                        {t.weeklyHours}
-                    </h3>
-                    <p className="text-4xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">
-                        {stats.weeklyHours.toFixed(1)}h
-                    </p>
-                    <div className="mt-2">
-                        <span className={`text-xs ${textClass}`}>
-                            📊 Ultimi 7 giorni
-                        </span>
+        <div className="space-y-4 sm:space-y-6">
+            {/* Welcome Header */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h1 className="text-2xl sm:text-3xl font-bold mb-2">👋 {t.dashboard}</h1>
+                <p className={textClass}>
+                    {t.recentActivity}
+                </p>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
+                {/* Weekly Hours */}
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-sm sm:text-base font-semibold ${textClass}`}>
+                            {t.weeklyHours}
+                        </h3>
+                        <span className="text-2xl sm:text-3xl">📅</span>
                     </div>
+                    <p className="text-3xl sm:text-4xl font-bold text-indigo-600 dark:text-indigo-400">
+                        {stats.weeklyHours.toFixed(1)}{t.hours_short}
+                    </p>
+                    <p className={`text-xs sm:text-sm ${textClass} mt-1`}>{t.lastDays}</p>
                 </div>
-                
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <h3 className={`text-sm font-medium ${textClass}`}>
-                        {t.monthlyHours}
-                    </h3>
-                    <p className="text-4xl font-bold text-green-600 dark:text-green-400 mt-2">
-                        {stats.monthlyHours.toFixed(1)}h
-                    </p>
-                    <div className="mt-2">
-                        <span className={`text-xs ${textClass}`}>
-                            📅 Ultimi 30 giorni
-                        </span>
+
+                {/* Monthly Hours */}
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-sm sm:text-base font-semibold ${textClass}`}>
+                            {t.monthlyHours}
+                        </h3>
+                        <span className="text-2xl sm:text-3xl">📆</span>
                     </div>
+                    <p className="text-3xl sm:text-4xl font-bold text-green-600 dark:text-green-400">
+                        {stats.monthlyHours.toFixed(1)}{t.hours_short}
+                    </p>
+                    <p className={`text-xs sm:text-sm ${textClass} mt-1`}>{t.lastDaysMonth}</p>
                 </div>
-                
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <h3 className={`text-sm font-medium ${textClass}`}>
-                        {t.activeSheets}
-                    </h3>
-                    <p className="text-4xl font-bold text-purple-600 dark:text-purple-400 mt-2">
-                        {sheets.filter(s => !s.archived).length}
-                    </p>
-                    <div className="mt-2">
-                        <span className={`text-xs ${textClass}`}>
-                            📋 Fogli non archiviati
-                        </span>
+
+                {/* Active Sheets */}
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-sm sm:text-base font-semibold ${textClass}`}>
+                            {t.activeSheets}
+                        </h3>
+                        <span className="text-2xl sm:text-3xl">📋</span>
                     </div>
+                    <p className="text-3xl sm:text-4xl font-bold text-blue-600 dark:text-blue-400">
+                        {activeSheets}
+                    </p>
+                    <p className={`text-xs sm:text-sm ${textClass} mt-1`}>{t.nonArchivedSheets}</p>
                 </div>
             </div>
 
             {/* Top Workers */}
-            <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                <h3 className="text-xl font-bold mb-4">
-                    🏆 {t.topWorkers}
-                </h3>
-                
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                    <span className="text-2xl sm:text-3xl">🏆</span>
+                    <h2 className="text-lg sm:text-2xl font-bold">{t.topWorkers}</h2>
+                </div>
+
                 {stats.topWorkers.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3 sm:space-y-4">
                         {stats.topWorkers.map((worker, i) => (
-                            <div 
-                                key={i} 
-                                className={`flex justify-between items-center p-4 rounded-lg ${
+                            <div
+                                key={i}
+                                className={`flex items-center justify-between p-3 sm:p-4 rounded-lg ${
                                     darkMode ? 'bg-gray-700' : 'bg-gray-50'
                                 }`}
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                                        i === 0 ? 'bg-yellow-500 text-white' :
-                                        i === 1 ? 'bg-gray-400 text-white' :
-                                        'bg-orange-600 text-white'
-                                    }`}>
-                                        {i + 1}
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold">{worker.name}</p>
-                                        <p className={`text-sm ${textClass}`}>
-                                            {worker.hours.toFixed(1)} ore totali
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <span className="text-xl sm:text-2xl flex-shrink-0">
+                                        {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-sm sm:text-base truncate">
+                                            {worker.name}
+                                        </p>
+                                        <p className={`text-xs sm:text-sm ${textClass}`}>
+                                            {worker.hours.toFixed(1)} {t.hours_short}
                                         </p>
                                     </div>
-                                </div>
-                                <div className="text-right">
-                                    {i === 0 && <span className="text-2xl">🥇</span>}
-                                    {i === 1 && <span className="text-2xl">🥈</span>}
-                                    {i === 2 && <span className="text-2xl">🥉</span>}
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <p className={textClass}>
-                        Nessun lavoratore registrato questo mese
-                    </p>
-                )}
-            </div>
-
-            {/* Recent Activity */}
-            <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                <h3 className="text-xl font-bold mb-4">
-                    📈 Attività Recente
-                </h3>
-                
-                <div className="space-y-2">
-                    {sheets.slice(0, 5).map(sheet => (
-                        <div 
-                            key={sheet.id}
-                            className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
-                        >
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold">{sheet.titoloAzienda || 'Senza titolo'}</p>
-                                    <p className={`text-sm ${textClass}`}>
-                                        {formatDate(sheet.data)} • {sheet.lavoratori?.length || 0} lavoratori
-                                    </p>
-                                </div>
-                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                    sheet.status === 'completed' 
-                                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                                }`}>
-                                    {sheet.status === 'completed' ? '✅ Completato' : '📝 Bozza'}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
-                    
-                    {sheets.length === 0 && (
-                        <p className={textClass}>
-                            Nessuna attività recente
+                    <div className="text-center py-8 sm:py-12">
+                        <p className={`${textClass} text-sm sm:text-base`}>
+                            {t.noWorkersThisMonth}
                         </p>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );
