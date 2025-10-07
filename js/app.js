@@ -281,7 +281,7 @@ const App = () => {
     return (
         <div className={`min-h-screen ${bgClass}`}>
             {/* Header - MOBILE OTTIMIZZATO */}
-            <header className="bg-indigo-825 text-white shadow-lg sticky top-0 z-50">
+            <header className="bg-indigo-600 text-white shadow-lg sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-between items-center">
                         {/* Logo e Titolo */}
