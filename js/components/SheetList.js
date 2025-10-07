@@ -1,103 +1,200 @@
-// Sheet List Component - FULLY FUNCTIONAL
-const SheetList = ({
-    sheets = [],
-    onSelectSheet,
-    onDeleteSheet,
-    onArchiveSheet,
-    darkMode,
-    language = 'it',
-    companyLogo
-}) => {
+// Sheet List Component - 5 LINGUE COMPLETE
+const SheetList = ({ sheets, onSelectSheet, onDeleteSheet, onArchiveSheet, darkMode, language = 'it', companyLogo }) => {
+    const [filter, setFilter] = React.useState('active');
+    const [searchTerm, setSearchTerm] = React.useState('');
+    
     const t = translations[language];
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
-    const buttonBase = "px-3 py-2 rounded font-semibold transition-colors focus:outline-none";
+    const inputClass = darkMode ? 
+        'bg-gray-700 border-gray-600 text-white' : 
+        'bg-white border-gray-300 text-gray-900';
 
-    // Sorting: Most recent first (by date, fallback to createdAt)
-    const sortedSheets = [...sheets].sort((a, b) => {
-        const dateA = new Date(a.data || a.createdAt);
-        const dateB = new Date(b.data || b.createdAt);
-        return dateB - dateA;
-    });
+    // Filter and search sheets
+    const filteredSheets = React.useMemo(() => {
+        let filtered = sheets;
+        
+        // Apply filter
+        if (filter === 'active') {
+            filtered = filtered.filter(s => !s.archived && s.status !== 'completed');
+        } else if (filter === 'archived') {
+            filtered = filtered.filter(s => s.archived);
+        } else if (filter === 'completed') {
+            filtered = filtered.filter(s => s.status === 'completed');
+        }
+        
+        // Apply search
+        if (searchTerm) {
+            filtered = filtered.filter(s => 
+                s.titoloAzienda?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                s.responsabile?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                s.location?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        return filtered;
+    }, [sheets, filter, searchTerm]);
+
+    // Get status badge
+    const getStatusBadge = (sheet) => {
+        if (sheet.archived) {
+            return <span className="px-2 py-1 bg-gray-500 text-white rounded text-xs font-semibold">{t.archived}</span>;
+        }
+        if (sheet.status === 'completed') {
+            return <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">{t.completed}</span>;
+        }
+        return <span className="px-2 py-1 bg-yellow-600 text-white rounded text-xs font-semibold">{t.draft}</span>;
+    };
 
     return (
-        <div className="space-y-5">
-            {sortedSheets.length === 0 ? (
-                <div className={`${cardClass} p-8 rounded-lg shadow-xl text-center max-w-xl mx-auto`}>
-                    <h2 className="text-xl font-bold mb-2">{t.noWorkers}</h2>
-                    <p className={textClass}>Clicca su "Crea Nuovo Foglio Ore" per iniziare.</p>
+        <div className="space-y-4">
+            {/* Filters and Search */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                {/* Filter Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
+                    <button
+                        onClick={() => setFilter('active')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                            filter === 'active'
+                                ? 'bg-indigo-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        📋 {t.active}
+                    </button>
+                    <button
+                        onClick={() => setFilter('completed')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                            filter === 'completed'
+                                ? 'bg-green-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        ✅ {t.completed}
+                    </button>
+                    <button
+                        onClick={() => setFilter('archived')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                            filter === 'archived'
+                                ? 'bg-gray-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        📦 {t.archived}
+                    </button>
+                    <button
+                        onClick={() => setFilter('all')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                            filter === 'all'
+                                ? 'bg-blue-600 text-white'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                    >
+                        📚 {t.all}
+                    </button>
+                </div>
+
+                {/* Search Bar */}
+                <input
+                    type="text"
+                    placeholder={`🔍 ${t.company}, ${t.responsible}, ${t.location}...`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-base`}
+                />
+            </div>
+
+            {/* Results Count */}
+            <p className={`${textClass} text-sm sm:text-base px-2`}>
+                {filteredSheets.length} {filteredSheets.length === 1 ? t.sheets.slice(0, -1) : t.sheets.toLowerCase()}
+            </p>
+
+            {/* Sheets List */}
+            {filteredSheets.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                    {filteredSheets.map((sheet) => (
+                        <div
+                            key={sheet.id}
+                            className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow`}
+                        >
+                            <div className="flex flex-col sm:flex-row justify-between gap-4">
+                                {/* Sheet Info */}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <h3 className="text-lg sm:text-xl font-bold truncate">
+                                            {sheet.titoloAzienda || t.company}
+                                        </h3>
+                                        {getStatusBadge(sheet)}
+                                    </div>
+                                    
+                                    <div className={`space-y-1 text-sm ${textClass}`}>
+                                        <p>📅 {formatDate(sheet.data)}</p>
+                                        <p>👤 {sheet.responsabile}</p>
+                                        {sheet.location && <p>📍 {sheet.location}</p>}
+                                        <p>👷 {sheet.lavoratori?.length || 0} {t.workers.toLowerCase()}</p>
+                                        {sheet.firmaResponsabile && (
+                                            <p className="text-green-600 dark:text-green-400 font-semibold">
+                                                ✍️ {t.responsibleSignature}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-row sm:flex-col gap-2 sm:justify-start">
+                                    <button
+                                        onClick={() => onSelectSheet(sheet)}
+                                        className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                                    >
+                                        ✏️ {t.edit}
+                                    </button>
+                                    
+                                    {sheet.status === 'completed' && (
+                                        <button
+                                            onClick={() => generatePDF(sheet, companyLogo)}
+                                            className="flex-1 sm:flex-none px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                                        >
+                                            📄 PDF
+                                        </button>
+                                    )}
+                                    
+                                    <button
+                                        onClick={() => onArchiveSheet(sheet.id, !sheet.archived)}
+                                        className="flex-1 sm:flex-none px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                                    >
+                                        {sheet.archived ? '↩️' : '📦'}
+                                    </button>
+                                    
+                                    <button
+                                        onClick={() => {
+                                            if (confirm(`${t.confirm}?`)) {
+                                                onDeleteSheet(sheet.id);
+                                            }
+                                        }}
+                                        className="flex-1 sm:flex-none px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                                    >
+                                        🗑️
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             ) : (
-                sortedSheets.map((sheet) => (
-                    <div
-                        key={sheet.id}
-                        className={`${cardClass} rounded-xl shadow flex flex-col md:flex-row md:items-center justify-between p-4 gap-4`}
-                    >
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-3 mb-1 flex-wrap">
-                                {companyLogo && (
-                                    <img src={companyLogo} alt="Logo" className="h-8 w-8 object-contain rounded" />
-                                )}
-                                <span className="text-lg font-bold break-all">{sheet.titoloAzienda || 'Senza titolo'}</span>
-                                {sheet.archived && (
-                                    <span className="ml-2 text-gray-400 font-semibold">📦 {t.archive}</span>
-                                )}
-                            </div>
-                            <div className={`text-sm ${textClass}`}>
-                                {formatDate(sheet.data)} • {sheet.lavoratori?.length || 0} lavoratori
-                                {sheet.status === 'completed' ? (
-                                    <span className="ml-2 text-green-600 font-semibold">✅ Completato</span>
-                                ) : (
-                                    <span className="ml-2 text-yellow-600 font-semibold">📝 Bozza</span>
-                                )}
-                            </div>
-                            {sheet.note && (
-                                <div className={`mt-1 text-xs italic ${textClass}`}>{sheet.note}</div>
-                            )}
-                        </div>
-                        <div className="flex gap-2 flex-wrap justify-end md:justify-normal">
-                            <button
-                                onClick={() => onSelectSheet(sheet)}
-                                className={`${buttonBase} bg-blue-600 text-white hover:bg-blue-700`}
-                                title="Visualizza / Modifica"
-                            >
-                                👁️ {t.edit}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (
-                                        window.confirm(
-                                            sheet.archived
-                                                ? `Vuoi ripristinare il foglio "${sheet.titoloAzienda || 'Senza titolo'}"?`
-                                                : `Vuoi archiviare il foglio "${sheet.titoloAzienda || 'Senza titolo'}"?`
-                                        )
-                                    ) {
-                                        onArchiveSheet(sheet.id, !sheet.archived);
-                                    }
-                                }}
-                                className={`${buttonBase} ${sheet.archived ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-700'} text-white`}
-                                title={sheet.archived ? t.restore : t.archive}
-                            >
-                                {sheet.archived ? '↩️ ' + t.restore : '📦 ' + t.archive}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (
-                                        window.confirm(
-                                            `Sei sicuro di voler eliminare il foglio "${sheet.titoloAzienda || 'Senza titolo'}"? Questa azione è irreversibile.`
-                                        )
-                                    ) {
-                                        onDeleteSheet(sheet.id);
-                                    }
-                                }}
-                                className={`${buttonBase} bg-red-600 hover:bg-red-700 text-white`}
-                                title={t.delete}
-                            >
-                                🗑️ {t.delete}
-                            </button>
-                        </div>
-                    </div>
-                ))
+                <div className={`${cardClass} rounded-xl shadow-lg p-8 sm:p-12 text-center`}>
+                    <p className="text-4xl sm:text-5xl mb-4">📋</p>
+                    <p className={`${textClass} text-base sm:text-lg`}>
+                        {searchTerm ? `${t.noSheets}` : `${t.noSheets}`}
+                    </p>
+                </div>
             )}
         </div>
     );
