@@ -1,129 +1,195 @@
-// Audit Log Component
-const AuditLog = ({ auditLog, darkMode, language = 'it' }) => {
+// Audit Log Component - MOBILE OTTIMIZZATO + SVUOTA REGISTRO
+const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
+    const [filter, setFilter] = React.useState('all');
+    const [clearing, setClearing] = React.useState(false);
     const t = translations[language];
+
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
-    const [filter, setFilter] = React.useState('all'); // all, add, edit, delete
 
+    // Filter logs
     const filteredLogs = React.useMemo(() => {
         if (filter === 'all') return auditLog;
-        
-        const filterMap = {
-            add: ['WORKER_ADD', 'BLACKLIST_ADD', 'SHEET_CREATE'],
-            edit: ['WORKER_EDIT', 'BULK_UPDATE', 'SHEET_EDIT'],
-            delete: ['WORKER_DELETE', 'BLACKLIST_REMOVE', 'SHEET_DELETE']
-        };
-        
-        return auditLog.filter(log => filterMap[filter]?.some(action => log.action.includes(action)));
+        return auditLog.filter(log => {
+            const action = log.action.toLowerCase();
+            if (filter === 'create') return action.includes('create');
+            if (filter === 'edit') return action.includes('edit') || action.includes('update');
+            if (filter === 'delete') return action.includes('delete');
+            return true;
+        });
     }, [auditLog, filter]);
 
+    // Clear audit log
+    const clearAuditLog = async () => {
+        if (!db) {
+            showToast('❌ Database non connesso', 'error');
+            return;
+        }
+
+        if (!confirm('⚠️ Sei sicuro di voler cancellare TUTTO il registro modifiche? Questa azione è irreversibile!')) {
+            return;
+        }
+
+        setClearing(true);
+
+        try {
+            const batch = db.batch();
+            const snapshot = await db.collection('auditLog').get();
+            
+            snapshot.docs.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+            showToast('✅ Registro modifiche svuotato!', 'success');
+        } catch (error) {
+            console.error('Errore:', error);
+            showToast('❌ Errore durante la cancellazione', 'error');
+        }
+
+        setClearing(false);
+    };
+
+    // Action icon
     const getActionIcon = (action) => {
-        if (action.includes('ADD') || action.includes('CREATE')) return '➕';
+        if (action.includes('CREATE')) return '➕';
         if (action.includes('EDIT') || action.includes('UPDATE')) return '✏️';
-        if (action.includes('DELETE') || action.includes('REMOVE')) return '🗑️';
+        if (action.includes('DELETE')) return '🗑️';
+        if (action.includes('COMPLETE')) return '✅';
+        if (action.includes('ARCHIVE')) return '📦';
+        if (action.includes('RESTORE')) return '↩️';
         if (action.includes('BLACKLIST')) return '🚫';
+        if (action.includes('SIGNATURE')) return '✍️';
         return '📝';
     };
 
+    // Action color
     const getActionColor = (action) => {
-        if (action.includes('ADD') || action.includes('CREATE')) return darkMode ? 'text-green-400' : 'text-green-600';
+        if (action.includes('DELETE')) return darkMode ? 'text-red-400' : 'text-red-600';
+        if (action.includes('CREATE')) return darkMode ? 'text-green-400' : 'text-green-600';
         if (action.includes('EDIT') || action.includes('UPDATE')) return darkMode ? 'text-blue-400' : 'text-blue-600';
-        if (action.includes('DELETE') || action.includes('REMOVE')) return darkMode ? 'text-red-400' : 'text-red-600';
-        if (action.includes('BLACKLIST')) return darkMode ? 'text-orange-400' : 'text-orange-600';
+        if (action.includes('COMPLETE')) return darkMode ? 'text-purple-400' : 'text-purple-600';
         return darkMode ? 'text-gray-400' : 'text-gray-600';
     };
 
     return (
-        <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">
-                    📋 {t.auditLog}
-                </h2>
-                
-                <div className="flex gap-2">
+        <div className={`${cardClass} rounded-xl shadow-lg p-3 sm:p-6`}>
+            {/* Header */}
+            <div className="mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold mb-2">📝 {t.auditLog}</h2>
+                <p className={`${textClass} text-sm sm:text-base`}>
+                    {filteredLogs.length} {filteredLogs.length === 1 ? 'modifica' : 'modifiche'}
+                </p>
+            </div>
+
+            {/* Filters + Clear - MOBILE OTTIMIZZATO */}
+            <div className="mb-4 space-y-3">
+                {/* Filter Buttons - STACK VERTICALE SU MOBILE */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <button
                         onClick={() => setFilter('all')}
-                        className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                             filter === 'all'
                                 ? 'bg-indigo-600 text-white'
-                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
-                        Tutti
+                        📋 Tutti
                     </button>
                     <button
-                        onClick={() => setFilter('add')}
-                        className={`px-3 py-1 rounded-lg text-sm font-semibold ${
-                            filter === 'add'
+                        onClick={() => setFilter('create')}
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+                            filter === 'create'
                                 ? 'bg-green-600 text-white'
-                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
                         ➕ Aggiunte
                     </button>
                     <button
                         onClick={() => setFilter('edit')}
-                        className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                             filter === 'edit'
                                 ? 'bg-blue-600 text-white'
-                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
                         ✏️ Modifiche
                     </button>
                     <button
                         onClick={() => setFilter('delete')}
-                        className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                        className={`px-3 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                             filter === 'delete'
                                 ? 'bg-red-600 text-white'
-                                : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                                : darkMode
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'bg-gray-200 hover:bg-gray-300'
                         }`}
                     >
-                        🗑️ Eliminazioni
+                        🗑️ Elimina
                     </button>
                 </div>
+
+                {/* Clear Button */}
+                <button
+                    onClick={clearAuditLog}
+                    disabled={clearing || auditLog.length === 0}
+                    className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                    {clearing ? '⏳ Cancellazione...' : '🗑️ Svuota Registro'}
+                </button>
             </div>
-            
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-                {filteredLogs.length === 0 ? (
-                    <p className={`text-center py-8 ${textClass}`}>
-                        {filter === 'all' 
-                            ? 'Nessuna modifica registrata' 
-                            : 'Nessuna modifica di questo tipo'}
-                    </p>
-                ) : (
-                    filteredLogs.map(log => (
+
+            {/* Logs List */}
+            {filteredLogs.length > 0 ? (
+                <div className="space-y-2 sm:space-y-3 max-h-[70vh] overflow-y-auto">
+                    {filteredLogs.map((log, i) => (
                         <div
-                            key={log.id}
-                            className={`p-3 rounded-lg border ${
-                                darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                            key={i}
+                            className={`p-3 sm:p-4 rounded-lg border-l-4 ${
+                                darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-300'
                             }`}
+                            style={{ borderLeftColor: getActionColor(log.action).includes('red') ? '#ef4444' : 
+                                                       getActionColor(log.action).includes('green') ? '#10b981' :
+                                                       getActionColor(log.action).includes('blue') ? '#3b82f6' : '#6b7280' }}
                         >
                             <div className="flex items-start gap-3">
-                                <span className="text-2xl">
+                                <span className="text-2xl sm:text-3xl flex-shrink-0">
                                     {getActionIcon(log.action)}
                                 </span>
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${getActionColor(log.action)}`}>
-                                        {log.action}
+                                <div className="flex-1 min-w-0">
+                                    <p className={`font-semibold text-sm sm:text-base ${getActionColor(log.action)} mb-1`}>
+                                        {log.action.replace(/_/g, ' ')}
                                     </p>
-                                    <p className={`text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                    <p className={`${textClass} text-xs sm:text-sm mb-2 break-words`}>
                                         {log.details}
                                     </p>
-                                    <div className={`text-xs ${textClass} mt-1 flex items-center gap-2`}>
-                                        <span>🕐 {formatDateTime(log.timestamp)}</span>
-                                        {log.user && <span>👤 {log.user}</span>}
+                                    <div className="flex flex-wrap gap-2 sm:gap-3 text-xs">
+                                        <span className={textClass}>
+                                            🕐 {formatDateTime(log.timestamp)}
+                                        </span>
+                                        <span className={textClass}>
+                                            👤 {log.user}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    ))
-                )}
-            </div>
-            
-            {filteredLogs.length > 0 && (
-                <div className={`mt-4 text-center ${textClass} text-sm`}>
-                    Mostrando {filteredLogs.length} di {auditLog.length} modifiche
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-8 sm:py-12">
+                    <p className={`${textClass} text-base sm:text-lg`}>
+                        {filter === 'all' 
+                            ? 'Nessuna modifica registrata' 
+                            : 'Nessuna modifica trovata per questo filtro'}
+                    </p>
                 </div>
             )}
         </div>
