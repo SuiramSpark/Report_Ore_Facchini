@@ -1,4 +1,4 @@
-// Worker Mode Component - MOBILE PORTRAIT OTTIMIZZATO
+// Worker Mode Component - 5 LINGUE COMPLETE
 const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
@@ -32,19 +32,19 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                     setSheetData({ id: doc.id, ...doc.data() });
                     setLoading(false);
                 } else {
-                    setError('Foglio non trovato');
+                    setError(t.sheetNotFound);
                     setLoading(false);
                 }
             },
             (err) => {
                 console.error(err);
-                setError('Errore caricamento dati');
+                setError(t.errorLoading);
                 setLoading(false);
             }
         );
         
         return () => unsubscribe();
-    }, [sheetId, db]);
+    }, [sheetId, db, language]);
 
     // Initialize canvas
     React.useEffect(() => {
@@ -70,13 +70,13 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
     const saveWorkerData = async () => {
         // Validation
         if (!workerData.nome || !workerData.cognome || !workerData.oraIn || !workerData.oraOut) {
-            showToast('❌ Compila tutti i campi obbligatori', 'error');
+            showToast(`❌ ${t.fillRequired}`, 'error');
             return;
         }
 
         // Check signature
         if (isCanvasBlank(canvasRef.current)) {
-            showToast('❌ Devi firmare prima di inviare', 'error');
+            showToast(`❌ ${t.signBeforeSend}`, 'error');
             return;
         }
 
@@ -99,10 +99,10 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
             });
             
             setSubmittedWorkerId(worker.id);
-            showToast('✅ Dati inviati con successo!', 'success');
+            showToast(`✅ ${t.dataSent}`, 'success');
         } catch (error) {
             console.error(error);
-            showToast('❌ Errore invio dati', 'error');
+            showToast(`❌ ${t.errorSending}`, 'error');
         }
         
         setLoading(false);
@@ -143,7 +143,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                     <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 mt-3 sm:mt-4`}>
                         <div className="text-center mb-4 sm:mb-6">
                             <h1 className="text-lg sm:text-2xl font-bold mb-1 text-indigo-700 dark:text-indigo-400">
-                                ✅ Riepilogo Inserimento
+                                ✅ {t.submissionSummary}
                             </h1>
                             <p className={`${textClass} text-sm sm:text-base mt-2`}>
                                 {sheetData.titoloAzienda} - {formatDate(sheetData.data)}
@@ -153,24 +153,24 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                         {mySubmission ? (
                             <div className={`border-l-4 ${isCompleted ? 'border-green-500' : 'border-yellow-500'} p-3 sm:p-4 rounded-r-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
                                 <h2 className="font-bold text-base sm:text-lg mb-2">
-                                    👋 Ciao, {mySubmission.nome}!
+                                    👋 {t.hello}, {mySubmission.nome}!
                                 </h2>
                                 <p className="mb-1 text-sm sm:text-base">
-                                    <span className="font-semibold">Ore:</span> {mySubmission.oraIn} - {mySubmission.oraOut}
+                                    <span className="font-semibold">{t.hours}:</span> {mySubmission.oraIn} - {mySubmission.oraOut}
                                 </p>
                                 <p className="mb-2 sm:mb-3 text-sm sm:text-base">
-                                    <span className="font-semibold">Totale:</span> {mySubmission.oreTotali}h
+                                    <span className="font-semibold">{t.total}:</span> {mySubmission.oreTotali}{t.hours_short}
                                 </p>
                                 <p className="mt-2 text-sm sm:text-base">
-                                    <span className="font-semibold">Stato:</span>{' '}
+                                    <span className="font-semibold">{t.status}:</span>{' '}
                                     <span className={`font-bold ${isCompleted ? 'text-green-500' : 'text-yellow-500'}`}>
-                                        {isCompleted ? '✅ Completato' : '⏳ In attesa firma responsabile'}
+                                        {isCompleted ? `✅ ${t.completed}` : `⏳ ${t.waitingSignature}`}
                                     </span>
                                 </p>
                             </div>
                         ) : (
                             <p className="text-center text-red-500 text-sm sm:text-base">
-                                Dati non trovati.
+                                {t.dataNotFound}
                             </p>
                         )}
                     </div>
@@ -260,7 +260,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                         {/* Totale Ore - COMPATTO SU MOBILE */}
                         <div className={`p-3 rounded-lg ${darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50'}`}>
                             <p className={`font-semibold text-base sm:text-lg ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>
-                                {t.totalHours}: {calculateHours(workerData.oraIn, workerData.oraOut, workerData.pausaMinuti)}h
+                                {t.totalHours}: {calculateHours(workerData.oraIn, workerData.oraOut, workerData.pausaMinuti)}{t.hours_short}
                             </p>
                         </div>
 
@@ -334,30 +334,30 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                                     type="button"
                                     onClick={() => {
                                         clearCanvas(canvasRef.current);
-                                        showToast('🗑️ Firma cancellata', 'success');
+                                        showToast(`🗑️ ${t.signatureCleared}`, 'success');
                                     }}
                                     className="w-full sm:w-auto px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base transition-colors font-medium"
                                 >
-                                    🗑️ Cancella
+                                    🗑️ {t.clear}
                                 </button>
                                 
                                 <button
                                     type="button"
                                     onClick={() => {
                                         if (isCanvasBlank(canvasRef.current)) {
-                                            showToast('❌ Canvas vuoto!', 'error');
+                                            showToast(`❌ ${t.canvasEmpty}`, 'error');
                                         } else {
-                                            showToast('✅ Firma presente!', 'success');
+                                            showToast(`✅ ${t.signaturePresent}`, 'success');
                                         }
                                     }}
                                     className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base transition-colors font-medium"
                                 >
-                                    ✓ Verifica
+                                    ✓ {t.verify}
                                 </button>
                             </div>
                             
                             <p className={`text-xs ${textClass} mt-1`}>
-                                💡 Disegna con il mouse o con il dito
+                                💡 {t.drawSignature}
                             </p>
                         </div>
 
@@ -367,7 +367,7 @@ const WorkerMode = ({ sheetId, db, darkMode, language = 'it' }) => {
                             disabled={loading}
                             className="w-full py-3 sm:py-4 bg-indigo-600 text-white rounded-lg font-bold text-base sm:text-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors touch-button shadow-lg"
                         >
-                            {loading ? '⏳ INVIO...' : `📤 ${t.sendData}`}
+                            {loading ? `⏳ ${t.sending}` : `📤 ${t.sendData}`}
                         </button>
                     </div>
                 </div>
