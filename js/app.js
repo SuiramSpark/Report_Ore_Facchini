@@ -513,6 +513,7 @@ const App = () => {
                         auditLog={auditLog}
                         darkMode={darkMode}
                         language={language}
+                        db={db}
                     />
                 )}
 
