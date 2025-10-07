@@ -505,3 +505,32 @@ header > div {
         color: white !important;
     }
 }
+/* ========================================
+   HEADER INDIGO-825 UNIVERSALE (LIGHT + DARK)
+   ======================================== */
+
+.bg-indigo-825 {
+    background-color: #312e81 !important; /* Indigo 825 */
+    color: #ffffff !important;
+}
+
+/* Variante per dark mode */
+.dark .bg-indigo-825 {
+    background-color: #4338ca !important; /* più brillante per dark mode */
+    color: #f9fafb !important;
+}
+
+/* Uniforma bottoni, select e label dentro header */
+header.bg-indigo-825 button,
+header.bg-indigo-825 select,
+header.bg-indigo-825 label {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+header.bg-indigo-825 button:hover,
+header.bg-indigo-825 select:hover,
+header.bg-indigo-825 label:hover {
+    background-color: rgba(255, 255, 255, 0.25) !important;
+}
