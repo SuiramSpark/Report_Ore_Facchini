@@ -476,3 +476,32 @@ header {
 header > div {
     max-width: 100vw;
 }
+/* ========================================
+   LANGUAGE SELECTOR DARK MODE FIX
+   ======================================== */
+
+/* Fix per dropdown lingua - forza colori leggibili */
+.language-selector {
+    color: white !important;
+}
+
+.language-selector option {
+    background-color: #1f2937 !important; /* Grigio scuro */
+    color: white !important;
+    padding: 8px !important;
+}
+
+/* Hover sulle opzioni */
+.language-selector option:hover,
+.language-selector option:checked {
+    background-color: #4f46e5 !important; /* Indigo */
+    color: white !important;
+}
+
+/* Fix per Safari/iOS */
+@supports (-webkit-touch-callout: none) {
+    .language-selector option {
+        background: #1f2937 !important;
+        color: white !important;
+    }
+}
