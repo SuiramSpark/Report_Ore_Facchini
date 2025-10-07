@@ -355,11 +355,11 @@ const App = () => {
                         {/* Actions - COMPATTE SU MOBILE */}
                         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                             {/* Language Selector - 5 LINGUE */}
-                            <select
-                                value={language}
-                                onChange={(e) => setLanguage(e.target.value)}
-                                className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-sm"
-                            >
+<select
+    value={language}
+    onChange={(e) => setLanguage(e.target.value)}
+    className="language-selector px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-sm"
+>
                                 <option value="it">🇮🇹 IT</option>
                                 <option value="en">🇬🇧 EN</option>
                                 <option value="es">🇪🇸 ES</option>
