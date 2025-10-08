@@ -304,6 +304,57 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         setGeneratingPDF(false);
     };
 
+    // 🔙 Handle Edit/Go Back
+    const handleEditSubmission = async () => {
+        if (!db || !sheetId || !submittedWorkerId) return;
+        
+        const confirmEdit = confirm(language === 'it' 
+            ? 'Vuoi modificare i tuoi dati? Dovrai reinserire la firma.' 
+            : language === 'en'
+            ? 'Do you want to edit your data? You will need to re-sign.'
+            : language === 'es'
+            ? '¿Quieres editar tus datos? Tendrás que volver a firmar.'
+            : language === 'fr'
+            ? 'Voulez-vous modifier vos données? Vous devrez re-signer.'
+            : 'Vrei să modifici datele? Va trebui să semnezi din nou.'
+        );
+        
+        if (!confirmEdit) return;
+        
+        try {
+            // Find and restore worker data
+            const mySubmission = sheetData.lavoratori?.find(w => w.id == submittedWorkerId);
+            if (mySubmission) {
+                setWorkerData({
+                    nome: mySubmission.nome || '',
+                    cognome: mySubmission.cognome || '',
+                    oraIn: mySubmission.oraIn || '',
+                    oraOut: mySubmission.oraOut || '',
+                    pausaMinuti: mySubmission.pausaMinuti || '',
+                    codiceFiscale: mySubmission.codiceFiscale || '',
+                    numeroIdentita: mySubmission.numeroIdentita || '',
+                    telefono: mySubmission.telefono || '',
+                    email: mySubmission.email || '',
+                    indirizzo: mySubmission.indirizzo || ''
+                });
+            }
+            
+            // Remove worker from sheet
+            const updatedWorkers = sheetData.lavoratori.filter(w => w.id != submittedWorkerId);
+            await db.collection('timesheets').doc(sheetId).update({
+                lavoratori: updatedWorkers
+            });
+            
+            // Reset submission
+            setSubmittedWorkerId(null);
+            
+            showToast(`✅ ${language === 'it' ? 'Puoi modificare i tuoi dati' : language === 'en' ? 'You can edit your data' : language === 'es' ? 'Puedes editar tus datos' : language === 'fr' ? 'Vous pouvez modifier vos données' : 'Poți modifica datele'}`, 'success');
+        } catch (error) {
+            console.error('Error editing submission:', error);
+            showToast(`❌ ${t.error}`, 'error');
+        }
+    };
+
     const bgClass = darkMode ? 'bg-gray-900' : 'bg-gray-50';
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
@@ -431,6 +482,16 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                         </span>
                                     </p>
                                 </div>
+                                
+                                {/* 🔙 Edit Button (only if NOT completed) */}
+                                {!isCompleted && (
+                                    <button
+                                        onClick={handleEditSubmission}
+                                        className="w-full py-3 mb-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold transition-colors shadow-lg"
+                                    >
+                                        ✏️ {t.edit}
+                                    </button>
+                                )}
                                 
                                 {/* 📄 PDF Download Button (only if completed) */}
                                 {isCompleted && (
