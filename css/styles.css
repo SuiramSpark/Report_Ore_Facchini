@@ -26,7 +26,7 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Toast Notifications */
+/* Toast Notifications - Mobile Friendly */
 #toast-container {
     position: fixed;
     top: 10px;
@@ -47,7 +47,7 @@ body {
     text-align: center;
 }
 
-/* Canvas Firma */
+/* Canvas Firma - SEMPRE SFONDO BIANCO */
 canvas.signature-canvas {
     border: 2px solid #3b82f6;
     border-radius: 8px;
@@ -60,7 +60,7 @@ canvas.signature-canvas {
     max-width: 100%;
 }
 
-/* Touch-friendly buttons */
+/* Touch-friendly buttons - MOBILE FIRST */
 .touch-button {
     min-height: 44px;
     min-width: 44px;
@@ -68,12 +68,38 @@ canvas.signature-canvas {
     padding: 10px 16px;
 }
 
+/* Mobile buttons layout */
+.mobile-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.mobile-buttons button {
+    width: 100%;
+}
+
+/* Tablet and Desktop */
+@media (min-width: 640px) {
+    .mobile-buttons {
+        flex-direction: row;
+        width: auto;
+    }
+    
+    .mobile-buttons button {
+        width: auto;
+    }
+}
+
 /* MOBILE PORTRAIT OPTIMIZATIONS */
 @media (max-width: 639px) {
+    /* Riduco padding generale */
     body {
         font-size: 14px;
     }
     
+    /* Header compatto */
     header {
         padding: 12px 16px !important;
     }
@@ -81,21 +107,401 @@ canvas.signature-canvas {
     header h1 {
         font-size: 18px !important;
     }
+    
+    /* Navigazione mobile */
+    nav button {
+        font-size: 13px !important;
+        padding: 8px 12px !important;
+    }
+    
+    /* Card compatte */
+    .rounded-xl {
+        border-radius: 12px !important;
+    }
+    
+    /* Padding ridotti */
+    .p-6 {
+        padding: 16px !important;
+    }
+    
+    .p-4 {
+        padding: 12px !important;
+    }
+    
+    /* Font sizes ridotti */
+    .text-3xl {
+        font-size: 20px !important;
+    }
+    
+    .text-2xl {
+        font-size: 18px !important;
+    }
+    
+    .text-xl {
+        font-size: 16px !important;
+    }
+    
+    .text-lg {
+        font-size: 15px !important;
+    }
+    
+    .text-base {
+        font-size: 14px !important;
+    }
+    
+    /* Input compatti */
+    input, select, textarea {
+        font-size: 16px !important; /* Previene zoom su iOS */
+        padding: 10px 12px !important;
+    }
+    
+    input[type="time"],
+    input[type="date"] {
+        padding: 8px !important;
+    }
+    
+    /* Bottoni compatti */
+    button {
+        font-size: 14px !important;
+        padding: 10px 16px !important;
+    }
+    
+    button.text-lg {
+        font-size: 16px !important;
+    }
+    
+    /* Gap ridotti */
+    .gap-6 {
+        gap: 12px !important;
+    }
+    
+    .gap-4 {
+        gap: 10px !important;
+    }
+    
+    .gap-3 {
+        gap: 8px !important;
+    }
+    
+    /* Margin ridotti */
+    .mb-6 {
+        margin-bottom: 16px !important;
+    }
+    
+    .mb-4 {
+        margin-bottom: 12px !important;
+    }
+    
+    .mt-4 {
+        margin-top: 12px !important;
+    }
+    
+    /* Canvas firma più piccolo */
+    canvas.signature-canvas {
+        min-height: 120px !important;
+    }
+    
+    /* Logo più piccolo */
+    header img {
+        max-height: 32px !important;
+    }
+    
+    /* Stats cards compatte */
+    .grid-cols-1.md\\:grid-cols-3 > div {
+        padding: 12px !important;
+    }
+    
+    .grid-cols-1.md\\:grid-cols-3 > div p.text-4xl {
+        font-size: 28px !important;
+    }
+    
+    /* Worker cards compatte */
+    .space-y-3 > div {
+        padding: 12px !important;
+    }
+    
+    /* Form grids stack completamente */
+    .grid-cols-1.sm\\:grid-cols-2,
+    .grid-cols-1.sm\\:grid-cols-3 {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Tabelle responsive */
+    table {
+        font-size: 12px !important;
+    }
+    
+    th, td {
+        padding: 6px 4px !important;
+    }
+    
+    /* Scroll orizzontale per contenuti larghi */
+    .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
-/* Language Selector Dark Mode Fix */
+/* EXTRA SMALL (iPhone SE, small phones) */
+@media (max-width: 374px) {
+    body {
+        font-size: 13px;
+    }
+    
+    .text-2xl {
+        font-size: 16px !important;
+    }
+    
+    .text-xl {
+        font-size: 15px !important;
+    }
+    
+    .p-6, .p-4 {
+        padding: 10px !important;
+    }
+    
+    button {
+        font-size: 13px !important;
+        padding: 8px 12px !important;
+    }
+    
+    input, select, textarea {
+        font-size: 15px !important;
+        padding: 8px 10px !important;
+    }
+}
+
+/* Scrollbar personalizzata */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-track {
+    background: #1f2937;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+/* Animazioni */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Blacklist card styles */
+.blacklist-card {
+    border: 2px solid #ef4444;
+    background: #fee2e2;
+}
+
+.dark .blacklist-card {
+    border-color: #dc2626;
+    background: #7f1d1d;
+}
+
+/* Fix per input iOS (previene zoom) */
+@supports (-webkit-touch-callout: none) {
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    input[type="time"],
+    input[type="date"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Migliora tap target su mobile */
+@media (max-width: 639px) {
+    a, button, input, select, textarea {
+        -webkit-tap-highlight-color: rgba(59, 130, 246, 0.3);
+    }
+}
+
+/* Previeni overflow orizzontale */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+/* Container responsive */
+.max-w-7xl, .max-w-6xl, .max-w-4xl, .max-w-2xl {
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+/* Fix per modal/dropdown su mobile */
+@media (max-width: 639px) {
+    .fixed {
+        left: 0 !important;
+        right: 0 !important;
+    }
+}
+
+/* Ottimizza performance su mobile */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+button, a {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ========================================
+   MENU HAMBURGER MOBILE - CRITICAL FIX
+   ======================================== */
+
+/* Menu hamburger responsive */
+@media (max-width: 767px) {
+    /* Header flex ottimizzato */
+    header .flex.justify-between {
+        flex-wrap: nowrap !important;
+        align-items: center;
+    }
+    
+    /* Logo e titolo più compatti */
+    header .flex.items-center.gap-4,
+    header .flex.items-center.gap-2 {
+        gap: 8px !important;
+    }
+    
+    header h1 {
+        font-size: 15px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 140px;
+    }
+    
+    header img {
+        height: 28px !important;
+        width: 28px !important;
+        flex-shrink: 0;
+    }
+    
+    /* Actions compatte */
+    header select,
+    header button:not(.md\\:hidden),
+    header label {
+        padding: 6px 8px !important;
+        font-size: 16px !important;
+        min-width: auto !important;
+    }
+    
+    /* Hamburger button */
+    header button.md\\:hidden {
+        padding: 8px 12px !important;
+        font-size: 20px !important;
+        line-height: 1 !important;
+    }
+    
+    /* Mobile menu dropdown */
+    nav.md\\:hidden {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        animation: slideDown 0.3s ease-out;
+    }
+    
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Bottoni menu mobile full width */
+    nav.md\\:hidden button {
+        width: 100% !important;
+        text-align: left !important;
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 374px) {
+    header h1 {
+        font-size: 13px !important;
+        max-width: 100px !important;
+    }
+    
+    header select,
+    header button,
+    header label {
+        padding: 5px 6px !important;
+        font-size: 14px !important;
+    }
+}
+
+/* Previeni overflow header */
+header {
+    overflow-x: hidden !important;
+}
+
+header > div {
+    max-width: 100vw;
+}
+/* ========================================
+   LANGUAGE SELECTOR DARK MODE FIX
+   ======================================== */
+
+/* Fix per dropdown lingua - forza colori leggibili */
 .language-selector {
     color: white !important;
 }
 
 .language-selector option {
-    background-color: #1f2937 !important;
+    background-color: #1f2937 !important; /* Grigio scuro */
     color: white !important;
     padding: 8px !important;
 }
 
+/* Hover sulle opzioni */
 .language-selector option:hover,
 .language-selector option:checked {
-    background-color: #4f46e5 !important;
+    background-color: #4f46e5 !important; /* Indigo */
     color: white !important;
+}
+
+/* Fix per Safari/iOS */
+@supports (-webkit-touch-callout: none) {
+    .language-selector option {
+        background: #1f2937 !important;
+        color: white !important;
+    }
 }
