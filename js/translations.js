@@ -1,4 +1,4 @@
-// Translations - 5 LINGUE COMPLETE
+// Translations - 5 LINGUE COMPLETE + NUOVE FUNZIONALITÀ
 const translations = {
     it: {
         // Navigation
@@ -8,6 +8,7 @@ const translations = {
         auditLog: 'REGISTRO MODIFICHE',
         reports: 'REPORT',
         sheets: 'Fogli Ore',
+        settings: 'IMPOSTAZIONI',
         
         // Dashboard Stats
         weeklyHours: 'Ore Settimanali',
@@ -42,6 +43,42 @@ const translations = {
         drawSignature: 'Disegna con il mouse o con il dito',
         clear: 'Cancella',
         verify: 'Verifica',
+        
+        // ⭐ Session Persistence - NUOVO
+        sessionSaved: 'Sessione salvata automaticamente',
+        sessionRestored: 'Sessione ripristinata',
+        previousSession: 'Sessione Precedente Trovata',
+        continueSession: 'Continua Sessione',
+        startNew: 'Inizia Nuova',
+        sessionPersistence: 'Salvataggio Automatico',
+        autoSaveEnabled: 'Salvataggio automatico attivo',
+        restoringSession: 'Ripristino sessione...',
+        
+        // 🌓 Dark Mode Worker - NUOVO
+        darkModeWorker: 'Tema Scuro',
+        lightMode: 'Tema Chiaro',
+        
+        // 📄 PDF Regeneration - NUOVO
+        regeneratePDF: 'Rigenera PDF',
+        pdfRegenerated: 'PDF rigenerato con successo',
+        downloadYourPDF: 'Scarica il tuo PDF',
+        generatingPDF: 'Generazione PDF...',
+        
+        // ⚙️ Settings - NUOVO
+        linkExpiration: 'Scadenza Link Lavoratore',
+        expirationTime: 'Tempo di Scadenza',
+        days: 'giorni',
+        day: 'giorno',
+        saveSettings: 'Salva Impostazioni',
+        settingsSaved: 'Impostazioni salvate con successo',
+        linkExpiresIn: 'Il link scade tra',
+        never: 'Mai',
+        expired: 'Scaduto',
+        linkSettings: 'Impostazioni Link',
+        systemSettings: 'Impostazioni Sistema',
+        linkExpired: 'Link Scaduto',
+        linkExpiredMessage: 'Questo link è scaduto. Contatta il responsabile per un nuovo link.',
+        contactResponsible: 'Contatta il Responsabile',
         
         // Sheet Info
         company: 'Azienda Cliente',
@@ -186,6 +223,7 @@ const translations = {
         auditLog: 'CHANGE LOG',
         reports: 'REPORTS',
         sheets: 'Timesheets',
+        settings: 'SETTINGS',
         
         // Dashboard Stats
         weeklyHours: 'Weekly Hours',
@@ -220,6 +258,42 @@ const translations = {
         drawSignature: 'Draw with mouse or finger',
         clear: 'Clear',
         verify: 'Verify',
+        
+        // ⭐ Session Persistence - NEW
+        sessionSaved: 'Session automatically saved',
+        sessionRestored: 'Session restored',
+        previousSession: 'Previous Session Found',
+        continueSession: 'Continue Session',
+        startNew: 'Start New',
+        sessionPersistence: 'Auto Save',
+        autoSaveEnabled: 'Auto save enabled',
+        restoringSession: 'Restoring session...',
+        
+        // 🌓 Dark Mode Worker - NEW
+        darkModeWorker: 'Dark Theme',
+        lightMode: 'Light Theme',
+        
+        // 📄 PDF Regeneration - NEW
+        regeneratePDF: 'Regenerate PDF',
+        pdfRegenerated: 'PDF regenerated successfully',
+        downloadYourPDF: 'Download Your PDF',
+        generatingPDF: 'Generating PDF...',
+        
+        // ⚙️ Settings - NEW
+        linkExpiration: 'Worker Link Expiration',
+        expirationTime: 'Expiration Time',
+        days: 'days',
+        day: 'day',
+        saveSettings: 'Save Settings',
+        settingsSaved: 'Settings saved successfully',
+        linkExpiresIn: 'Link expires in',
+        never: 'Never',
+        expired: 'Expired',
+        linkSettings: 'Link Settings',
+        systemSettings: 'System Settings',
+        linkExpired: 'Link Expired',
+        linkExpiredMessage: 'This link has expired. Contact the supervisor for a new link.',
+        contactResponsible: 'Contact Supervisor',
         
         // Sheet Info
         company: 'Client Company',
@@ -364,6 +438,7 @@ const translations = {
         auditLog: 'REGISTRO CAMBIOS',
         reports: 'INFORMES',
         sheets: 'Hojas de Horas',
+        settings: 'AJUSTES',
         
         // Dashboard Stats
         weeklyHours: 'Horas Semanales',
@@ -398,6 +473,42 @@ const translations = {
         drawSignature: 'Dibuja con el ratón o el dedo',
         clear: 'Borrar',
         verify: 'Verificar',
+        
+        // ⭐ Session Persistence - NUEVO
+        sessionSaved: 'Sesión guardada automáticamente',
+        sessionRestored: 'Sesión restaurada',
+        previousSession: 'Sesión Anterior Encontrada',
+        continueSession: 'Continuar Sesión',
+        startNew: 'Iniciar Nueva',
+        sessionPersistence: 'Guardado Automático',
+        autoSaveEnabled: 'Guardado automático activo',
+        restoringSession: 'Restaurando sesión...',
+        
+        // 🌓 Dark Mode Worker - NUEVO
+        darkModeWorker: 'Tema Oscuro',
+        lightMode: 'Tema Claro',
+        
+        // 📄 PDF Regeneration - NUEVO
+        regeneratePDF: 'Regenerar PDF',
+        pdfRegenerated: 'PDF regenerado con éxito',
+        downloadYourPDF: 'Descargar Tu PDF',
+        generatingPDF: 'Generando PDF...',
+        
+        // ⚙️ Settings - NUEVO
+        linkExpiration: 'Caducidad Enlace Trabajador',
+        expirationTime: 'Tiempo de Caducidad',
+        days: 'días',
+        day: 'día',
+        saveSettings: 'Guardar Ajustes',
+        settingsSaved: 'Ajustes guardados con éxito',
+        linkExpiresIn: 'El enlace caduca en',
+        never: 'Nunca',
+        expired: 'Caducado',
+        linkSettings: 'Ajustes de Enlace',
+        systemSettings: 'Ajustes del Sistema',
+        linkExpired: 'Enlace Caducado',
+        linkExpiredMessage: 'Este enlace ha caducado. Contacta al supervisor para un nuevo enlace.',
+        contactResponsible: 'Contactar Supervisor',
         
         // Sheet Info
         company: 'Empresa Cliente',
@@ -542,6 +653,7 @@ const translations = {
         auditLog: 'JOURNAL MODIFICATIONS',
         reports: 'RAPPORTS',
         sheets: 'Feuilles de Temps',
+        settings: 'PARAMÈTRES',
         
         // Dashboard Stats
         weeklyHours: 'Heures Hebdomadaires',
@@ -576,6 +688,42 @@ const translations = {
         drawSignature: 'Dessinez avec la souris ou le doigt',
         clear: 'Effacer',
         verify: 'Vérifier',
+        
+        // ⭐ Session Persistence - NOUVEAU
+        sessionSaved: 'Session enregistrée automatiquement',
+        sessionRestored: 'Session restaurée',
+        previousSession: 'Session Précédente Trouvée',
+        continueSession: 'Continuer Session',
+        startNew: 'Commencer Nouvelle',
+        sessionPersistence: 'Enregistrement Automatique',
+        autoSaveEnabled: 'Enregistrement automatique actif',
+        restoringSession: 'Restauration session...',
+        
+        // 🌓 Dark Mode Worker - NOUVEAU
+        darkModeWorker: 'Thème Sombre',
+        lightMode: 'Thème Clair',
+        
+        // 📄 PDF Regeneration - NOUVEAU
+        regeneratePDF: 'Régénérer PDF',
+        pdfRegenerated: 'PDF régénéré avec succès',
+        downloadYourPDF: 'Télécharger Votre PDF',
+        generatingPDF: 'Génération PDF...',
+        
+        // ⚙️ Settings - NOUVEAU
+        linkExpiration: 'Expiration Lien Travailleur',
+        expirationTime: 'Temps d\'Expiration',
+        days: 'jours',
+        day: 'jour',
+        saveSettings: 'Sauvegarder Paramètres',
+        settingsSaved: 'Paramètres sauvegardés avec succès',
+        linkExpiresIn: 'Le lien expire dans',
+        never: 'Jamais',
+        expired: 'Expiré',
+        linkSettings: 'Paramètres Lien',
+        systemSettings: 'Paramètres Système',
+        linkExpired: 'Lien Expiré',
+        linkExpiredMessage: 'Ce lien a expiré. Contactez le superviseur pour un nouveau lien.',
+        contactResponsible: 'Contacter Superviseur',
         
         // Sheet Info
         company: 'Entreprise Cliente',
@@ -720,6 +868,7 @@ const translations = {
         auditLog: 'JURNAL MODIFICĂRI',
         reports: 'RAPOARTE',
         sheets: 'Fișe de Pontaj',
+        settings: 'SETĂRI',
         
         // Dashboard Stats
         weeklyHours: 'Ore Săptămânale',
@@ -754,6 +903,42 @@ const translations = {
         drawSignature: 'Desenează cu mouse-ul sau degetul',
         clear: 'Șterge',
         verify: 'Verifică',
+        
+        // ⭐ Session Persistence - NOU
+        sessionSaved: 'Sesiune salvată automat',
+        sessionRestored: 'Sesiune restaurată',
+        previousSession: 'Sesiune Anterioară Găsită',
+        continueSession: 'Continuă Sesiunea',
+        startNew: 'Începe Nou',
+        sessionPersistence: 'Salvare Automată',
+        autoSaveEnabled: 'Salvare automată activă',
+        restoringSession: 'Restaurare sesiune...',
+        
+        // 🌓 Dark Mode Worker - NOU
+        darkModeWorker: 'Temă Întunecoasă',
+        lightMode: 'Temă Luminoasă',
+        
+        // 📄 PDF Regeneration - NOU
+        regeneratePDF: 'Regenerează PDF',
+        pdfRegenerated: 'PDF regenerat cu succes',
+        downloadYourPDF: 'Descarcă PDF-ul Tău',
+        generatingPDF: 'Generare PDF...',
+        
+        // ⚙️ Settings - NOU
+        linkExpiration: 'Expirare Link Muncitor',
+        expirationTime: 'Timp de Expirare',
+        days: 'zile',
+        day: 'zi',
+        saveSettings: 'Salvează Setări',
+        settingsSaved: 'Setări salvate cu succes',
+        linkExpiresIn: 'Link-ul expiră în',
+        never: 'Niciodată',
+        expired: 'Expirat',
+        linkSettings: 'Setări Link',
+        systemSettings: 'Setări Sistem',
+        linkExpired: 'Link Expirat',
+        linkExpiredMessage: 'Acest link a expirat. Contactează responsabilul pentru un link nou.',
+        contactResponsible: 'Contactează Responsabilul',
         
         // Sheet Info
         company: 'Companie Client',
