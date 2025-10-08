@@ -1,4 +1,4 @@
-// Main App Component - 5 LINGUE COMPLETE
+// Main App Component - 5 LINGUE COMPLETE + SETTINGS
 const App = () => {
     const { useState, useEffect, useCallback, useMemo } = React;
     
@@ -12,7 +12,7 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     
     // Admin State
-    const [currentView, setCurrentView] = useState('dashboard'); // dashboard, list, sheet, blacklist, audit, reports
+    const [currentView, setCurrentView] = useState('dashboard'); // dashboard, list, sheet, blacklist, audit, reports, settings ⭐
     const [sheets, setSheets] = useState([]);
     const [blacklist, setBlacklist] = useState([]);
     const [auditLog, setAuditLog] = useState([]);
@@ -350,16 +350,27 @@ const App = () => {
                             >
                                 📈 {t.reports}
                             </button>
+                            {/* ⭐ NUOVO: SETTINGS */}
+                            <button
+                                onClick={() => setCurrentView('settings')}
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'settings' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
+                                }`}
+                            >
+                                ⚙️ {t.settings}
+                            </button>
                         </nav>
 
                         {/* Actions - COMPATTE SU MOBILE */}
                         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                             {/* Language Selector - 5 LINGUE */}
-<select
-    value={language}
-    onChange={(e) => setLanguage(e.target.value)}
-    className="language-selector px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-sm"
->
+                            <select
+                                value={language}
+                                onChange={(e) => setLanguage(e.target.value)}
+                                className="language-selector px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white text-sm"
+                            >
                                 <option value="it">🇮🇹 IT</option>
                                 <option value="en">🇬🇧 EN</option>
                                 <option value="es">🇪🇸 ES</option>
@@ -451,6 +462,17 @@ const App = () => {
                             >
                                 📈 {t.reports}
                             </button>
+                            {/* ⭐ NUOVO: SETTINGS MOBILE */}
+                            <button
+                                onClick={() => { setCurrentView('settings'); setMobileMenuOpen(false); }}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'settings' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
+                            >
+                                ⚙️ {t.settings}
+                            </button>
                         </nav>
                     )}
                 </div>
@@ -525,6 +547,15 @@ const App = () => {
                         darkMode={darkMode}
                         language={language}
                         companyLogo={companyLogo}
+                    />
+                )}
+
+                {/* ⭐ NUOVO: SETTINGS VIEW */}
+                {currentView === 'settings' && (
+                    <Settings
+                        db={db}
+                        darkMode={darkMode}
+                        language={language}
                     />
                 )}
             </main>
