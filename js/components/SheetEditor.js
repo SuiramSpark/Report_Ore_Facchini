@@ -1,4 +1,4 @@
-// Sheet Editor Component - VERSIONE COMPLETA 5 LINGUE
+// Sheet Editor Component - VERSIONE COMPLETA 5 LINGUE + LINK VISIBILE
 const SheetEditor = ({ 
     sheet, 
     onSave, 
@@ -60,25 +60,12 @@ const SheetEditor = ({
         ) || false;
     };
 
-    const generateShareLink = (sheetId) => {
-        const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
-        const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
-        navigator.clipboard.writeText(link)
-            .then(() => {
-                showToastLocal(`✅ ${t.linkCopied}`, 'success');
-            })
-            .catch(() => {
-                prompt(`${t.generateLink}:`, link);
-            });
-    };
-
     // Initialize canvas responsabile
     React.useEffect(() => {
         const initCanvas = (canvas) => {
             if (!canvas) return;
             
             const ctx = canvas.getContext('2d');
-            // Sfondo bianco
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
@@ -88,8 +75,6 @@ const SheetEditor = ({
             ctx.lineJoin = 'round';
             
             let isDrawing = false;
-            let lastX = 0;
-            let lastY = 0;
 
             const getPos = (e) => {
                 const rect = canvas.getBoundingClientRect();
@@ -115,8 +100,6 @@ const SheetEditor = ({
             const startDraw = (e) => {
                 isDrawing = true;
                 const pos = getPos(e);
-                lastX = pos.x;
-                lastY = pos.y;
                 ctx.beginPath();
                 ctx.moveTo(pos.x, pos.y);
                 e.preventDefault();
@@ -127,8 +110,6 @@ const SheetEditor = ({
                 const pos = getPos(e);
                 ctx.lineTo(pos.x, pos.y);
                 ctx.stroke();
-                lastX = pos.x;
-                lastY = pos.y;
                 e.preventDefault();
             };
 
@@ -136,13 +117,10 @@ const SheetEditor = ({
                 isDrawing = false;
             };
 
-            // Eventi mouse
             canvas.addEventListener('mousedown', startDraw);
             canvas.addEventListener('mousemove', draw);
             canvas.addEventListener('mouseup', stopDraw);
             canvas.addEventListener('mouseleave', stopDraw);
-
-            // Eventi touch
             canvas.addEventListener('touchstart', startDraw);
             canvas.addEventListener('touchmove', draw);
             canvas.addEventListener('touchend', stopDraw);
@@ -170,8 +148,6 @@ const SheetEditor = ({
 
         if (respCanvasRef.current) {
             initCanvas(respCanvasRef.current);
-            
-            // Salva le funzioni nel ref
             respCanvasRef.current.clearCanvas = () => clearCanvas(respCanvasRef.current);
             respCanvasRef.current.isCanvasBlank = () => isCanvasBlank(respCanvasRef.current);
         }
@@ -418,7 +394,7 @@ const SheetEditor = ({
                     rows="3"
                 />
 
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3">
                     <button
                         onClick={saveSheet}
                         disabled={loading}
@@ -433,31 +409,32 @@ const SheetEditor = ({
                     >
                         🔗 {t.generateLink}
                     </button>
-                        {/* ↓ NUOVO: Link visibile */}
-<div className={`mt-3 p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-    <p className={`text-xs ${textClass} mb-1 font-semibold`}>🔗 {t.shareLink}:</p>
-    <div className="flex gap-2">
-        <input
-            type="text"
-            value={`${window.location.origin}/Report_Ore_Facchini/?mode=worker&sheet=${currentSheet.id}`}
-            readOnly
-            className={`flex-1 px-3 py-2 rounded border ${inputClass} text-xs sm:text-sm`}
-            onClick={(e) => e.target.select()}
-        />
-        <button
-            onClick={() => {
-                const input = document.querySelector(`input[value*="${currentSheet.id}"]`);
-                input.select();
-                document.execCommand('copy');
-                showToast('✅ Link copiato!', 'success');
-            }}
-            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold"
-        >
-            📋
-        </button>
-    </div>
-</div>
-            
+                </div>
+
+                {/* Link visibile */}
+                <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <p className={`text-xs ${textClass} mb-2 font-semibold`}>🔗 {t.shareLink || 'Link condivisione'}:</p>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={`${window.location.origin}/Report_Ore_Facchini/?mode=worker&sheet=${currentSheet.id}`}
+                            readOnly
+                            className={`flex-1 px-3 py-2 rounded border ${inputClass} text-xs sm:text-sm`}
+                            onClick={(e) => e.target.select()}
+                        />
+                        <button
+                            onClick={() => {
+                                const link = `${window.location.origin}/Report_Ore_Facchini/?mode=worker&sheet=${currentSheet.id}`;
+                                navigator.clipboard.writeText(link);
+                                showToastLocal('✅ Link copiato!', 'success');
+                            }}
+                            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold"
+                        >
+                            📋
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             {/* Workers Section */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
@@ -540,7 +517,6 @@ const SheetEditor = ({
                                     }`}
                                 >
                                     {isEditing ? (
-                                        // EDIT MODE
                                         <div className="space-y-3">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 <input
@@ -593,7 +569,6 @@ const SheetEditor = ({
                                             </div>
                                         </div>
                                     ) : (
-                                        // VIEW MODE
                                         <div className="flex items-start gap-3">
                                             {bulkEditMode && (
                                                 <input
