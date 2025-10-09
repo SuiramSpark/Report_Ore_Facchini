@@ -151,11 +151,11 @@ const SheetList = ({ sheets, onSelectSheet, onDeleteSheet, onArchiveSheet, darkM
                                 {/* Actions */}
                                 <div className="flex flex-row sm:flex-col gap-2 sm:justify-start">
                                     <button
-                                        onClick={() => onSelectSheet(sheet)}
-                                        className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
-                                    >
-                                        ✏️ {t.edit}
-                                    </button>
+    onClick={() => onSelectSheet(sheet)}
+    className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+>
+    ✏️ {t.edit}
+</button>
                                     
                                     {sheet.status === 'completed' && (
                                         <button
