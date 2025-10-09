@@ -1,0 +1,25 @@
+{
+  "name": "Registro Ore Lavoratori",
+  "short_name": "Registro Ore",
+  "description": "Sistema gestione fogli ore - Admin & Worker",
+  "start_url": "/Report_Ore_Facchini/",
+  "scope": "/Report_Ore_Facchini/",
+  "display": "standalone",
+  "background_color": "#1F2937",
+  "theme_color": "#4F46E5",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
