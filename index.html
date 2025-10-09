@@ -13,6 +13,34 @@
     
     <title>Registro Ore Lavoratori</title>
     
+    <!-- ========================================
+         PWA (Progressive Web App) SUPPORT
+         ======================================== -->
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Registro Ore">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512x512.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-192x192.png">
+    <link rel="shortcut icon" href="icons/icon-192x192.png">
+    
+    <!-- Android Chrome -->
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- Windows Tiles -->
+    <meta name="msapplication-TileColor" content="#4F46E5">
+    <meta name="msapplication-TileImage" content="icons/icon-192x192.png">
+    
+    <!-- ======================================== -->
+    
     <!-- React & Firebase -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -61,7 +89,7 @@
     <script type="text/babel" src="js/components/SheetList.js"></script>
     <script type="text/babel" src="js/components/SheetEditor.js"></script>
     <script type="text/babel" src="js/components/ReportManager.js"></script>
-    <script type="text/babel" src="js/components/Settings.js"></script> <!-- ⭐ NUOVO -->
+    <script type="text/babel" src="js/components/Settings.js"></script>
     
     <!-- App Principale (CARICA PER ULTIMO) -->
     <script type="text/babel" src="js/app.js"></script>
