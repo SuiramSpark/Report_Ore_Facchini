@@ -59,14 +59,42 @@ const formatDateTime = (dateString) => {
 };
 
 // Generate Share Link (ALWAYS CORRECT PATH)
-const generateShareLink = (sheetId) => {
+// Generate Share Link con WEB SHARE API
+const generateShareLink = async (sheetId) => {
     const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
     const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
+    
+    // Verifica se Web Share API è disponibile
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Registro Ore Lavoratori',
+                text: 'Compila il tuo foglio ore:',
+                url: link
+            });
+            showToast('✅ Link condiviso!', 'success');
+        } catch (error) {
+            // Utente ha annullato la condivisione o errore
+            if (error.name !== 'AbortError') {
+                console.error('Errore condivisione:', error);
+                // Fallback: copia negli appunti
+                copyToClipboard(link);
+            }
+        }
+    } else {
+        // Fallback per browser che non supportano Web Share API
+        copyToClipboard(link);
+    }
+};
+
+// Funzione helper per copiare negli appunti
+const copyToClipboard = (link) => {
     navigator.clipboard.writeText(link)
         .then(() => {
             showToast('✅ Link copiato negli appunti!', 'success');
         })
         .catch(() => {
+            // Fallback se anche clipboard API non funziona
             prompt('Copia questo link:', link);
         });
 };
