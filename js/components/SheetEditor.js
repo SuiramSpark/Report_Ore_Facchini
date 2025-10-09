@@ -433,8 +433,31 @@ const SheetEditor = ({
                     >
                         🔗 {t.generateLink}
                     </button>
-                </div>
-            </div>
+                        {/* ↓ NUOVO: Link visibile */}
+<div className={`mt-3 p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+    <p className={`text-xs ${textClass} mb-1 font-semibold`}>🔗 {t.shareLink}:</p>
+    <div className="flex gap-2">
+        <input
+            type="text"
+            value={`${window.location.origin}/Report_Ore_Facchini/?mode=worker&sheet=${currentSheet.id}`}
+            readOnly
+            className={`flex-1 px-3 py-2 rounded border ${inputClass} text-xs sm:text-sm`}
+            onClick={(e) => e.target.select()}
+        />
+        <button
+            onClick={() => {
+                const input = document.querySelector(`input[value*="${currentSheet.id}"]`);
+                input.select();
+                document.execCommand('copy');
+                showToast('✅ Link copiato!', 'success');
+            }}
+            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold"
+        >
+            📋
+        </button>
+    </div>
+</div>
+            
 
             {/* Workers Section */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
