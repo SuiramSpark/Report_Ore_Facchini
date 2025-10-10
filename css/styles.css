@@ -1,4 +1,4 @@
-/* Registro Ore - MOBILE PORTRAIT OTTIMIZZATO + MENU HAMBURGER FIX */
+/* Registro Ore - MOBILE PORTRAIT OTTIMIZZATO + DASHBOARD ANIMATIONS */
 
 * {
     margin: 0;
@@ -80,6 +80,395 @@ canvas.signature-canvas {
     width: 100%;
 }
 
+/* ========================================
+   DASHBOARD ANIMATIONS & STYLES
+   ======================================== */
+
+/* ANIMAZIONI PRINCIPALI */
+@keyframes fadeInUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(30px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes slideInLeft {
+    from { 
+        opacity: 0; 
+        transform: translateX(-30px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateX(0); 
+    }
+}
+
+@keyframes growBar {
+    from { 
+        transform: scaleX(0); 
+        opacity: 0; 
+    }
+    to { 
+        transform: scaleX(1); 
+        opacity: 1; 
+    }
+}
+
+@keyframes fillPie {
+    from { 
+        stroke-dashoffset: 251.2; 
+    }
+    to { 
+        stroke-dashoffset: var(--target-offset); 
+    }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { 
+        box-shadow: 0 0 5px rgba(79, 70, 229, 0.3); 
+    }
+    50% { 
+        box-shadow: 0 0 20px rgba(79, 70, 229, 0.6); 
+    }
+}
+
+@keyframes bounceIn {
+    0% { 
+        transform: scale(0.3); 
+        opacity: 0; 
+    }
+    50% { 
+        transform: scale(1.05); 
+    }
+    70% { 
+        transform: scale(0.9); 
+    }
+    100% { 
+        transform: scale(1); 
+        opacity: 1; 
+    }
+}
+
+@keyframes shimmer {
+    0% { 
+        background-position: -200px 0; 
+    }
+    100% { 
+        background-position: 200px 0; 
+    }
+}
+
+/* CLASSI ANIMAZIONE */
+.animate-fade-in {
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-slide-in {
+    animation: slideInLeft 0.6s ease-out forwards;
+}
+
+.animate-pulse-glow {
+    animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.animate-bounce-in {
+    animation: bounceIn 0.8s ease-out forwards;
+}
+
+.animate-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200px 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+.dark .animate-shimmer {
+    background: linear-gradient(90deg, #374151 25%, #4B5563 50%, #374151 75%);
+    background-size: 200px 100%;
+}
+
+/* CARD HOVER EFFECTS */
+.dashboard-card {
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(79, 70, 229, 0.2);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.dark .dashboard-card:hover {
+    border-color: rgba(79, 70, 229, 0.4);
+}
+
+/* METRIC CARDS */
+.metric-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.metric-card:hover::before {
+    left: 100%;
+}
+
+.dark .metric-card::before {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+}
+
+/* PROGRESS BARS */
+.progress-bar {
+    transition: width 1.5s ease-in-out;
+    background: linear-gradient(90deg, #4f46e5, #7c3aed);
+}
+
+.progress-bar-success {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.progress-bar-warning {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+/* CHART CONTAINERS */
+.chart-container {
+    position: relative;
+    background: transparent;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.chart-container canvas {
+    max-height: 300px;
+}
+
+/* STATS GRID MOBILE OPTIMIZED */
+.stats-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* LOADING SKELETON */
+.skeleton {
+    background: #f0f0f0;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.dark .skeleton {
+    background: #374151;
+}
+
+.skeleton::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 1.5s infinite;
+}
+
+.dark .skeleton::after {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+}
+
+/* GRADIENT BACKGROUNDS */
+.gradient-primary {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.gradient-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.gradient-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.gradient-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* TABLE STYLES */
+.dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.dark .dashboard-table th,
+.dark .dashboard-table td {
+    border-bottom: 1px solid #374151;
+}
+
+.dashboard-table tr {
+    transition: background-color 0.2s ease;
+}
+
+.dashboard-table tr:hover {
+    background-color: #f9fafb;
+}
+
+.dark .dashboard-table tr:hover {
+    background-color: #374151;
+}
+
+/* BADGES */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.dark .badge-success {
+    background-color: #064e3b;
+    color: #a7f3d0;
+}
+
+.badge-warning {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.dark .badge-warning {
+    background-color: #78350f;
+    color: #fcd34d;
+}
+
+.badge-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.dark .badge-danger {
+    background-color: #7f1d1d;
+    color: #fca5a5;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 639px) {
+    /* MOBILE OPTIMIZATIONS */
+    body {
+        font-size: 14px;
+    }
+    
+    /* Dashboard specific mobile styles */
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+    
+    .dashboard-card {
+        margin: 0.5rem;
+        padding: 1rem !important;
+    }
+    
+    .chart-container {
+        padding: 0.5rem;
+    }
+    
+    .chart-container canvas {
+        max-height: 200px;
+    }
+    
+    .dashboard-table {
+        font-size: 0.75rem;
+    }
+    
+    .dashboard-table th,
+    .dashboard-table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    /* Metric cards mobile */
+    .metric-card {
+        padding: 1rem !important;
+    }
+    
+    .metric-card .text-3xl {
+        font-size: 1.5rem !important;
+    }
+    
+    .metric-card .text-2xl {
+        font-size: 1.25rem !important;
+    }
+    
+    /* Progress bars mobile */
+    .progress-bar {
+        height: 8px;
+    }
+    
+    /* Animazioni mobile più veloci */
+    .animate-fade-in {
+        animation-duration: 0.4s;
+    }
+    
+    .animate-slide-in {
+        animation-duration: 0.4s;
+    }
+}
+
+/* EXTRA SMALL (iPhone SE, small phones) */
+@media (max-width: 374px) {
+    body {
+        font-size: 13px;
+    }
+    
+    .dashboard-card {
+        padding: 0.75rem !important;
+        margin: 0.25rem;
+    }
+    
+    .metric-card .text-3xl {
+        font-size: 1.25rem !important;
+    }
+    
+    .chart-container {
+        padding: 0.25rem;
+    }
+    
+    .dashboard-table {
+        font-size: 0.7rem;
+    }
+}
+
 /* Tablet and Desktop */
 @media (min-width: 640px) {
     .mobile-buttons {
@@ -90,183 +479,15 @@ canvas.signature-canvas {
     .mobile-buttons button {
         width: auto;
     }
-}
-
-/* MOBILE PORTRAIT OPTIMIZATIONS */
-@media (max-width: 639px) {
-    /* Riduco padding generale */
-    body {
-        font-size: 14px;
-    }
     
-    /* Header compatto */
-    header {
-        padding: 12px 16px !important;
-    }
-    
-    header h1 {
-        font-size: 18px !important;
-    }
-    
-    /* Navigazione mobile */
-    nav button {
-        font-size: 13px !important;
-        padding: 8px 12px !important;
-    }
-    
-    /* Card compatte */
-    .rounded-xl {
-        border-radius: 12px !important;
-    }
-    
-    /* Padding ridotti */
-    .p-6 {
-        padding: 16px !important;
-    }
-    
-    .p-4 {
-        padding: 12px !important;
-    }
-    
-    /* Font sizes ridotti */
-    .text-3xl {
-        font-size: 20px !important;
-    }
-    
-    .text-2xl {
-        font-size: 18px !important;
-    }
-    
-    .text-xl {
-        font-size: 16px !important;
-    }
-    
-    .text-lg {
-        font-size: 15px !important;
-    }
-    
-    .text-base {
-        font-size: 14px !important;
-    }
-    
-    /* Input compatti */
-    input, select, textarea {
-        font-size: 16px !important; /* Previene zoom su iOS */
-        padding: 10px 12px !important;
-    }
-    
-    input[type="time"],
-    input[type="date"] {
-        padding: 8px !important;
-    }
-    
-    /* Bottoni compatti */
-    button {
-        font-size: 14px !important;
-        padding: 10px 16px !important;
-    }
-    
-    button.text-lg {
-        font-size: 16px !important;
-    }
-    
-    /* Gap ridotti */
-    .gap-6 {
-        gap: 12px !important;
-    }
-    
-    .gap-4 {
-        gap: 10px !important;
-    }
-    
-    .gap-3 {
-        gap: 8px !important;
-    }
-    
-    /* Margin ridotti */
-    .mb-6 {
-        margin-bottom: 16px !important;
-    }
-    
-    .mb-4 {
-        margin-bottom: 12px !important;
-    }
-    
-    .mt-4 {
-        margin-top: 12px !important;
-    }
-    
-    /* Canvas firma più piccolo */
-    canvas.signature-canvas {
-        min-height: 120px !important;
-    }
-    
-    /* Logo più piccolo */
-    header img {
-        max-height: 32px !important;
-    }
-    
-    /* Stats cards compatte */
-    .grid-cols-1.md\\:grid-cols-3 > div {
-        padding: 12px !important;
-    }
-    
-    .grid-cols-1.md\\:grid-cols-3 > div p.text-4xl {
-        font-size: 28px !important;
-    }
-    
-    /* Worker cards compatte */
-    .space-y-3 > div {
-        padding: 12px !important;
-    }
-    
-    /* Form grids stack completamente */
-    .grid-cols-1.sm\\:grid-cols-2,
-    .grid-cols-1.sm\\:grid-cols-3 {
-        grid-template-columns: 1fr !important;
-    }
-    
-    /* Tabelle responsive */
-    table {
-        font-size: 12px !important;
-    }
-    
-    th, td {
-        padding: 6px 4px !important;
-    }
-    
-    /* Scroll orizzontale per contenuti larghi */
-    .overflow-x-auto {
-        -webkit-overflow-scrolling: touch;
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
-/* EXTRA SMALL (iPhone SE, small phones) */
-@media (max-width: 374px) {
-    body {
-        font-size: 13px;
-    }
-    
-    .text-2xl {
-        font-size: 16px !important;
-    }
-    
-    .text-xl {
-        font-size: 15px !important;
-    }
-    
-    .p-6, .p-4 {
-        padding: 10px !important;
-    }
-    
-    button {
-        font-size: 13px !important;
-        padding: 8px 12px !important;
-    }
-    
-    input, select, textarea {
-        font-size: 15px !important;
-        padding: 8px 10px !important;
+@media (min-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
     }
 }
 
@@ -300,27 +521,6 @@ canvas.signature-canvas {
 
 .dark ::-webkit-scrollbar-thumb:hover {
     background: #6b7280;
-}
-
-/* Animazioni */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.fade-in {
-    animation: fadeIn 0.3s ease-in;
-}
-
-/* Blacklist card styles */
-.blacklist-card {
-    border: 2px solid #ef4444;
-    background: #fee2e2;
-}
-
-.dark .blacklist-card {
-    border-color: #dc2626;
-    background: #7f1d1d;
 }
 
 /* Fix per input iOS (previene zoom) */
@@ -476,6 +676,7 @@ header {
 header > div {
     max-width: 100vw;
 }
+
 /* ========================================
    LANGUAGE SELECTOR DARK MODE FIX
    ======================================== */
@@ -486,7 +687,7 @@ header > div {
 }
 
 .language-selector option {
-    background-color: #1f2937 !important; /* Grigio scuro */
+    background-color: #1f2937 !important;
     color: white !important;
     padding: 8px !important;
 }
@@ -494,7 +695,7 @@ header > div {
 /* Hover sulle opzioni */
 .language-selector option:hover,
 .language-selector option:checked {
-    background-color: #4f46e5 !important; /* Indigo */
+    background-color: #4f46e5 !important;
     color: white !important;
 }
 
