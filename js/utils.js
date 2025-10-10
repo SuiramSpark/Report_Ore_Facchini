@@ -1,4 +1,4 @@
-// Utilities Functions
+// Utilities Functions - VERSIONE COMPLETA DASHBOARD
 
 // Toast Notification System
 const showToast = (message, type = 'default') => {
@@ -58,13 +58,11 @@ const formatDateTime = (dateString) => {
     });
 };
 
-// Generate Share Link (ALWAYS CORRECT PATH)
 // Generate Share Link con WEB SHARE API
 const generateShareLink = async (sheetId) => {
     const baseUrl = `${window.location.origin}/Report_Ore_Facchini`;
     const link = `${baseUrl}/?mode=worker&sheet=${sheetId}`;
     
-    // Verifica se Web Share API è disponibile
     if (navigator.share) {
         try {
             await navigator.share({
@@ -74,15 +72,11 @@ const generateShareLink = async (sheetId) => {
             });
             showToast('✅ Link condiviso!', 'success');
         } catch (error) {
-            // Utente ha annullato la condivisione o errore
             if (error.name !== 'AbortError') {
-                console.error('Errore condivisione:', error);
-                // Fallback: copia negli appunti
                 copyToClipboard(link);
             }
         }
     } else {
-        // Fallback per browser che non supportano Web Share API
         copyToClipboard(link);
     }
 };
@@ -94,7 +88,6 @@ const copyToClipboard = (link) => {
             showToast('✅ Link copiato negli appunti!', 'success');
         })
         .catch(() => {
-            // Fallback se anche clipboard API non funziona
             prompt('Copia questo link:', link);
         });
 };
@@ -200,7 +193,6 @@ const initCanvas = (canvas) => {
 const clearCanvas = (canvas) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    // Ridisegna sfondo bianco
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 };
@@ -212,9 +204,7 @@ const isCanvasBlank = (canvas) => {
     const ctx = canvas.getContext('2d');
     const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     
-    // Controlla se tutti i pixel sono bianchi
     for (let i = 0; i < pixelData.length; i += 4) {
-        // Se trovi un pixel non bianco, il canvas non è vuoto
         if (pixelData[i] !== 255 || pixelData[i+1] !== 255 || pixelData[i+2] !== 255) {
             return false;
         }
@@ -264,34 +254,242 @@ const getStatistics = (sheets) => {
     };
 };
 
-// Generate PDF 
+// ========================================
+// FUNZIONI DASHBOARD AVANZATA
+// ========================================
 
+// Calcolo statistiche avanzate per dashboard
+const calculateAdvancedStats = (sheets, period = 'week') => {
+    const now = new Date();
+    const today = new Date().toISOString().split('T')[0];
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    let weeklyHours = 0;
+    let monthlyHours = 0;
+    let todayHours = 0;
+    let activeWorkers = new Set();
+    const workerHours = {};
+    const dailyHours = {};
+    const companyHours = {};
+    const hourlyDistribution = Array(24).fill(0);
+    const locationHours = {};
+
+    sheets.forEach(sheet => {
+        const sheetDate = new Date(sheet.data);
+        
+        // Ore di oggi
+        if (sheet.data === today) {
+            sheet.lavoratori?.forEach(worker => {
+                todayHours += parseFloat(worker.oreTotali) || 0;
+            });
+        }
+        
+        sheet.lavoratori?.forEach(worker => {
+            const hours = parseFloat(worker.oreTotali) || 0;
+            
+            if (sheetDate >= weekAgo) {
+                weeklyHours += hours;
+            }
+            
+            if (sheetDate >= monthAgo) {
+                monthlyHours += hours;
+            }
+            
+            // Worker unici
+            const workerKey = `${worker.nome} ${worker.cognome}`;
+            activeWorkers.add(workerKey);
+            
+            // Ore per worker
+            workerHours[workerKey] = (workerHours[workerKey] || 0) + hours;
+            
+            // Ore per azienda
+            const companyKey = sheet.titoloAzienda || 'Non specificato';
+            companyHours[companyKey] = (companyHours[companyKey] || 0) + hours;
+            
+            // Ore per location
+            const locationKey = sheet.location || 'Non specificato';
+            locationHours[locationKey] = (locationHours[locationKey] || 0) + hours;
+            
+            // Ore giornaliere
+            const dateKey = sheet.data;
+            dailyHours[dateKey] = (dailyHours[dateKey] || 0) + hours;
+            
+            // Distribuzione oraria
+            if (worker.oraIn) {
+                const hour = parseInt(worker.oraIn.split(':')[0]);
+                hourlyDistribution[hour] += hours;
+            }
+        });
+    });
+
+    const topWorkers = Object.entries(workerHours)
+        .map(([name, hours]) => ({ name, hours }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 10);
+
+    const topCompanies = Object.entries(companyHours)
+        .map(([name, hours]) => ({ name, hours }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5);
+
+    const topLocations = Object.entries(locationHours)
+        .map(([name, hours]) => ({ name, hours }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5);
+
+    // Dati per grafico
+    const days = period === 'week' ? 7 : 30;
+    const chartData = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dateStr = date.toISOString().split('T')[0];
+        chartData.push({
+            date: dateStr,
+            hours: dailyHours[dateStr] || 0,
+            label: date.toLocaleDateString('it-IT', { 
+                month: 'short', 
+                day: 'numeric',
+                weekday: days === 7 ? 'short' : undefined 
+            })
+        });
+    }
+
+    return {
+        weeklyHours,
+        monthlyHours,
+        todayHours,
+        activeWorkers: activeWorkers.size,
+        totalSheets: sheets.length,
+        completedSheets: sheets.filter(s => s.status === 'completed').length,
+        draftSheets: sheets.filter(s => s.status === 'draft').length,
+        archivedSheets: sheets.filter(s => s.archived).length,
+        topWorkers,
+        topCompanies,
+        topLocations,
+        chartData,
+        hourlyDistribution,
+        totalWorkers: Object.keys(workerHours).length,
+        avgDailyHours: (monthlyHours / 30).toFixed(1),
+        efficiency: sheets.length > 0 ? (sheets.filter(s => s.status === 'completed').length / sheets.length) * 100 : 0
+    };
+};
+
+// Inizializza Chart.js per dashboard
+const initDashboardCharts = (canvasId, chartType, data, darkMode) => {
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js non caricato');
+        return null;
+    }
+
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+
+    // Distruggi chart esistente
+    if (ctx.chart) {
+        ctx.chart.destroy();
+    }
+
+    const textColor = darkMode ? '#fff' : '#333';
+    const gridColor = darkMode ? '#374151' : '#E5E7EB';
+    const borderColor = darkMode ? '#4B5563' : '#D1D5DB';
+
+    const config = {
+        type: chartType,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: textColor,
+                        font: {
+                            size: window.innerWidth < 768 ? 10 : 12
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: textColor,
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
+                        }
+                    },
+                    grid: {
+                        color: gridColor
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: textColor,
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
+                        }
+                    },
+                    grid: {
+                        color: gridColor
+                    }
+                }
+            }
+        }
+    };
+
+    ctx.chart = new Chart(ctx, config);
+    return ctx.chart;
+};
+
+// Animazioni per elementi dashboard
+const animateValue = (element, start, end, duration) => {
+    if (!element) return;
+    
+    const startTime = performance.now();
+    const step = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        const current = Math.floor(start + (end - start) * progress);
+        element.textContent = current;
+        
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        }
+    };
+    
+    requestAnimationFrame(step);
+};
+
+// Generate PDF 
 const generatePDF = async (sheet, companyLogo = null) => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "landscape" });
 
-    // --- Header blu compatto ---
-    const HEADER_HEIGHT = 24; // era 40 o più, ora più compatto
-    doc.setFillColor(59, 130, 246); // blu
+    // Header blu compatto
+    const HEADER_HEIGHT = 24;
+    doc.setFillColor(59, 130, 246);
     doc.rect(0, 0, 297, HEADER_HEIGHT, 'F');
 
-    // Logo (più basso)
+    // Logo
     if (companyLogo) {
         try {
-            doc.addImage(companyLogo, 'PNG', 10, 4, 24, 16); // logo più compatto
+            doc.addImage(companyLogo, 'PNG', 10, 4, 24, 16);
         } catch (e) {
             console.error('Errore logo:', e);
         }
     }
-    // Titolo in bold, più grande, accanto al logo
+
+    // Titolo
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont(undefined, 'bold');
     doc.text(sheet.titoloAzienda || 'REGISTRO ORE', companyLogo ? 40 : 15, 16);
 
-    // --- Info sezione DATA/RESPONSABILE/LOCALITA ---
+    // Info sezione
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(13); // titoli 2px più grandi
+    doc.setFontSize(13);
     doc.setFont(undefined, 'bold');
 
     let y = HEADER_HEIGHT + 12;
@@ -318,13 +516,13 @@ const generatePDF = async (sheet, companyLogo = null) => {
 
     y += 12;
 
-    // --- Tabella header ---
+    // Tabella header
     doc.setFillColor(59, 130, 246);
     doc.rect(12, y, 273, 11, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    const xCols = [16, 80, 108, 136, 164, 196, 240]; // Firma spostata più a destra
+    const xCols = [16, 80, 108, 136, 164, 196, 240];
     doc.text('Nome', xCols[0], y + 8);
     doc.text('Ora In', xCols[1], y + 8);
     doc.text('Ora Out', xCols[2], y + 8);
@@ -334,7 +532,7 @@ const generatePDF = async (sheet, companyLogo = null) => {
 
     y += 11;
 
-    // --- Tabella dati lavoratori ---
+    // Tabella dati lavoratori
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
@@ -344,19 +542,16 @@ const generatePDF = async (sheet, companyLogo = null) => {
             doc.setFillColor(243, 244, 246);
             doc.rect(12, y, 273, 20, 'F');
         }
-        // Nome
         doc.text(`${worker.nome} ${worker.cognome}`, xCols[0], y + 8);
-        // Orari
         doc.text(worker.oraIn, xCols[1], y + 8);
         doc.text(worker.oraOut, xCols[2], y + 8);
         doc.text(`${worker.pausaMinuti || 0}min`, xCols[3], y + 8);
         doc.setFont(undefined, 'bold');
         doc.text(worker.oreTotali + 'h', xCols[4], y + 8);
         doc.setFont(undefined, 'normal');
-        // Firma lavoratore (più a destra, allineata)
         if (worker.firma) {
             try {
-                doc.addImage(worker.firma, 'PNG', xCols[5], y + 1, 38, 14); // più larga e nella cella giusta!
+                doc.addImage(worker.firma, 'PNG', xCols[5], y + 1, 38, 14);
             } catch (e) {
                 console.error('Errore firma:', e);
             }
@@ -364,14 +559,14 @@ const generatePDF = async (sheet, companyLogo = null) => {
         y += 20;
     });
 
-    // --- Firma responsabile ---
+    // Firma responsabile
     y += 10;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(12);
     doc.text('Firma Responsabile:', 14, y);
     if (sheet.firmaResponsabile) {
         try {
-            doc.addImage(sheet.firmaResponsabile, 'PNG', 48, y - 8, 60, 22); // più largo e ben allineato
+            doc.addImage(sheet.firmaResponsabile, 'PNG', 48, y - 8, 60, 22);
         } catch (e) {
             console.error('Errore firma responsabile:', e);
         }
@@ -381,7 +576,6 @@ const generatePDF = async (sheet, companyLogo = null) => {
     doc.save(fileName);
     showToast('📄 PDF generato con successo!', 'success');
 };
-
 
 // Check Blacklist
 const checkBlacklist = (workerData, blacklist) => {
