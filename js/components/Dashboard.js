@@ -1,362 +1,554 @@
-// Dashboard Component - DESIGN FREEPIK PROFESSIONALE
+// Dashboard Component - VERSIONE AVANZATA COMPLETA MOBILE
 const Dashboard = ({ sheets, darkMode, language = 'it' }) => {
     const t = translations[language];
     const [selectedPeriod, setSelectedPeriod] = React.useState('week');
-    const [activeView, setActiveView] = React.useState('overview');
+    const [loading, setLoading] = React.useState(false);
+    const [animated, setAnimated] = React.useState(false);
 
-    const cardClass = `${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border rounded-lg shadow-sm`;
+    const cardClass = `${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-xl shadow-lg dashboard-card`;
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
-    const titleClass = darkMode ? 'text-white' : 'text-gray-900';
 
-    // Calcolo statistiche
+    // Calcolo statistiche avanzate
     const stats = React.useMemo(() => {
         return calculateAdvancedStats(sheets, selectedPeriod);
     }, [sheets, selectedPeriod]);
 
-    // 🎯 HEADER PRINCIPALE
-    const renderHeader = () => (
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-            <div>
-                <h1 className={`text-2xl font-bold ${titleClass} mb-2`}>Dashboard Overview</h1>
-                <p className={`text-sm ${textClass}`}>
-                    Monitoraggio completo delle attività e delle performance
-                </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-                <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                    <button
-                        onClick={() => setActiveView('overview')}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                            activeView === 'overview'
-                                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                    >
-                        Overview
-                    </button>
-                    <button
-                        onClick={() => setActiveView('analytics')}
-                        className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                            activeView === 'analytics'
-                                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                    >
-                        Analytics
-                    </button>
-                </div>
-                <select
-                    value={selectedPeriod}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                    <option value="week">Last 7 days</option>
-                    <option value="month">Last 30 days</option>
-                </select>
-            </div>
-        </div>
-    );
+    // Animazione al mount
+    React.useEffect(() => {
+        setAnimated(true);
+        const timer = setTimeout(() => setLoading(false), 1000);
+        return () => clearTimeout(timer);
+    }, []);
 
-    // 📊 METRICHE PRINCIPALI - Design Freepik
-    const renderMetrics = () => (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[
-                {
-                    title: 'Total Hours',
-                    value: stats.weeklyHours.toFixed(1),
-                    change: '+12%',
-                    trend: 'up',
-                    icon: '⏱️',
-                    color: 'blue'
-                },
-                {
-                    title: 'Active Workers',
-                    value: stats.activeWorkers,
-                    change: '+5%',
-                    trend: 'up',
-                    icon: '👥',
-                    color: 'green'
-                },
-                {
-                    title: 'Completed Sheets',
-                    value: stats.completedSheets,
-                    change: '+8%',
-                    trend: 'up',
-                    icon: '✅',
-                    color: 'purple'
-                },
-                {
-                    title: 'Efficiency Rate',
-                    value: `${stats.efficiency.toFixed(0)}%`,
-                    change: '+3%',
-                    trend: 'up',
-                    icon: '📈',
-                    color: 'orange'
-                }
-            ].map((metric, index) => (
-                <div key={index} className={`${cardClass} p-6`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className={`w-12 h-12 rounded-lg bg-${metric.color}-50 dark:bg-${metric.color}-900/20 flex items-center justify-center`}>
-                            <span className="text-xl">{metric.icon}</span>
-                        </div>
-                        <div className={`text-sm font-medium ${
-                            metric.trend === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                            {metric.change}
-                        </div>
-                    </div>
-                    <h3 className={`text-sm font-medium ${textClass} mb-1`}>{metric.title}</h3>
-                    <p className={`text-2xl font-bold ${titleClass}`}>{metric.value}</p>
-                </div>
-            ))}
-        </div>
-    );
-
-    // 📈 GRAFICO PRINCIPALE - Design pulito
-    const renderMainChart = () => {
+    // 🎯 GRAFICO A BARRE AVANZATO
+    const renderAdvancedBarChart = () => {
         const maxHours = Math.max(...stats.chartData.map(day => day.hours));
+        const colors = ['#4f46e5', '#7c3aed', '#a855f7', '#c084fc', '#d946ef', '#ec4899', '#f97316'];
         
         return (
-            <div className={`${cardClass} p-6 mb-8`}>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                    <h3 className={`text-lg font-semibold ${titleClass} mb-2 sm:mb-0`}>Hours Trend</h3>
-                    <div className="flex items-center gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                            <span className={textClass}>Work Hours</span>
-                        </div>
+            <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <h3 className="font-semibold text-lg">📈 Andamento Ore Lavorate</h3>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setSelectedPeriod('week')}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                selectedPeriod === 'week' 
+                                    ? 'bg-indigo-600 text-white' 
+                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            }`}
+                        >
+                            7 Giorni
+                        </button>
+                        <button
+                            onClick={() => setSelectedPeriod('month')}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                selectedPeriod === 'month' 
+                                    ? 'bg-indigo-600 text-white' 
+                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            }`}
+                        >
+                            30 Giorni
+                        </button>
                     </div>
                 </div>
                 
-                <div className="space-y-4">
-                    {stats.chartData.map((day, index) => {
+                <div className="space-y-3">
+                    {stats.chartData.map((day, i) => {
                         const percentage = maxHours > 0 ? (day.hours / maxHours) * 100 : 0;
+                        const color = colors[i % colors.length];
                         
                         return (
-                            <div key={index} className="flex items-center gap-4">
-                                <div className="w-16 text-sm font-medium text-gray-500 dark:text-gray-400">
+                            <div key={i} className={`flex items-center gap-3 group ${animated ? 'animate-fade-in' : ''}`}
+                                 style={{ animationDelay: `${i * 100}ms` }}>
+                                <span className="text-xs font-medium w-12 sm:w-16 text-right truncate">
                                     {day.label}
-                                </div>
-                                <div className="flex-1">
-                                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3">
+                                </span>
+                                <div className="flex-1 relative">
+                                    <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-4 sm:h-5 overflow-hidden">
                                         <div 
-                                            className="bg-blue-500 h-3 rounded-full transition-all duration-1000 ease-out"
-                                            style={{ width: `${percentage}%` }}
+                                            className="h-full rounded-full transition-all duration-1000 ease-out transform origin-left"
+                                            style={{ 
+                                                width: `${percentage}%`,
+                                                backgroundColor: color,
+                                                transform: `scaleX(0)`,
+                                                animation: `growBar 1s ${i * 100}ms ease-out forwards`
+                                            }}
                                         ></div>
                                     </div>
-                                </div>
-                                <div className="w-12 text-right text-sm font-semibold">
-                                    {day.hours.toFixed(1)}h
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-xs font-semibold text-white mix-blend-difference px-1">
+                                            {day.hours > 0 ? day.hours.toFixed(1) + 'h' : ''}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
+                
+                {stats.chartData.every(day => day.hours === 0) && (
+                    <div className="text-center py-8 text-gray-500">
+                        <span className="text-3xl">📊</span>
+                        <p className="mt-2">Nessun dato disponibile per il periodo selezionato</p>
+                    </div>
+                )}
             </div>
         );
     };
 
-    // 📋 TABELLA ATTIVITÀ - Design professionale
-    const renderActivityTable = () => (
-        <div className={`${cardClass} p-6 mb-8`}>
-            <h3 className={`text-lg font-semibold ${titleClass} mb-6`}>Recent Activity</h3>
-            
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead>
-                        <tr className="border-b border-gray-200 dark:border-gray-700">
-                            <th className="pb-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Company</th>
-                            <th className="pb-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Date</th>
-                            <th className="pb-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Workers</th>
-                            <th className="pb-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Hours</th>
-                            <th className="pb-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {sheets
-                            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                            .slice(0, 5)
-                            .map((sheet, index) => {
-                                const totalHours = sheet.lavoratori?.reduce((sum, worker) => 
-                                    sum + parseFloat(worker.oreTotali || 0), 0
-                                ) || 0;
-                                
-                                const getStatus = () => {
-                                    if (sheet.archived) return { text: 'Archived', color: 'gray' };
-                                    if (sheet.status === 'completed') return { text: 'Completed', color: 'green' };
-                                    return { text: 'Draft', color: 'yellow' };
-                                };
-                                
-                                const status = getStatus();
-                                
-                                return (
-                                    <tr key={sheet.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="py-4">
-                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                {sheet.titoloAzienda || 'N/A'}
-                                            </div>
-                                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                {sheet.responsabile}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 text-sm text-gray-900 dark:text-white">
-                                            {formatDate(sheet.data)}
-                                        </td>
-                                        <td className="py-4 text-sm text-gray-900 dark:text-white">
-                                            {sheet.lavoratori?.length || 0}
-                                        </td>
-                                        <td className="py-4 text-sm font-medium text-gray-900 dark:text-white">
-                                            {totalHours.toFixed(1)}h
-                                        </td>
-                                        <td className="py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                status.color === 'green' 
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                    : status.color === 'yellow'
-                                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                                            }`}>
-                                                {status.text}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-
-    // 🏆 TOP PERFORMERS - Design elegante
-    const renderTopPerformers = () => (
-        <div className={`${cardClass} p-6`}>
-            <h3 className={`text-lg font-semibold ${titleClass} mb-6`}>Top Performers</h3>
-            
-            <div className="space-y-4">
-                {stats.topWorkers.slice(0, 4).map((worker, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                                index === 0 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                index === 1 ? 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' :
-                                index === 2 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                                'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            }`}>
-                                #{index + 1}
-                            </div>
-                            <div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {worker.name}
-                                </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {worker.hours.toFixed(1)} total hours
-                                </div>
-                            </div>
-                        </div>
-                        <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {worker.hours.toFixed(1)}h
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    // 📊 DISTRIBUZIONE AZIENDE - Grafico torta semplificato
-    const renderCompanyDistribution = () => {
+    // 📊 GRAFICO A TORTA per distribuzione aziende
+    const renderPieChart = () => {
         const totalHours = stats.topCompanies.reduce((sum, company) => sum + company.hours, 0);
+        const colors = ['#4f46e5', '#7c3aed', '#a855f7', '#c084fc', '#d946ef'];
         
         if (totalHours === 0) {
             return (
-                <div className={`${cardClass} p-6`}>
-                    <h3 className={`text-lg font-semibold ${titleClass} mb-6`}>Company Distribution</h3>
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        <span className="text-2xl">💼</span>
-                        <p className="mt-2 text-sm">No company data available</p>
+                <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">🏢 Distribuzione per Azienda</h3>
+                    <div className="text-center py-8 text-gray-500">
+                        <span className="text-3xl">💼</span>
+                        <p className="mt-2">Nessun dato aziendale disponibile</p>
                     </div>
                 </div>
             );
         }
 
         return (
-            <div className={`${cardClass} p-6`}>
-                <h3 className={`text-lg font-semibold ${titleClass} mb-6`}>Company Distribution</h3>
-                
-                <div className="space-y-4">
-                    {stats.topCompanies.slice(0, 4).map((company, index) => {
-                        const percentage = totalHours > 0 ? (company.hours / totalHours) * 100 : 0;
-                        const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
-                        
-                        return (
-                            <div key={index} className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="font-medium text-gray-900 dark:text-white truncate max-w-[120px]">
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg">🏢 Distribuzione per Azienda</h3>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                    <div className="relative w-32 h-32 sm:w-40 sm:h-40">
+                        {stats.topCompanies.map((company, i) => {
+                            const percentage = (company.hours / totalHours) * 100;
+                            const circumference = 2 * Math.PI * 45;
+                            const strokeDasharray = circumference;
+                            const strokeDashoffset = circumference - (percentage / 100) * circumference;
+                            const rotation = stats.topCompanies.slice(0, i).reduce((sum, c) => 
+                                sum + (c.hours / totalHours) * 360, 0
+                            );
+                            
+                            return (
+                                <circle
+                                    key={i}
+                                    cx="50%"
+                                    cy="50%"
+                                    r="45"
+                                    fill="transparent"
+                                    stroke={colors[i]}
+                                    strokeWidth="20"
+                                    strokeDasharray={strokeDasharray}
+                                    strokeDashoffset={strokeDashoffset}
+                                    transform={`rotate(${rotation} 64 64)`}
+                                    className="transition-all duration-1000 ease-out"
+                                    style={{ 
+                                        strokeDashoffset: circumference,
+                                        animation: `fillPie 1s ${i * 200}ms ease-out forwards`
+                                    }}
+                                />
+                            );
+                        })}
+                        <text x="50%" y="50%" textAnchor="middle" dy="0.3em" 
+                              className="text-sm sm:text-base font-bold fill-current">
+                            {totalHours.toFixed(0)}h
+                        </text>
+                    </div>
+                    
+                    <div className="space-y-3 flex-1 min-w-0">
+                        {stats.topCompanies.map((company, i) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div 
+                                        className="w-3 h-3 rounded-full flex-shrink-0"
+                                        style={{ backgroundColor: colors[i] }}
+                                    ></div>
+                                    <span className="truncate" title={company.name}>
                                         {company.name}
                                     </span>
-                                    <span className="text-gray-500 dark:text-gray-400">
-                                        {percentage.toFixed(1)}%
-                                    </span>
                                 </div>
-                                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
-                                    <div 
-                                        className={`h-2 rounded-full ${colors[index]} transition-all duration-1000`}
-                                        style={{ width: `${percentage}%` }}
-                                    ></div>
-                                </div>
-                                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                                    <span>{company.hours.toFixed(1)} hours</span>
-                                    <span>{percentage.toFixed(1)}%</span>
-                                </div>
+                                <span className="font-semibold text-right flex-shrink-0 ml-2">
+                                    {company.hours.toFixed(1)}h
+                                </span>
                             </div>
-                        );
-                    })}
+                        ))}
+                    </div>
                 </div>
             </div>
         );
     };
 
-    // 🎯 LAYOUT PRINCIPALE - Grid professionale
+    // 📈 GRAFICO DISTRIBUZIONE ORARIA
+    const renderHourlyChart = () => {
+        const maxHourly = Math.max(...stats.hourlyDistribution) || 1;
+        
+        return (
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg">🕐 Distribuzione Oraria</h3>
+                <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-12 gap-1 sm:gap-2">
+                    {stats.hourlyDistribution.slice(6, 22).map((hours, index) => {
+                        const hour = index + 6;
+                        return (
+                            <div key={hour} className="text-center">
+                                <div className="text-xs text-gray-500 mb-1">{hour}h</div>
+                                <div 
+                                    className="bg-indigo-500 rounded-t transition-all duration-500 hover:bg-indigo-600 cursor-help mx-auto"
+                                    style={{ 
+                                        height: `${(hours / maxHourly) * 40}px`,
+                                        width: '80%',
+                                        minHeight: hours > 0 ? '4px' : '0px'
+                                    }}
+                                    title={`${hour}:00 - ${hours.toFixed(1)} ore`}
+                                ></div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="text-xs text-gray-500 text-center">
+                    Orario lavorativo: 6:00 - 22:00
+                </div>
+            </div>
+        );
+    };
+
+    // 📋 TABELLA ATTIVITÀ RECENTI
+    const renderActivityTable = () => {
+        const recentActivities = sheets
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 6);
+        
+        const getStatusBadge = (sheet) => {
+            if (sheet.archived) return { text: 'Archiviato', color: 'badge-gray' };
+            if (sheet.status === 'completed') return { text: 'Completato', color: 'badge-success' };
+            return { text: 'Bozza', color: 'badge-warning' };
+        };
+
+        if (recentActivities.length === 0) {
+            return (
+                <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                        <span>📋</span> Attività Recenti
+                    </h3>
+                    <div className="text-center py-8 text-gray-500">
+                        <span className="text-3xl">📝</span>
+                        <p className="mt-2">Nessuna attività recente</p>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <span>📋</span> Attività Recenti
+                </h3>
+                
+                <div className="overflow-x-auto">
+                    <table className="dashboard-table w-full">
+                        <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-100'}>
+                            <tr>
+                                <th className="px-3 py-3 text-left text-xs font-semibold">Azienda</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold hidden sm:table-cell">Data</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold">Lavoratori</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold hidden md:table-cell">Ore</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold">Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {recentActivities.map((sheet, i) => {
+                                const status = getStatusBadge(sheet);
+                                const totalHours = sheet.lavoratori?.reduce((sum, worker) => 
+                                    sum + parseFloat(worker.oreTotali || 0), 0
+                                ) || 0;
+                                
+                                return (
+                                    <tr 
+                                        key={sheet.id} 
+                                        className={`transition-colors hover:${darkMode ? 'bg-gray-700' : 'bg-gray-50'} ${animated ? 'animate-fade-in' : ''}`}
+                                        style={{ animationDelay: `${i * 50}ms` }}
+                                    >
+                                        <td className="px-3 py-3 text-sm">
+                                            <div className="font-medium truncate max-w-[120px] sm:max-w-none" title={sheet.titoloAzienda}>
+                                                {sheet.titoloAzienda || 'N/D'}
+                                            </div>
+                                            <div className="text-xs text-gray-500 truncate">{sheet.responsabile}</div>
+                                        </td>
+                                        <td className="px-3 py-3 text-sm hidden sm:table-cell">
+                                            {formatDate(sheet.data)}
+                                        </td>
+                                        <td className="px-3 py-3 text-sm">
+                                            <span className="font-semibold">{sheet.lavoratori?.length || 0}</span>
+                                        </td>
+                                        <td className="px-3 py-3 text-sm font-semibold hidden md:table-cell">
+                                            {totalHours.toFixed(1)}h
+                                        </td>
+                                        <td className="px-3 py-3 text-sm">
+                                            <span className={`badge ${status.color}`}>
+                                                {status.text}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
+    // 🎯 WIDGET PERFORMANCE
+    const renderPerformanceWidget = () => {
+        return (
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg">📈 Performance</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-4 rounded-lg gradient-primary text-white">
+                        <div className="text-xl sm:text-2xl font-bold">{stats.efficiency.toFixed(0)}%</div>
+                        <div className="text-xs opacity-90 mt-1">Efficienza</div>
+                    </div>
+                    
+                    <div className="text-center p-4 rounded-lg gradient-success text-white">
+                        <div className="text-xl sm:text-2xl font-bold">{stats.avgDailyHours}h</div>
+                        <div className="text-xs opacity-90 mt-1">Media Giornaliera</div>
+                    </div>
+                </div>
+                
+                <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                        <span>Fogli Completati</span>
+                        <span className="font-semibold">{stats.completedSheets} / {stats.totalSheets}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div 
+                            className="progress-bar-success h-2 rounded-full transition-all duration-1000"
+                            style={{ width: `${stats.efficiency}%` }}
+                        ></div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // 🔔 WIDGET NOTIFICHE
+    const renderNotificationsWidget = () => {
+        const pendingSheets = sheets.filter(s => 
+            !s.archived && s.status === 'draft' && s.lavoratori?.length > 0
+        ).length;
+        
+        const unsignedSheets = sheets.filter(s => 
+            !s.archived && s.status === 'draft' && s.lavoratori?.length > 0 && !s.firmaResponsabile
+        ).length;
+        
+        return (
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <span>🔔</span> Notifiche
+                </h3>
+                
+                <div className="space-y-3">
+                    {pendingSheets > 0 && (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                            <span className="text-xl">📋</span>
+                            <div className="flex-1">
+                                <div className="font-semibold text-yellow-800 dark:text-yellow-200">
+                                    {pendingSheets} fogli in attesa
+                                </div>
+                                <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                                    Completali per generare i PDF
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {unsignedSheets > 0 && (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                            <span className="text-xl">✍️</span>
+                            <div className="flex-1">
+                                <div className="font-semibold text-orange-800 dark:text-orange-200">
+                                    {unsignedSheets} da firmare
+                                </div>
+                                <div className="text-xs text-orange-600 dark:text-orange-400">
+                                    Firma dei responsabili mancante
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {pendingSheets === 0 && unsignedSheets === 0 && (
+                        <div className="text-center py-4 text-gray-500">
+                            <span className="text-2xl">🎉</span>
+                            <div className="text-sm mt-2">Tutto completato!</div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // 🏆 TOP WORKERS WIDGET
+    const renderTopWorkers = () => {
+        if (stats.topWorkers.length === 0) {
+            return (
+                <div className="space-y-4">
+                    <h3 className="font-semibold text-lg">🏆 Top Lavoratori</h3>
+                    <div className="text-center py-8 text-gray-500">
+                        <span className="text-3xl">👷</span>
+                        <p className="mt-2">Nessun dato disponibile</p>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg">🏆 Top Lavoratori</h3>
+                <div className="space-y-3">
+                    {stats.topWorkers.slice(0, 5).map((worker, i) => (
+                        <div
+                            key={i}
+                            className={`flex items-center justify-between p-3 rounded-lg ${
+                                darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                            } ${animated ? 'animate-fade-in' : ''}`}
+                            style={{ animationDelay: `${i * 100}ms` }}
+                        >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <span className={`text-lg font-bold ${
+                                    i === 0 ? 'text-yellow-500' : 
+                                    i === 1 ? 'text-gray-400' : 
+                                    i === 2 ? 'text-orange-500' : 'text-gray-500'
+                                }`}>
+                                    #{i + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-semibold text-sm truncate" title={worker.name}>
+                                        {worker.name}
+                                    </p>
+                                    <p className={`text-xs ${textClass}`}>
+                                        {worker.hours.toFixed(1)} ore totali
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-bold text-indigo-600 dark:text-indigo-400">
+                                    {worker.hours.toFixed(1)}h
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="loader"></div>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-8 animate-fade-in">
-            {renderHeader()}
-            {renderMetrics()}
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Colonna sinistra - Grafico principale */}
-                <div className="lg:col-span-2 space-y-8">
-                    {renderMainChart()}
+        <div className="space-y-6 animate-fade-in">
+            {/* HEADER */}
+            <div className={`${cardClass} p-4 sm:p-6`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold">📊 Dashboard</h1>
+                        <p className={`${textClass} mt-1 text-sm sm:text-base`}>
+                            Panoramica completa delle attività e statistiche
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm text-gray-500">Aggiornato</p>
+                        <p className="text-lg font-semibold">{new Date().toLocaleTimeString('it-IT')}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* METRICHE PRINCIPALI - MOBILE OPTIMIZED */}
+            <div className="stats-grid">
+                {[
+                    { icon: '📅', value: stats.todayHours.toFixed(1), label: 'Ore Oggi', color: 'green', suffix: 'h' },
+                    { icon: '📊', value: stats.weeklyHours.toFixed(1), label: 'Questa Settimana', color: 'blue', suffix: 'h' },
+                    { icon: '👥', value: stats.activeWorkers, label: 'Lavoratori Attivi', color: 'purple' },
+                    { icon: '✅', value: stats.completedSheets, label: 'Fogli Completati', color: 'orange' }
+                ].map((metric, i) => (
+                    <div 
+                        key={i}
+                        className={`${cardClass} metric-card p-4 sm:p-6 border-l-4 border-${metric.color}-500 ${animated ? 'animate-fade-in' : ''}`}
+                        style={{ animationDelay: `${i * 150}ms` }}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className={`text-sm font-semibold ${textClass}`}>{metric.label}</h3>
+                            <span className="text-2xl">{metric.icon}</span>
+                        </div>
+                        <p className={`text-2xl sm:text-3xl font-bold text-${metric.color}-600 dark:text-${metric.color}-400`}>
+                            {metric.value}{metric.suffix || ''}
+                        </p>
+                    </div>
+                ))}
+            </div>
+
+            {/* PRIMA RIGA: GRAFICI PRINCIPALI */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={`${cardClass} p-4 sm:p-6`}>
+                    {renderAdvancedBarChart()}
+                </div>
+                
+                <div className={`${cardClass} p-4 sm:p-6`}>
+                    {renderPieChart()}
+                </div>
+            </div>
+
+            {/* SECONDA RIGA: TABELLA E WIDGETS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className={`${cardClass} p-4 sm:p-6 lg:col-span-2`}>
                     {renderActivityTable()}
                 </div>
                 
-                {/* Colonna destra - Sidebar widgets */}
-                <div className="space-y-8">
-                    {renderTopPerformers()}
-                    {renderCompanyDistribution()}
+                <div className="space-y-6">
+                    <div className={`${cardClass} p-4 sm:p-6`}>
+                        {renderPerformanceWidget()}
+                    </div>
                     
-                    {/* Quick Stats */}
-                    <div className={`${cardClass} p-6`}>
-                        <h3 className={`text-lg font-semibold ${titleClass} mb-4`}>Quick Stats</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Sheets</div>
-                                <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.totalSheets}</div>
-                            </div>
-                            <div className="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Draft</div>
-                                <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{stats.draftSheets}</div>
-                            </div>
-                            <div className="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Archived</div>
-                                <div className="text-xl font-bold text-gray-600 dark:text-gray-400">{stats.archivedSheets}</div>
-                            </div>
-                            <div className="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Avg Daily</div>
-                                <div className="text-xl font-bold text-green-600 dark:text-green-400">{stats.avgDailyHours}h</div>
-                            </div>
-                        </div>
+                    <div className={`${cardClass} p-4 sm:p-6`}>
+                        {renderNotificationsWidget()}
                     </div>
                 </div>
+            </div>
+
+            {/* TERZA RIGA: WIDGETS AGGIUNTIVI */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`${cardClass} p-4 sm:p-6`}>
+                    {renderTopWorkers()}
+                </div>
+                
+                <div className={`${cardClass} p-4 sm:p-6`}>
+                    {renderHourlyChart()}
+                </div>
+            </div>
+
+            {/* QUARTA RIGA: STATISTICHE AGGIUNTIVE */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                {[
+                    { value: stats.totalSheets, label: 'Fogli Totali', color: 'indigo' },
+                    { value: stats.draftSheets, label: 'In Bozza', color: 'yellow' },
+                    { value: stats.archivedSheets, label: 'Archiviati', color: 'gray' },
+                    { value: stats.totalWorkers, label: 'Lavoratori Totali', color: 'purple' }
+                ].map((stat, i) => (
+                    <div 
+                        key={i}
+                        className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`}
+                        style={{ animationDelay: `${800 + i * 100}ms` }}
+                    >
+                        <div className={`text-xl sm:text-2xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400`}>
+                            {stat.value}
+                        </div>
+                        <div className={`text-xs ${textClass} mt-1`}>{stat.label}</div>
+                    </div>
+                ))}
             </div>
         </div>
     );
