@@ -1,4 +1,4 @@
-// Main App Component - 5 LINGUE COMPLETE + SETTINGS
+// Main App Component - 5 LINGUE COMPLETE + SETTINGS + v4.0 NEW VIEWS
 const App = () => {
     const { useState, useEffect, useCallback, useMemo } = React;
     
@@ -12,7 +12,7 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     
     // Admin State
-    const [currentView, setCurrentView] = useState('dashboard'); // dashboard, list, sheet, blacklist, audit, reports, settings ⭐
+    const [currentView, setCurrentView] = useState('dashboard'); // dashboard, list, sheet, blacklist, audit, reports, settings, calendar, workerstats, backup ⭐
     const [sheets, setSheets] = useState([]);
     const [blacklist, setBlacklist] = useState([]);
     const [auditLog, setAuditLog] = useState([]);
@@ -299,7 +299,7 @@ const App = () => {
                         </div>
                         
                         {/* Desktop Navigation - NASCOSTO SU MOBILE */}
-                        <nav className="hidden md:flex items-center gap-3">
+                        <nav className="hidden lg:flex items-center gap-2">
                             <button
                                 onClick={() => setCurrentView('dashboard')}
                                 className={`px-3 py-2 rounded-lg transition-colors text-sm ${
@@ -320,25 +320,27 @@ const App = () => {
                             >
                                 📋 {t.sheets}
                             </button>
+                            {/* ⭐ NEW: Calendar */}
                             <button
-                                onClick={() => setCurrentView('blacklist')}
+                                onClick={() => setCurrentView('calendar')}
                                 className={`px-3 py-2 rounded-lg transition-colors text-sm ${
-                                    currentView === 'blacklist' 
+                                    currentView === 'calendar' 
                                         ? 'bg-white text-indigo-600 font-semibold' 
                                         : 'hover:bg-indigo-700'
                                 }`}
                             >
-                                🚫 {t.blacklist}
+                                📆 {t.calendar || 'Calendario'}
                             </button>
+                            {/* ⭐ NEW: Worker Stats */}
                             <button
-                                onClick={() => setCurrentView('audit')}
+                                onClick={() => setCurrentView('workerstats')}
                                 className={`px-3 py-2 rounded-lg transition-colors text-sm ${
-                                    currentView === 'audit' 
+                                    currentView === 'workerstats' 
                                         ? 'bg-white text-indigo-600 font-semibold' 
                                         : 'hover:bg-indigo-700'
                                 }`}
                             >
-                                📝 {t.auditLog}
+                                👤 {t.workerStatistics || 'Statistiche'}
                             </button>
                             <button
                                 onClick={() => setCurrentView('reports')}
@@ -350,7 +352,17 @@ const App = () => {
                             >
                                 📈 {t.reports}
                             </button>
-                            {/* ⭐ NUOVO: SETTINGS */}
+                            {/* ⭐ NEW: Backup */}
+                            <button
+                                onClick={() => setCurrentView('backup')}
+                                className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                                    currentView === 'backup' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'hover:bg-indigo-700'
+                                }`}
+                            >
+                                💾 {t.backupData || 'Backup'}
+                            </button>
                             <button
                                 onClick={() => setCurrentView('settings')}
                                 className={`px-3 py-2 rounded-lg transition-colors text-sm ${
@@ -401,7 +413,7 @@ const App = () => {
                             {/* Mobile Menu Toggle - SOLO SU MOBILE */}
                             <button
                                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className="md:hidden px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors font-bold"
+                                className="lg:hidden px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors font-bold"
                                 aria-label="Menu"
                             >
                                 {mobileMenuOpen ? '✕' : '☰'}
@@ -411,7 +423,7 @@ const App = () => {
 
                     {/* Mobile Navigation - SI APRE SOTTO */}
                     {mobileMenuOpen && (
-                        <nav className="md:hidden mt-3 flex flex-col gap-2">
+                        <nav className="lg:hidden mt-3 flex flex-col gap-2">
                             <button
                                 onClick={() => { setCurrentView('dashboard'); setMobileMenuOpen(false); }}
                                 className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -431,6 +443,28 @@ const App = () => {
                                 }`}
                             >
                                 📋 {t.sheets}
+                            </button>
+                            {/* ⭐ NEW: Calendar Mobile */}
+                            <button
+                                onClick={() => { setCurrentView('calendar'); setMobileMenuOpen(false); }}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'calendar' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
+                            >
+                                📆 {t.calendar || 'Calendario'}
+                            </button>
+                            {/* ⭐ NEW: Worker Stats Mobile */}
+                            <button
+                                onClick={() => { setCurrentView('workerstats'); setMobileMenuOpen(false); }}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'workerstats' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
+                            >
+                                👤 {t.workerStatistics || 'Statistiche Lavoratori'}
                             </button>
                             <button
                                 onClick={() => { setCurrentView('blacklist'); setMobileMenuOpen(false); }}
@@ -462,7 +496,17 @@ const App = () => {
                             >
                                 📈 {t.reports}
                             </button>
-                            {/* ⭐ NUOVO: SETTINGS MOBILE */}
+                            {/* ⭐ NEW: Backup Mobile */}
+                            <button
+                                onClick={() => { setCurrentView('backup'); setMobileMenuOpen(false); }}
+                                className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    currentView === 'backup' 
+                                        ? 'bg-white text-indigo-600 font-semibold' 
+                                        : 'bg-white bg-opacity-10 hover:bg-opacity-20'
+                                }`}
+                            >
+                                💾 {t.backupData || 'Backup Dati'}
+                            </button>
                             <button
                                 onClick={() => { setCurrentView('settings'); setMobileMenuOpen(false); }}
                                 className={`text-left px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -523,6 +567,29 @@ const App = () => {
                     />
                 )}
 
+                {/* ⭐ NEW: Calendar View */}
+                {currentView === 'calendar' && (
+                    <Calendar 
+                        sheets={sheets}
+                        darkMode={darkMode}
+                        language={language}
+                        onSelectSheet={(sheet) => {
+                            setCurrentSheet(sheet);
+                            setCurrentView('sheet');
+                        }}
+                    />
+                )}
+
+                {/* ⭐ NEW: Worker Stats View */}
+                {currentView === 'workerstats' && (
+                    <WorkerStats
+                        sheets={sheets}
+                        darkMode={darkMode}
+                        language={language}
+                        onBack={() => setCurrentView('dashboard')}
+                    />
+                )}
+
                 {currentView === 'blacklist' && (
                     <Blacklist
                         blacklist={blacklist}
@@ -550,10 +617,19 @@ const App = () => {
                     />
                 )}
 
-                {/* ⭐ NUOVO: SETTINGS VIEW */}
+                {/* ⭐ NEW: Backup View */}
+                {currentView === 'backup' && (
+                    <BackupRestore
+                        db={db}
+                        darkMode={darkMode}
+                        language={language}
+                    />
+                )}
+
                 {currentView === 'settings' && (
                     <Settings
                         db={db}
+                        sheets={sheets}
                         darkMode={darkMode}
                         language={language}
                     />
