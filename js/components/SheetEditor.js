@@ -1,4 +1,4 @@
-// Sheet Editor Component - VERSIONE COMPLETA 5 LINGUE + LINK VISIBILE
+// Sheet Editor Component - v3.0 FIX BUG LINK + FIRMA
 const SheetEditor = ({ 
     sheet, 
     onSave, 
@@ -19,6 +19,9 @@ const SheetEditor = ({
     const [bulkEditMode, setBulkEditMode] = React.useState(false);
     const [bulkEditData, setBulkEditData] = React.useState({ pausaMinuti: '' });
     const [editingWorker, setEditingWorker] = React.useState(null);
+    
+    // 🐛 FIX BUG #2: State per forzare re-render canvas
+    const [canvasKey, setCanvasKey] = React.useState(0);
     
     const respCanvasRef = React.useRef(null);
     
@@ -60,7 +63,7 @@ const SheetEditor = ({
         ) || false;
     };
 
-    // Initialize canvas responsabile
+    // Initialize canvas responsabile - 🐛 FIX: Dipende da canvasKey per re-render
     React.useEffect(() => {
         const initCanvas = (canvas) => {
             if (!canvas) return;
@@ -151,7 +154,7 @@ const SheetEditor = ({
             respCanvasRef.current.clearCanvas = () => clearCanvas(respCanvasRef.current);
             respCanvasRef.current.isCanvasBlank = () => isCanvasBlank(respCanvasRef.current);
         }
-    }, []);
+    }, [canvasKey]); // 🐛 FIX: Re-inizializza quando canvasKey cambia
 
     const saveSheet = async () => {
         if (!currentSheet.titoloAzienda || !currentSheet.responsabile) {
@@ -170,6 +173,42 @@ const SheetEditor = ({
             console.error(error);
             showToastLocal(`❌ ${t.errorSaving}`, 'error');
         }
+        setLoading(false);
+    };
+
+    // 🐛 FIX BUG #1: Genera link e salva timestamp
+    const handleGenerateLink = async () => {
+        if (!db) {
+            showToastLocal(`❌ ${t.dbNotConnected}`, 'error');
+            return;
+        }
+
+        setLoading(true);
+        
+        try {
+            // Salva il timestamp di generazione link
+            const linkGeneratedAt = new Date().toISOString();
+            
+            await db.collection('timesheets').doc(currentSheet.id).update({
+                linkGeneratedAt: linkGeneratedAt
+            });
+            
+            setCurrentSheet(prev => ({ ...prev, linkGeneratedAt }));
+            
+            // Genera e copia il link
+            const link = `${window.location.origin}/Report_Ore_Facchini/?mode=worker&sheet=${currentSheet.id}`;
+            await navigator.clipboard.writeText(link);
+            
+            if (addAuditLog) {
+                await addAuditLog('LINK_GENERATED', `Link generato per: ${currentSheet.titoloAzienda}`);
+            }
+            
+            showToastLocal(`✅ Link copiato! Scadenza calcolata da ora.`, 'success');
+        } catch (error) {
+            console.error('Error generating link:', error);
+            showToastLocal(`❌ ${t.error}`, 'error');
+        }
+        
         setLoading(false);
     };
 
@@ -200,6 +239,35 @@ const SheetEditor = ({
             console.error(error);
             showToastLocal(`❌ ${t.errorSaving}`, 'error');
         }
+        setLoading(false);
+    };
+
+    // 🐛 FIX BUG #2: Cancella firma e re-inizializza canvas
+    const deleteResponsabileSignature = async () => {
+        if (!confirm(`${t.confirm}?`)) return;
+        
+        setLoading(true);
+        
+        try {
+            await db.collection('timesheets').doc(currentSheet.id).update({
+                firmaResponsabile: firebase.firestore.FieldValue.delete()
+            });
+            
+            setCurrentSheet(prev => ({ ...prev, firmaResponsabile: null }));
+            
+            // 🐛 FIX: Forza re-render del canvas incrementando la key
+            setCanvasKey(prevKey => prevKey + 1);
+            
+            if (addAuditLog) {
+                await addAuditLog('SIGNATURE_DELETE', `Firma responsabile cancellata: ${currentSheet.responsabile}`);
+            }
+            
+            showToastLocal(`✅ Firma cancellata. Puoi firmare di nuovo.`, 'success');
+        } catch (error) {
+            console.error(error);
+            showToastLocal(`❌ ${t.errorDeleting}`, 'error');
+        }
+        
         setLoading(false);
     };
 
@@ -403,17 +471,26 @@ const SheetEditor = ({
                         {loading ? `⏳ ${t.loading}...` : `💾 ${t.saveSheet}`}
                     </button>
                     
+                    {/* 🐛 FIX BUG #1: Nuovo handler per genera link */}
                     <button
-                        onClick={() => generateShareLink(currentSheet.id)}
-                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors text-sm sm:text-base"
+                        onClick={handleGenerateLink}
+                        disabled={loading}
+                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
                     >
-                        🔗 {t.generateLink}
+                        {loading ? `⏳ ${t.loading}...` : `🔗 ${t.generateLink}`}
                     </button>
                 </div>
 
-                {/* Link visibile */}
+                {/* Link visibile con indicatore scadenza */}
                 <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <p className={`text-xs ${textClass} mb-2 font-semibold`}>🔗 {t.shareLink || 'Link condivisione'}:</p>
+                    <p className={`text-xs ${textClass} mb-2 font-semibold flex items-center gap-2`}>
+                        🔗 {t.shareLink || 'Link condivisione'}:
+                        {currentSheet.linkGeneratedAt && (
+                            <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs">
+                                ✅ Attivo da {new Date(currentSheet.linkGeneratedAt).toLocaleString('it-IT')}
+                            </span>
+                        )}
+                    </p>
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -643,7 +720,7 @@ const SheetEditor = ({
                 )}
             </div>
 
-            {/* Firma Responsabile */}
+            {/* 🐛 FIX BUG #2: Firma Responsabile con canvas re-inizializzabile */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
                 <h3 className="text-lg sm:text-xl font-bold mb-4">✍️ {t.responsibleSignature}</h3>
                 
@@ -655,20 +732,19 @@ const SheetEditor = ({
                             className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white max-w-md w-full" 
                         />
                         <button
-                            onClick={() => {
-                                if (confirm(`${t.confirm}?`)) {
-                                    setCurrentSheet({...currentSheet, firmaResponsabile: null});
-                                }
-                            }}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base"
+                            onClick={deleteResponsabileSignature}
+                            disabled={loading}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base disabled:bg-gray-400"
                         >
-                            🗑️ {t.deleteSignature}
+                            {loading ? `⏳ ${t.loading}...` : `🗑️ ${t.deleteSignature}`}
                         </button>
                     </div>
                 ) : (
                     <div>
                         <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
+                            {/* 🐛 FIX: Canvas con key per forzare re-render */}
                             <canvas 
+                                key={canvasKey}
                                 ref={respCanvasRef} 
                                 width={800} 
                                 height={300} 
@@ -689,7 +765,7 @@ const SheetEditor = ({
                                 disabled={loading}
                                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 text-sm sm:text-base"
                             >
-                                ✓ {t.saveSignature}
+                                {loading ? `⏳ ${t.loading}...` : `✓ ${t.saveSignature}`}
                             </button>
                             <button
                                 onClick={clearSignature}
