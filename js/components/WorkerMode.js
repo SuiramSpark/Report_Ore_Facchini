@@ -1,4 +1,4 @@
-// Worker Mode Component - 5 LINGUE COMPLETE + NUOVE FUNZIONALITÀ
+// Worker Mode Component - v3.0 FIX BUG LINK + FIRMA
 const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' }) => {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
@@ -36,6 +36,9 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     // ⚙️ Link Expiration State
     const [linkExpired, setLinkExpired] = React.useState(false);
     
+    // 🐛 FIX BUG #2: State per forzare re-render canvas
+    const [canvasKey, setCanvasKey] = React.useState(0);
+    
     const canvasRef = React.useRef(null);
     const cleanupRef = React.useRef(null);
     const autoSaveTimeoutRef = React.useRef(null);
@@ -43,7 +46,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
 
     const darkMode = localDarkMode; // Use local dark mode
 
-    // ⚙️ Check Link Expiration
+    // 🐛 FIX BUG #1: Check Link Expiration usando linkGeneratedAt
     React.useEffect(() => {
         if (!db || !sheetId) return;
         
@@ -58,21 +61,34 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                     return;
                 }
                 
-                // Get sheet creation date
+                // Get sheet link generation date
                 const sheetDoc = await db.collection('timesheets').doc(sheetId).get();
                 if (!sheetDoc.exists) return;
                 
-                const sheetCreatedAt = sheetDoc.data().createdAt;
-                if (!sheetCreatedAt) return;
+                // 🐛 FIX: Usa linkGeneratedAt invece di createdAt
+                const linkGeneratedAt = sheetDoc.data().linkGeneratedAt;
                 
-                const createdDate = new Date(sheetCreatedAt);
+                if (!linkGeneratedAt) {
+                    // Link mai generato, non scade
+                    console.log('✅ Link mai generato, nessuna scadenza');
+                    return;
+                }
+                
+                const generatedDate = new Date(linkGeneratedAt);
                 const now = new Date();
-                const daysDiff = (now - createdDate) / (1000 * 60 * 60 * 24);
+                const daysDiff = (now - generatedDate) / (1000 * 60 * 60 * 24);
+                
+                console.log(`🔗 Link generato: ${generatedDate.toLocaleString()}`);
+                console.log(`⏱️ Giorni trascorsi: ${daysDiff.toFixed(2)}`);
+                console.log(`⚙️ Scadenza impostata: ${settings.expirationDays} giorni`);
                 
                 if (daysDiff > settings.expirationDays) {
+                    console.log('❌ Link scaduto!');
                     setLinkExpired(true);
                     setError(t.linkExpired);
                     setLoading(false);
+                } else {
+                    console.log(`✅ Link valido ancora per ${(settings.expirationDays - daysDiff).toFixed(2)} giorni`);
                 }
             } catch (err) {
                 console.error('Error checking link expiration:', err);
@@ -218,7 +234,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         return () => unsubscribe();
     }, [sheetId, db, language, linkExpired]);
 
-    // Initialize canvas
+    // 🐛 FIX BUG #2: Initialize canvas con supporto re-render
     React.useEffect(() => {
         console.log('🔄 WorkerMode: Inizializzo canvas...');
         
@@ -237,7 +253,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                 cleanupRef.current();
             }
         };
-    }, [canvasRef.current]);
+    }, [canvasKey]); // 🐛 FIX: Re-inizializza quando canvasKey cambia
 
     const saveWorkerData = async () => {
         // Validation
@@ -304,7 +320,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         setGeneratingPDF(false);
     };
 
-    // 🔙 Handle Edit/Go Back
+    // 🔙 Handle Edit/Go Back - 🐛 FIX: con re-inizializzazione canvas
     const handleEditSubmission = async () => {
         if (!db || !sheetId || !submittedWorkerId) return;
         
@@ -348,7 +364,10 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
             // Reset submission
             setSubmittedWorkerId(null);
             
-            showToast(`✅ ${language === 'it' ? 'Puoi modificare i tuoi dati' : language === 'en' ? 'You can edit your data' : language === 'es' ? 'Puedes editar tus datos' : language === 'fr' ? 'Vous pouvez modifier vos données' : 'Poți modifica datele'}`, 'success');
+            // 🐛 FIX: Re-inizializza canvas
+            setCanvasKey(prevKey => prevKey + 1);
+            
+            showToast(`✅ ${language === 'it' ? 'Puoi modificare i tuoi dati e firmare di nuovo' : language === 'en' ? 'You can edit your data and sign again' : language === 'es' ? 'Puedes editar tus datos y firmar de nuevo' : language === 'fr' ? 'Vous pouvez modifier vos données et signer à nouveau' : 'Poți modifica datele și semna din nou'}`, 'success');
         } catch (error) {
             console.error('Error editing submission:', error);
             showToast(`❌ ${t.error}`, 'error');
@@ -662,7 +681,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                             </div>
                         )}
 
-                        {/* Firma - CANVAS OTTIMIZZATO MOBILE */}
+                        {/* 🐛 FIX BUG #2: Firma - CANVAS OTTIMIZZATO MOBILE con key per re-render */}
                         <div className="space-y-2">
                             <label className="block font-semibold text-sm sm:text-base">
                                 {t.signature} *
@@ -670,6 +689,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                             
                             <div className="border-2 border-indigo-500 rounded-lg p-1 sm:p-2 bg-white">
                                 <canvas
+                                    key={canvasKey} // 🐛 FIX: Forza re-render quando cambia
                                     ref={canvasRef}
                                     width={800}
                                     height={300}
