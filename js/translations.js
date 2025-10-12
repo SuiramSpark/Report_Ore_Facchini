@@ -1,10 +1,6 @@
-// Translations - 5 LINGUE COMPLETE + v4.0 NEW FEATURES
+// Translations - 5 LINGUE COMPLETE + v4.0
 const translations = {
-    // ========================================
-    // 🇮🇹 ITALIANO
-    // ========================================
     it: {
-        // General
         administrator: 'Amministratore',
         loading: 'Caricamento',
         save: 'Salva',
@@ -24,8 +20,6 @@ const translations = {
         success: 'Successo',
         warning: 'Attenzione',
         info: 'Informazione',
-        
-        // Time
         day: 'giorno',
         days: 'giorni',
         hour: 'ora',
@@ -37,8 +31,6 @@ const translations = {
         week: 'Settimana',
         month: 'Mese',
         year: 'Anno',
-        
-        // Dashboard
         dashboard: 'Dashboard',
         statistics: 'Statistiche',
         totalSheets: 'Fogli Totali',
@@ -53,8 +45,6 @@ const translations = {
         topWorkers: 'Top Lavoratori',
         topCompanies: 'Top Aziende',
         recentActivity: 'Attività Recenti',
-        
-        // Sheets
         sheets: 'Fogli',
         sheet: 'Foglio',
         createNewSheet: 'Crea Nuovo Foglio',
@@ -70,8 +60,6 @@ const translations = {
         draft: 'Bozza',
         completed: 'Completato',
         archived: 'Archiviato',
-        
-        // Company Info
         company: 'Azienda',
         companyName: 'Nome Azienda',
         companyTitle: 'Titolo Azienda',
@@ -80,8 +68,6 @@ const translations = {
         notes: 'Note',
         signature: 'Firma',
         signResponsible: 'Firma Responsabile',
-        
-        // Workers
         workers: 'Lavoratori',
         worker: 'Lavoratore',
         addWorker: 'Aggiungi Lavoratore',
@@ -95,16 +81,12 @@ const translations = {
         idNumber: 'Numero Identità',
         phone: 'Telefono',
         email: 'Email',
-        
-        // Work Hours
         timeIn: 'Ora Entrata',
         timeOut: 'Ora Uscita',
         breakMinutes: 'Pausa (minuti)',
         totalHours: 'Ore Totali',
         workHours: 'Ore Lavoro',
         overtime: 'Straordinario',
-        
-        // Actions
         generate: 'Genera',
         generateLink: 'Genera Link',
         generatePDF: 'Genera PDF',
@@ -114,15 +96,13 @@ const translations = {
         viewPDF: 'Visualizza PDF',
         downloadPDF: 'Scarica PDF',
         print: 'Stampa',
-        
-        // Export
         export: 'Esporta',
         exportCSV: 'Esporta CSV',
         exportPDF: 'Esporta PDF',
+        exportExcel: 'Esporta Excel',
         csvExported: 'CSV esportato con successo',
         pdfExported: 'PDF esportato con successo',
-        
-        // Blacklist
+        excelExported: 'Excel esportato con successo',
         blacklist: 'Blacklist',
         addToBlacklist: 'Aggiungi a Blacklist',
         removeFromBlacklist: 'Rimuovi da Blacklist',
@@ -130,15 +110,11 @@ const translations = {
         blacklistAdded: 'Aggiunto alla blacklist',
         blacklistRemoved: 'Rimosso dalla blacklist',
         workerInBlacklist: 'Lavoratore in blacklist',
-        
-        // Audit Log
         auditLog: 'Log Audit',
         action: 'Azione',
         details: 'Dettagli',
         timestamp: 'Data/Ora',
         user: 'Utente',
-        
-        // Reports
         reports: 'Report',
         generateReport: 'Genera Report',
         weeklyReport: 'Report Settimanale',
@@ -147,8 +123,6 @@ const translations = {
         dateRange: 'Periodo',
         startDate: 'Data Inizio',
         endDate: 'Data Fine',
-        
-        // Settings
         settings: 'Impostazioni',
         systemSettings: 'Impostazioni Sistema',
         saveSettings: 'Salva Impostazioni',
@@ -158,8 +132,6 @@ const translations = {
         linkExpiresIn: 'Link scade tra',
         never: 'Mai',
         linkSettings: 'Impostazioni Link',
-        
-        // Worker Mode
         workerMode: 'Modalità Lavoratore',
         workerRegistration: 'Registrazione Lavoratore',
         fillAllFields: 'Compila tutti i campi',
@@ -168,8 +140,6 @@ const translations = {
         sessionSaved: 'Sessione salvata',
         restoreSession: 'Ripristina Sessione',
         clearSession: 'Cancella Sessione',
-        
-        // Messages
         fillRequired: 'Compila tutti i campi obbligatori',
         confirmDelete: 'Sei sicuro di voler eliminare?',
         confirmArchive: 'Sei sicuro di voler archiviare?',
@@ -185,26 +155,18 @@ const translations = {
         linkNotFound: 'Link non trovato',
         uploadLogo: 'Carica Logo',
         logoUploaded: 'Logo caricato',
-        
-        // Dark Mode
         darkMode: 'Modalità Scura',
         lightMode: 'Modalità Chiara',
-        
-        // Language
         language: 'Lingua',
         italian: 'Italiano',
         english: 'Inglese',
         spanish: 'Spagnolo',
         french: 'Francese',
         romanian: 'Rumeno',
-        
-        // Status
         status: 'Stato',
         active: 'Attivo',
         inactive: 'Inattivo',
         pending: 'In Attesa',
-        
-        // Misc
         archive: 'Archivia',
         restore: 'Ripristina',
         duplicate: 'Duplica',
@@ -212,12 +174,8 @@ const translations = {
         lastUpdate: 'Ultimo Aggiornamento',
         createdAt: 'Creato il',
         updatedAt: 'Aggiornato il',
-        
-        // ⭐ v4.0 NEW FEATURES
-        exportExcel: 'Esporta Excel',
-        excelExported: 'Excel esportato con successo',
         notificationsEnabled: 'Notifiche attivate',
-        notificationsBlocked: 'Notifiche bloccate dal browser',
+        notificationsBlocked: 'Notifiche bloccate',
         newWorkerRegistered: 'Nuovo lavoratore registrato',
         workerNotes: 'Note Lavoratore',
         comparePeriodsTitle: 'Confronta Periodi',
@@ -228,28 +186,15 @@ const translations = {
         searchEverywhere: 'Cerca ovunque...',
         backupData: 'Backup Dati',
         restoreBackup: 'Ripristina Backup',
-        backupSuccess: 'Backup scaricato con successo',
-        restoreSuccess: 'Backup ripristinato con successo',
+        backupSuccess: 'Backup scaricato',
+        restoreSuccess: 'Backup ripristinato',
         workerStatistics: 'Statistiche Lavoratore',
         totalPresences: 'Presenze Totali',
         avgHoursPerDay: 'Media Ore/Giorno',
         calendar: 'Calendario',
-        customLinks: 'Link Personalizzati',
-        createCustomLink: 'Crea Link Personalizzato',
-        workerName: 'Nome Lavoratore',
-        customLinkCreated: 'Link personalizzato creato',
-        autocompleteSuggestions: 'Suggerimenti',
-        autoSaveEnabled: 'Salvataggio automatico attivo',
-        draftRestored: 'Bozza ripristinata',
-        installApp: 'Installa App',
-        installPrompt: 'Installa questa app sul tuo dispositivo'
+        installApp: 'Installa App'
     },
-    
-    // ========================================
-    // 🇬🇧 ENGLISH
-    // ========================================
     en: {
-        // General
         administrator: 'Administrator',
         loading: 'Loading',
         save: 'Save',
@@ -269,8 +214,6 @@ const translations = {
         success: 'Success',
         warning: 'Warning',
         info: 'Information',
-        
-        // Time
         day: 'day',
         days: 'days',
         hour: 'hour',
@@ -282,8 +225,6 @@ const translations = {
         week: 'Week',
         month: 'Month',
         year: 'Year',
-        
-        // Dashboard
         dashboard: 'Dashboard',
         statistics: 'Statistics',
         totalSheets: 'Total Sheets',
@@ -292,14 +233,12 @@ const translations = {
         activeSheets: 'Active Sheets',
         completedSheets: 'Completed Sheets',
         archivedSheets: 'Archived Sheets',
-        todayHours: 'Today\'s Hours',
+        todayHours: 'Today Hours',
         weekHours: 'Week Hours',
         monthHours: 'Month Hours',
         topWorkers: 'Top Workers',
         topCompanies: 'Top Companies',
         recentActivity: 'Recent Activity',
-        
-        // Sheets
         sheets: 'Sheets',
         sheet: 'Sheet',
         createNewSheet: 'Create New Sheet',
@@ -315,8 +254,6 @@ const translations = {
         draft: 'Draft',
         completed: 'Completed',
         archived: 'Archived',
-        
-        // Company Info
         company: 'Company',
         companyName: 'Company Name',
         companyTitle: 'Company Title',
@@ -325,8 +262,6 @@ const translations = {
         notes: 'Notes',
         signature: 'Signature',
         signResponsible: 'Sign Responsible',
-        
-        // Workers
         workers: 'Workers',
         worker: 'Worker',
         addWorker: 'Add Worker',
@@ -340,16 +275,12 @@ const translations = {
         idNumber: 'ID Number',
         phone: 'Phone',
         email: 'Email',
-        
-        // Work Hours
         timeIn: 'Time In',
         timeOut: 'Time Out',
         breakMinutes: 'Break (minutes)',
         totalHours: 'Total Hours',
         workHours: 'Work Hours',
         overtime: 'Overtime',
-        
-        // Actions
         generate: 'Generate',
         generateLink: 'Generate Link',
         generatePDF: 'Generate PDF',
@@ -359,15 +290,13 @@ const translations = {
         viewPDF: 'View PDF',
         downloadPDF: 'Download PDF',
         print: 'Print',
-        
-        // Export
         export: 'Export',
         exportCSV: 'Export CSV',
         exportPDF: 'Export PDF',
+        exportExcel: 'Export Excel',
         csvExported: 'CSV exported successfully',
         pdfExported: 'PDF exported successfully',
-        
-        // Blacklist
+        excelExported: 'Excel exported successfully',
         blacklist: 'Blacklist',
         addToBlacklist: 'Add to Blacklist',
         removeFromBlacklist: 'Remove from Blacklist',
@@ -375,15 +304,11 @@ const translations = {
         blacklistAdded: 'Added to blacklist',
         blacklistRemoved: 'Removed from blacklist',
         workerInBlacklist: 'Worker in blacklist',
-        
-        // Audit Log
         auditLog: 'Audit Log',
         action: 'Action',
         details: 'Details',
         timestamp: 'Timestamp',
         user: 'User',
-        
-        // Reports
         reports: 'Reports',
         generateReport: 'Generate Report',
         weeklyReport: 'Weekly Report',
@@ -392,8 +317,6 @@ const translations = {
         dateRange: 'Date Range',
         startDate: 'Start Date',
         endDate: 'End Date',
-        
-        // Settings
         settings: 'Settings',
         systemSettings: 'System Settings',
         saveSettings: 'Save Settings',
@@ -403,8 +326,6 @@ const translations = {
         linkExpiresIn: 'Link expires in',
         never: 'Never',
         linkSettings: 'Link Settings',
-        
-        // Worker Mode
         workerMode: 'Worker Mode',
         workerRegistration: 'Worker Registration',
         fillAllFields: 'Fill all fields',
@@ -413,8 +334,6 @@ const translations = {
         sessionSaved: 'Session saved',
         restoreSession: 'Restore Session',
         clearSession: 'Clear Session',
-        
-        // Messages
         fillRequired: 'Fill all required fields',
         confirmDelete: 'Are you sure you want to delete?',
         confirmArchive: 'Are you sure you want to archive?',
@@ -430,26 +349,18 @@ const translations = {
         linkNotFound: 'Link not found',
         uploadLogo: 'Upload Logo',
         logoUploaded: 'Logo uploaded',
-        
-        // Dark Mode
         darkMode: 'Dark Mode',
         lightMode: 'Light Mode',
-        
-        // Language
         language: 'Language',
         italian: 'Italian',
         english: 'English',
         spanish: 'Spanish',
         french: 'French',
         romanian: 'Romanian',
-        
-        // Status
         status: 'Status',
         active: 'Active',
         inactive: 'Inactive',
         pending: 'Pending',
-        
-        // Misc
         archive: 'Archive',
         restore: 'Restore',
         duplicate: 'Duplicate',
@@ -457,12 +368,8 @@ const translations = {
         lastUpdate: 'Last Update',
         createdAt: 'Created at',
         updatedAt: 'Updated at',
-        
-        // ⭐ v4.0 NEW FEATURES
-        exportExcel: 'Export Excel',
-        excelExported: 'Excel exported successfully',
         notificationsEnabled: 'Notifications enabled',
-        notificationsBlocked: 'Notifications blocked by browser',
+        notificationsBlocked: 'Notifications blocked',
         newWorkerRegistered: 'New worker registered',
         workerNotes: 'Worker Notes',
         comparePeriodsTitle: 'Compare Periods',
@@ -473,28 +380,15 @@ const translations = {
         searchEverywhere: 'Search everywhere...',
         backupData: 'Backup Data',
         restoreBackup: 'Restore Backup',
-        backupSuccess: 'Backup downloaded successfully',
-        restoreSuccess: 'Backup restored successfully',
+        backupSuccess: 'Backup downloaded',
+        restoreSuccess: 'Backup restored',
         workerStatistics: 'Worker Statistics',
         totalPresences: 'Total Presences',
         avgHoursPerDay: 'Avg Hours/Day',
         calendar: 'Calendar',
-        customLinks: 'Custom Links',
-        createCustomLink: 'Create Custom Link',
-        workerName: 'Worker Name',
-        customLinkCreated: 'Custom link created',
-        autocompleteSuggestions: 'Suggestions',
-        autoSaveEnabled: 'Auto-save enabled',
-        draftRestored: 'Draft restored',
-        installApp: 'Install App',
-        installPrompt: 'Install this app on your device'
+        installApp: 'Install App'
     },
-    
-    // ========================================
-    // 🇪🇸 ESPAÑOL
-    // ========================================
     es: {
-        // General
         administrator: 'Administrador',
         loading: 'Cargando',
         save: 'Guardar',
@@ -514,8 +408,6 @@ const translations = {
         success: 'Éxito',
         warning: 'Advertencia',
         info: 'Información',
-        
-        // Time
         day: 'día',
         days: 'días',
         hour: 'hora',
@@ -527,8 +419,6 @@ const translations = {
         week: 'Semana',
         month: 'Mes',
         year: 'Año',
-        
-        // Dashboard
         dashboard: 'Panel',
         statistics: 'Estadísticas',
         totalSheets: 'Hojas Totales',
@@ -543,8 +433,6 @@ const translations = {
         topWorkers: 'Top Trabajadores',
         topCompanies: 'Top Empresas',
         recentActivity: 'Actividad Reciente',
-        
-        // Sheets
         sheets: 'Hojas',
         sheet: 'Hoja',
         createNewSheet: 'Crear Nueva Hoja',
@@ -560,8 +448,6 @@ const translations = {
         draft: 'Borrador',
         completed: 'Completado',
         archived: 'Archivado',
-        
-        // Company Info
         company: 'Empresa',
         companyName: 'Nombre Empresa',
         companyTitle: 'Título Empresa',
@@ -570,8 +456,6 @@ const translations = {
         notes: 'Notas',
         signature: 'Firma',
         signResponsible: 'Firma Responsable',
-        
-        // Workers
         workers: 'Trabajadores',
         worker: 'Trabajador',
         addWorker: 'Añadir Trabajador',
@@ -585,34 +469,28 @@ const translations = {
         idNumber: 'Número Identidad',
         phone: 'Teléfono',
         email: 'Email',
-        
-        // Work Hours
         timeIn: 'Hora Entrada',
         timeOut: 'Hora Salida',
         breakMinutes: 'Pausa (minutos)',
         totalHours: 'Horas Totales',
         workHours: 'Horas Trabajo',
         overtime: 'Horas Extra',
-        
-        // Actions
         generate: 'Generar',
         generateLink: 'Generar Enlace',
         generatePDF: 'Generar PDF',
         copyLink: 'Copiar Enlace',
-        linkCopied: '¡Enlace copiado!',
+        linkCopied: 'Enlace copiado!',
         shareLink: 'Compartir Enlace',
         viewPDF: 'Ver PDF',
         downloadPDF: 'Descargar PDF',
         print: 'Imprimir',
-        
-        // Export
         export: 'Exportar',
         exportCSV: 'Exportar CSV',
         exportPDF: 'Exportar PDF',
-        csvExported: 'CSV exportado con éxito',
-        pdfExported: 'PDF exportado con éxito',
-        
-        // Blacklist
+        exportExcel: 'Exportar Excel',
+        csvExported: 'CSV exportado',
+        pdfExported: 'PDF exportado',
+        excelExported: 'Excel exportado',
         blacklist: 'Lista Negra',
         addToBlacklist: 'Añadir a Lista Negra',
         removeFromBlacklist: 'Quitar de Lista Negra',
@@ -620,15 +498,11 @@ const translations = {
         blacklistAdded: 'Añadido a lista negra',
         blacklistRemoved: 'Eliminado de lista negra',
         workerInBlacklist: 'Trabajador en lista negra',
-        
-        // Audit Log
         auditLog: 'Registro Auditoría',
         action: 'Acción',
         details: 'Detalles',
         timestamp: 'Fecha/Hora',
         user: 'Usuario',
-        
-        // Reports
         reports: 'Informes',
         generateReport: 'Generar Informe',
         weeklyReport: 'Informe Semanal',
@@ -637,8 +511,6 @@ const translations = {
         dateRange: 'Período',
         startDate: 'Fecha Inicio',
         endDate: 'Fecha Fin',
-        
-        // Settings
         settings: 'Configuración',
         systemSettings: 'Configuración Sistema',
         saveSettings: 'Guardar Configuración',
@@ -648,25 +520,21 @@ const translations = {
         linkExpiresIn: 'Enlace caduca en',
         never: 'Nunca',
         linkSettings: 'Configuración Enlaces',
-        
-        // Worker Mode
         workerMode: 'Modo Trabajador',
         workerRegistration: 'Registro Trabajador',
         fillAllFields: 'Rellena todos los campos',
         submitData: 'Enviar Datos',
-        dataSubmitted: 'Datos enviados con éxito',
+        dataSubmitted: 'Datos enviados',
         sessionSaved: 'Sesión guardada',
         restoreSession: 'Restaurar Sesión',
         clearSession: 'Borrar Sesión',
-        
-        // Messages
-        fillRequired: 'Rellena todos los campos obligatorios',
+        fillRequired: 'Rellena todos los campos',
         confirmDelete: '¿Estás seguro de eliminar?',
         confirmArchive: '¿Estás seguro de archivar?',
-        sheetSaved: 'Hoja guardada con éxito',
-        sheetDeleted: 'Hoja eliminada con éxito',
-        sheetArchived: 'Hoja archivada con éxito',
-        sheetRestored: 'Hoja restaurada con éxito',
+        sheetSaved: 'Hoja guardada',
+        sheetDeleted: 'Hoja eliminada',
+        sheetArchived: 'Hoja archivada',
+        sheetRestored: 'Hoja restaurada',
         errorSaving: 'Error al guardar',
         errorDeleting: 'Error al eliminar',
         errorLoading: 'Error al cargar',
@@ -675,26 +543,18 @@ const translations = {
         linkNotFound: 'Enlace no encontrado',
         uploadLogo: 'Subir Logo',
         logoUploaded: 'Logo subido',
-        
-        // Dark Mode
         darkMode: 'Modo Oscuro',
         lightMode: 'Modo Claro',
-        
-        // Language
         language: 'Idioma',
         italian: 'Italiano',
         english: 'Inglés',
         spanish: 'Español',
         french: 'Francés',
         romanian: 'Rumano',
-        
-        // Status
         status: 'Estado',
         active: 'Activo',
         inactive: 'Inactivo',
         pending: 'Pendiente',
-        
-        // Misc
         archive: 'Archivar',
         restore: 'Restaurar',
         duplicate: 'Duplicar',
@@ -702,12 +562,8 @@ const translations = {
         lastUpdate: 'Última Actualización',
         createdAt: 'Creado el',
         updatedAt: 'Actualizado el',
-        
-        // ⭐ v4.0 NEW FEATURES
-        exportExcel: 'Exportar Excel',
-        excelExported: 'Excel exportado con éxito',
         notificationsEnabled: 'Notificaciones activadas',
-        notificationsBlocked: 'Notificaciones bloqueadas por el navegador',
+        notificationsBlocked: 'Notificaciones bloqueadas',
         newWorkerRegistered: 'Nuevo trabajador registrado',
         workerNotes: 'Notas Trabajador',
         comparePeriodsTitle: 'Comparar Períodos',
@@ -715,31 +571,18 @@ const translations = {
         lastMonth: 'Mes Pasado',
         difference: 'Diferencia',
         globalSearch: 'Búsqueda Global',
-        searchEverywhere: 'Buscar en todas partes...',
+        searchEverywhere: 'Buscar...',
         backupData: 'Copia de Seguridad',
         restoreBackup: 'Restaurar Copia',
-        backupSuccess: 'Copia descargada con éxito',
-        restoreSuccess: 'Copia restaurada con éxito',
-        workerStatistics: 'Estadísticas Trabajador',
+        backupSuccess: 'Copia descargada',
+        restoreSuccess: 'Copia restaurada',
+        workerStatistics: 'Estadísticas',
         totalPresences: 'Presencias Totales',
         avgHoursPerDay: 'Promedio Horas/Día',
         calendar: 'Calendario',
-        customLinks: 'Enlaces Personalizados',
-        createCustomLink: 'Crear Enlace Personalizado',
-        workerName: 'Nombre Trabajador',
-        customLinkCreated: 'Enlace personalizado creado',
-        autocompleteSuggestions: 'Sugerencias',
-        autoSaveEnabled: 'Guardado automático activado',
-        draftRestored: 'Borrador restaurado',
-        installApp: 'Instalar App',
-        installPrompt: 'Instala esta app en tu dispositivo'
+        installApp: 'Instalar App'
     },
-    
-    // ========================================
-    // 🇫🇷 FRANÇAIS
-    // ========================================
     fr: {
-        // General
         administrator: 'Administrateur',
         loading: 'Chargement',
         save: 'Enregistrer',
@@ -759,8 +602,6 @@ const translations = {
         success: 'Succès',
         warning: 'Avertissement',
         info: 'Information',
-        
-        // Time
         day: 'jour',
         days: 'jours',
         hour: 'heure',
@@ -772,8 +613,6 @@ const translations = {
         week: 'Semaine',
         month: 'Mois',
         year: 'Année',
-        
-        // Dashboard
         dashboard: 'Tableau de Bord',
         statistics: 'Statistiques',
         totalSheets: 'Feuilles Totales',
@@ -788,8 +627,6 @@ const translations = {
         topWorkers: 'Top Travailleurs',
         topCompanies: 'Top Entreprises',
         recentActivity: 'Activité Récente',
-        
-        // Sheets
         sheets: 'Feuilles',
         sheet: 'Feuille',
         createNewSheet: 'Créer Nouvelle Feuille',
@@ -805,8 +642,6 @@ const translations = {
         draft: 'Brouillon',
         completed: 'Complété',
         archived: 'Archivé',
-        
-        // Company Info
         company: 'Entreprise',
         companyName: 'Nom Entreprise',
         companyTitle: 'Titre Entreprise',
@@ -814,15 +649,13 @@ const translations = {
         location: 'Localisation',
         notes: 'Notes',
         signature: 'Signature',
-        signResponsible: 'Signer Responsable',
-        
-        // Workers
+        signResponsible: 'Signer',
         workers: 'Travailleurs',
         worker: 'Travailleur',
-        addWorker: 'Ajouter Travailleur',
-        editWorker: 'Modifier Travailleur',
-        deleteWorker: 'Supprimer Travailleur',
-        workerDetails: 'Détails Travailleur',
+        addWorker: 'Ajouter',
+        editWorker: 'Modifier',
+        deleteWorker: 'Supprimer',
+        workerDetails: 'Détails',
         firstName: 'Prénom',
         lastName: 'Nom',
         fullName: 'Nom Complet',
@@ -830,161 +663,120 @@ const translations = {
         idNumber: 'Numéro Identité',
         phone: 'Téléphone',
         email: 'Email',
-        
-        // Work Hours
         timeIn: 'Heure Entrée',
         timeOut: 'Heure Sortie',
         breakMinutes: 'Pause (minutes)',
         totalHours: 'Heures Totales',
         workHours: 'Heures Travail',
         overtime: 'Heures Supplémentaires',
-        
-        // Actions
         generate: 'Générer',
         generateLink: 'Générer Lien',
         generatePDF: 'Générer PDF',
         copyLink: 'Copier Lien',
         linkCopied: 'Lien copié!',
-        shareLink: 'Partager Lien',
+        shareLink: 'Partager',
         viewPDF: 'Voir PDF',
         downloadPDF: 'Télécharger PDF',
         print: 'Imprimer',
-        
-        // Export
         export: 'Exporter',
         exportCSV: 'Exporter CSV',
         exportPDF: 'Exporter PDF',
-        csvExported: 'CSV exporté avec succès',
-        pdfExported: 'PDF exporté avec succès',
-        
-        // Blacklist
+        exportExcel: 'Exporter Excel',
+        csvExported: 'CSV exporté',
+        pdfExported: 'PDF exporté',
+        excelExported: 'Excel exporté',
         blacklist: 'Liste Noire',
-        addToBlacklist: 'Ajouter à Liste Noire',
-        removeFromBlacklist: 'Retirer de Liste Noire',
+        addToBlacklist: 'Ajouter',
+        removeFromBlacklist: 'Retirer',
         blacklistReason: 'Raison',
-        blacklistAdded: 'Ajouté à liste noire',
-        blacklistRemoved: 'Retiré de liste noire',
-        workerInBlacklist: 'Travailleur en liste noire',
-        
-        // Audit Log
-        auditLog: 'Journal d\'Audit',
+        blacklistAdded: 'Ajouté',
+        blacklistRemoved: 'Retiré',
+        workerInBlacklist: 'Dans liste noire',
+        auditLog: 'Journal',
         action: 'Action',
         details: 'Détails',
         timestamp: 'Date/Heure',
         user: 'Utilisateur',
-        
-        // Reports
         reports: 'Rapports',
-        generateReport: 'Générer Rapport',
-        weeklyReport: 'Rapport Hebdomadaire',
-        monthlyReport: 'Rapport Mensuel',
-        customReport: 'Rapport Personnalisé',
+        generateReport: 'Générer',
+        weeklyReport: 'Hebdomadaire',
+        monthlyReport: 'Mensuel',
+        customReport: 'Personnalisé',
         dateRange: 'Période',
         startDate: 'Date Début',
         endDate: 'Date Fin',
-        
-        // Settings
         settings: 'Paramètres',
         systemSettings: 'Paramètres Système',
-        saveSettings: 'Enregistrer Paramètres',
-        settingsSaved: 'Paramètres enregistrés',
-        linkExpiration: 'Expiration Lien',
-        expirationTime: 'Temps Expiration',
-        linkExpiresIn: 'Lien expire dans',
+        saveSettings: 'Enregistrer',
+        settingsSaved: 'Enregistrés',
+        linkExpiration: 'Expiration',
+        expirationTime: 'Temps',
+        linkExpiresIn: 'Expire dans',
         never: 'Jamais',
-        linkSettings: 'Paramètres Liens',
-        
-        // Worker Mode
+        linkSettings: 'Liens',
         workerMode: 'Mode Travailleur',
-        workerRegistration: 'Enregistrement Travailleur',
-        fillAllFields: 'Remplir tous les champs',
-        submitData: 'Envoyer Données',
-        dataSubmitted: 'Données envoyées avec succès',
-        sessionSaved: 'Session enregistrée',
-        restoreSession: 'Restaurer Session',
-        clearSession: 'Effacer Session',
-        
-        // Messages
-        fillRequired: 'Remplir tous les champs obligatoires',
-        confirmDelete: 'Êtes-vous sûr de supprimer?',
-        confirmArchive: 'Êtes-vous sûr d\'archiver?',
-        sheetSaved: 'Feuille enregistrée avec succès',
-        sheetDeleted: 'Feuille supprimée avec succès',
-        sheetArchived: 'Feuille archivée avec succès',
-        sheetRestored: 'Feuille restaurée avec succès',
-        errorSaving: 'Erreur lors de l\'enregistrement',
-        errorDeleting: 'Erreur lors de la suppression',
-        errorLoading: 'Erreur lors du chargement',
-        dbNotConnected: 'Base de données non connectée',
-        linkExpired: 'Lien expiré',
-        linkNotFound: 'Lien non trouvé',
+        workerRegistration: 'Enregistrement',
+        fillAllFields: 'Remplir tous',
+        submitData: 'Envoyer',
+        dataSubmitted: 'Envoyés',
+        sessionSaved: 'Sauvegardé',
+        restoreSession: 'Restaurer',
+        clearSession: 'Effacer',
+        fillRequired: 'Remplir tous',
+        confirmDelete: 'Supprimer?',
+        confirmArchive: 'Archiver?',
+        sheetSaved: 'Sauvegardé',
+        sheetDeleted: 'Supprimé',
+        sheetArchived: 'Archivé',
+        sheetRestored: 'Restauré',
+        errorSaving: 'Erreur',
+        errorDeleting: 'Erreur',
+        errorLoading: 'Erreur',
+        dbNotConnected: 'Non connecté',
+        linkExpired: 'Expiré',
+        linkNotFound: 'Non trouvé',
         uploadLogo: 'Charger Logo',
-        logoUploaded: 'Logo chargé',
-        
-        // Dark Mode
+        logoUploaded: 'Chargé',
         darkMode: 'Mode Sombre',
         lightMode: 'Mode Clair',
-        
-        // Language
         language: 'Langue',
         italian: 'Italien',
         english: 'Anglais',
         spanish: 'Espagnol',
         french: 'Français',
         romanian: 'Roumain',
-        
-        // Status
         status: 'Statut',
         active: 'Actif',
         inactive: 'Inactif',
         pending: 'En Attente',
-        
-        // Misc
         archive: 'Archiver',
         restore: 'Restaurer',
         duplicate: 'Dupliquer',
         version: 'Version',
-        lastUpdate: 'Dernière Mise à Jour',
+        lastUpdate: 'Dernière MAJ',
         createdAt: 'Créé le',
-        updatedAt: 'Mis à jour le',
-        
-        // ⭐ v4.0 NEW FEATURES
-        exportExcel: 'Exporter Excel',
-        excelExported: 'Excel exporté avec succès',
+        updatedAt: 'MAJ le',
         notificationsEnabled: 'Notifications activées',
-        notificationsBlocked: 'Notifications bloquées par le navigateur',
-        newWorkerRegistered: 'Nouveau travailleur enregistré',
-        workerNotes: 'Notes Travailleur',
-        comparePeriodsTitle: 'Comparer Périodes',
+        notificationsBlocked: 'Bloquées',
+        newWorkerRegistered: 'Nouveau',
+        workerNotes: 'Notes',
+        comparePeriodsTitle: 'Comparer',
         thisMonth: 'Ce Mois',
         lastMonth: 'Mois Dernier',
         difference: 'Différence',
-        globalSearch: 'Recherche Globale',
-        searchEverywhere: 'Rechercher partout...',
-        backupData: 'Sauvegarde Données',
-        restoreBackup: 'Restaurer Sauvegarde',
-        backupSuccess: 'Sauvegarde téléchargée avec succès',
-        restoreSuccess: 'Sauvegarde restaurée avec succès',
-        workerStatistics: 'Statistiques Travailleur',
-        totalPresences: 'Présences Totales',
-        avgHoursPerDay: 'Moyenne Heures/Jour',
+        globalSearch: 'Recherche',
+        searchEverywhere: 'Rechercher...',
+        backupData: 'Sauvegarde',
+        restoreBackup: 'Restaurer',
+        backupSuccess: 'Téléchargé',
+        restoreSuccess: 'Restauré',
+        workerStatistics: 'Statistiques',
+        totalPresences: 'Présences',
+        avgHoursPerDay: 'Moy/Jour',
         calendar: 'Calendrier',
-        customLinks: 'Liens Personnalisés',
-        createCustomLink: 'Créer Lien Personnalisé',
-        workerName: 'Nom Travailleur',
-        customLinkCreated: 'Lien personnalisé créé',
-        autocompleteSuggestions: 'Suggestions',
-        autoSaveEnabled: 'Sauvegarde automatique activée',
-        draftRestored: 'Brouillon restauré',
-        installApp: 'Installer App',
-        installPrompt: 'Installez cette app sur votre appareil'
+        installApp: 'Installer'
     },
-    
-    // ========================================
-    // 🇷🇴 ROMÂNĂ
-    // ========================================
     ro: {
-        // General
         administrator: 'Administrator',
         loading: 'Încărcare',
         save: 'Salvează',
@@ -1004,8 +796,6 @@ const translations = {
         success: 'Succes',
         warning: 'Atenție',
         info: 'Informație',
-        
-        // Time
         day: 'zi',
         days: 'zile',
         hour: 'oră',
@@ -1017,211 +807,167 @@ const translations = {
         week: 'Săptămână',
         month: 'Lună',
         year: 'An',
-        
-        // Dashboard
         dashboard: 'Panou',
         statistics: 'Statistici',
         totalSheets: 'Fișe Totale',
         totalHours: 'Ore Totale',
-        totalWorkers: 'Muncitori Totali',
+        totalWorkers: 'Muncitori',
         activeSheets: 'Fișe Active',
-        completedSheets: 'Fișe Completate',
-        archivedSheets: 'Fișe Arhivate',
+        completedSheets: 'Completate',
+        archivedSheets: 'Arhivate',
         todayHours: 'Ore Astăzi',
-        weekHours: 'Ore Săptămână',
+        weekHours: 'Ore Săpt',
         monthHours: 'Ore Lună',
         topWorkers: 'Top Muncitori',
         topCompanies: 'Top Companii',
-        recentActivity: 'Activitate Recentă',
-        
-        // Sheets
+        recentActivity: 'Activitate',
         sheets: 'Fișe',
         sheet: 'Fișă',
-        createNewSheet: 'Creează Fișă Nouă',
-        sheetDetails: 'Detalii Fișă',
-        sheetList: 'Listă Fișe',
-        editSheet: 'Editează Fișă',
-        deleteSheet: 'Șterge Fișă',
-        archiveSheet: 'Arhivează Fișă',
-        restoreSheet: 'Restaurează Fișă',
-        completeSheet: 'Completează Fișă',
-        sheetDate: 'Data Fișă',
-        sheetStatus: 'Status Fișă',
+        createNewSheet: 'Creează Fișă',
+        sheetDetails: 'Detalii',
+        sheetList: 'Listă',
+        editSheet: 'Editează',
+        deleteSheet: 'Șterge',
+        archiveSheet: 'Arhivează',
+        restoreSheet: 'Restaurează',
+        completeSheet: 'Completează',
+        sheetDate: 'Data',
+        sheetStatus: 'Status',
         draft: 'Ciornă',
         completed: 'Completat',
         archived: 'Arhivat',
-        
-        // Company Info
         company: 'Companie',
-        companyName: 'Nume Companie',
-        companyTitle: 'Titlu Companie',
+        companyName: 'Nume',
+        companyTitle: 'Titlu',
         responsible: 'Responsabil',
         location: 'Locație',
         notes: 'Note',
         signature: 'Semnătură',
-        signResponsible: 'Semnare Responsabil',
-        
-        // Workers
+        signResponsible: 'Semnare',
         workers: 'Muncitori',
         worker: 'Muncitor',
-        addWorker: 'Adaugă Muncitor',
-        editWorker: 'Editează Muncitor',
-        deleteWorker: 'Șterge Muncitor',
-        workerDetails: 'Detalii Muncitor',
+        addWorker: 'Adaugă',
+        editWorker: 'Editează',
+        deleteWorker: 'Șterge',
+        workerDetails: 'Detalii',
         firstName: 'Prenume',
         lastName: 'Nume',
         fullName: 'Nume Complet',
         fiscalCode: 'Cod Fiscal',
-        idNumber: 'Număr Identitate',
+        idNumber: 'Nr Identitate',
         phone: 'Telefon',
         email: 'Email',
-        
-        // Work Hours
         timeIn: 'Oră Intrare',
         timeOut: 'Oră Ieșire',
-        breakMinutes: 'Pauză (minute)',
+        breakMinutes: 'Pauză (min)',
         totalHours: 'Ore Totale',
         workHours: 'Ore Muncă',
-        overtime: 'Ore Suplimentare',
-        
-        // Actions
+        overtime: 'Ore Extra',
         generate: 'Generează',
         generateLink: 'Generează Link',
         generatePDF: 'Generează PDF',
         copyLink: 'Copiază Link',
-        linkCopied: 'Link copiat!',
-        shareLink: 'Distribuie Link',
+        linkCopied: 'Copiat!',
+        shareLink: 'Distribuie',
         viewPDF: 'Vezi PDF',
         downloadPDF: 'Descarcă PDF',
         print: 'Printează',
-        
-        // Export
         export: 'Exportă',
         exportCSV: 'Exportă CSV',
         exportPDF: 'Exportă PDF',
-        csvExported: 'CSV exportat cu succes',
-        pdfExported: 'PDF exportat cu succes',
-        
-        // Blacklist
+        exportExcel: 'Exportă Excel',
+        csvExported: 'CSV exportat',
+        pdfExported: 'PDF exportat',
+        excelExported: 'Excel exportat',
         blacklist: 'Listă Neagră',
-        addToBlacklist: 'Adaugă la Listă Neagră',
-        removeFromBlacklist: 'Elimină din Listă Neagră',
+        addToBlacklist: 'Adaugă',
+        removeFromBlacklist: 'Elimină',
         blacklistReason: 'Motiv',
-        blacklistAdded: 'Adăugat la listă neagră',
-        blacklistRemoved: 'Eliminat din listă neagră',
-        workerInBlacklist: 'Muncitor în listă neagră',
-        
-        // Audit Log
-        auditLog: 'Jurnal Audit',
+        blacklistAdded: 'Adăugat',
+        blacklistRemoved: 'Eliminat',
+        workerInBlacklist: 'În listă',
+        auditLog: 'Jurnal',
         action: 'Acțiune',
         details: 'Detalii',
         timestamp: 'Data/Ora',
         user: 'Utilizator',
-        
-        // Reports
         reports: 'Rapoarte',
-        generateReport: 'Generează Raport',
-        weeklyReport: 'Raport Săptămânal',
-        monthlyReport: 'Raport Lunar',
-        customReport: 'Raport Personalizat',
+        generateReport: 'Generează',
+        weeklyReport: 'Săptămânal',
+        monthlyReport: 'Lunar',
+        customReport: 'Personalizat',
         dateRange: 'Perioadă',
         startDate: 'Data Început',
         endDate: 'Data Sfârșit',
-        
-        // Settings
         settings: 'Setări',
         systemSettings: 'Setări Sistem',
-        saveSettings: 'Salvează Setări',
-        settingsSaved: 'Setări salvate',
-        linkExpiration: 'Expirare Link',
-        expirationTime: 'Timp Expirare',
-        linkExpiresIn: 'Link-ul expiră în',
+        saveSettings: 'Salvează',
+        settingsSaved: 'Salvat',
+        linkExpiration: 'Expirare',
+        expirationTime: 'Timp',
+        linkExpiresIn: 'Expiră în',
         never: 'Niciodată',
-        linkSettings: 'Setări Link-uri',
-        
-        // Worker Mode
+        linkSettings: 'Link-uri',
         workerMode: 'Mod Muncitor',
-        workerRegistration: 'Înregistrare Muncitor',
-        fillAllFields: 'Completează toate câmpurile',
-        submitData: 'Trimite Date',
-        dataSubmitted: 'Date trimise cu succes',
-        sessionSaved: 'Sesiune salvată',
-        restoreSession: 'Restaurează Sesiune',
-        clearSession: 'Șterge Sesiune',
-        
-        // Messages
-        fillRequired: 'Completează toate câmpurile obligatorii',
-        confirmDelete: 'Ești sigur că vrei să ștergi?',
-        confirmArchive: 'Ești sigur că vrei să arhivezi?',
-        sheetSaved: 'Fișă salvată cu succes',
-        sheetDeleted: 'Fișă ștearsă cu succes',
-        sheetArchived: 'Fișă arhivată cu succes',
-        sheetRestored: 'Fișă restaurată cu succes',
-        errorSaving: 'Eroare la salvare',
-        errorDeleting: 'Eroare la ștergere',
-        errorLoading: 'Eroare la încărcare',
-        dbNotConnected: 'Baza de date nu este conectată',
-        linkExpired: 'Link expirat',
-        linkNotFound: 'Link negăsit',
-        uploadLogo: 'Încarcă Logo',
-        logoUploaded: 'Logo încărcat',
-        
-        // Dark Mode
+        workerRegistration: 'Înregistrare',
+        fillAllFields: 'Completează',
+        submitData: 'Trimite',
+        dataSubmitted: 'Trimis',
+        sessionSaved: 'Salvat',
+        restoreSession: 'Restaurează',
+        clearSession: 'Șterge',
+        fillRequired: 'Completează',
+        confirmDelete: 'Ștergi?',
+        confirmArchive: 'Arhivezi?',
+        sheetSaved: 'Salvat',
+        sheetDeleted: 'Șters',
+        sheetArchived: 'Arhivat',
+        sheetRestored: 'Restaurat',
+        errorSaving: 'Eroare',
+        errorDeleting: 'Eroare',
+        errorLoading: 'Eroare',
+        dbNotConnected: 'Neconectat',
+        linkExpired: 'Expirat',
+        linkNotFound: 'Negăsit',
+        uploadLogo: 'Încarcă',
+        logoUploaded: 'Încărcat',
         darkMode: 'Mod Întunecat',
         lightMode: 'Mod Luminos',
-        
-        // Language
         language: 'Limbă',
         italian: 'Italiană',
         english: 'Engleză',
         spanish: 'Spaniolă',
         french: 'Franceză',
         romanian: 'Română',
-        
-        // Status
         status: 'Status',
         active: 'Activ',
         inactive: 'Inactiv',
-        pending: 'În Așteptare',
-        
-        // Misc
+        pending: 'Așteptare',
         archive: 'Arhivează',
         restore: 'Restaurează',
         duplicate: 'Duplică',
         version: 'Versiune',
-        lastUpdate: 'Ultima Actualizare',
-        createdAt: 'Creat la',
-        updatedAt: 'Actualizat la',
-        
-        // ⭐ v4.0 NEW FEATURES
-        exportExcel: 'Exportă Excel',
-        excelExported: 'Excel exportat cu succes',
-        notificationsEnabled: 'Notificări activate',
-        notificationsBlocked: 'Notificări blocate de browser',
-        newWorkerRegistered: 'Muncitor nou înregistrat',
-        workerNotes: 'Note Muncitor',
-        comparePeriodsTitle: 'Compară Perioade',
-        thisMonth: 'Luna Aceasta',
+        lastUpdate: 'Ultima MAJ',
+        createdAt: 'Creat',
+        updatedAt: 'MAJ',
+        notificationsEnabled: 'Notificări',
+        notificationsBlocked: 'Blocate',
+        newWorkerRegistered: 'Nou',
+        workerNotes: 'Note',
+        comparePeriodsTitle: 'Compară',
+        thisMonth: 'Luna',
         lastMonth: 'Luna Trecută',
         difference: 'Diferență',
-        globalSearch: 'Căutare Globală',
-        searchEverywhere: 'Caută peste tot...',
-        backupData: 'Backup Date',
-        restoreBackup: 'Restaurează Backup',
-        backupSuccess: 'Backup descărcat cu succes',
-        restoreSuccess: 'Backup restaurat cu succes',
-        workerStatistics: 'Statistici Muncitor',
-        totalPresences: 'Prezențe Totale',
-        avgHoursPerDay: 'Medie Ore/Zi',
+        globalSearch: 'Căutare',
+        searchEverywhere: 'Caută...',
+        backupData: 'Backup',
+        restoreBackup: 'Restaurează',
+        backupSuccess: 'Descărcat',
+        restoreSuccess: 'Restaurat',
+        workerStatistics: 'Statistici',
+        totalPresences: 'Prezențe',
+        avgHoursPerDay: 'Medie/Zi',
         calendar: 'Calendar',
-        customLinks: 'Link-uri Personalizate',
-        createCustomLink: 'Creează Link Personalizat',
-        workerName: 'Nume Muncitor',
-        customLinkCreated: 'Link personalizat creat',
-        autocompleteSuggestions: 'Sugestii',
-        autoSaveEnabled: 'Salvare automată activată',
-        draftRestored: 'Ciornă restaurată',
-        installApp: 'Instalează App',
-        installPrompt: 'Instalează această aplicație pe dispozitiv'
+        installApp: 'Instalează'
     }
 };
