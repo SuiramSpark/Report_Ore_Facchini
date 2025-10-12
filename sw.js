@@ -44,18 +44,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // Clone response
                 const responseClone = response.clone();
-                
-                // Update cache
                 caches.open(CACHE_NAME).then((cache) => {
                     cache.put(event.request, responseClone);
                 });
-                
                 return response;
             })
             .catch(() => {
-                // Fallback to cache
                 return caches.match(event.request);
             })
     );
