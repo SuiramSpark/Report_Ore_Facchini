@@ -1,7 +1,8 @@
-// Settings Component - 5 LINGUE COMPLETE
+// Settings Component - v3.0 CON CHANGELOG E BUG FIX
 const Settings = ({ db, darkMode, language = 'it' }) => {
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
+    const [showChangelog, setShowChangelog] = React.useState(false);
     const [settings, setSettings] = React.useState({
         expirationDays: 1 // Default 24h
     });
@@ -13,6 +14,78 @@ const Settings = ({ db, darkMode, language = 'it' }) => {
     const inputClass = darkMode ? 
         'bg-gray-700 border-gray-600 text-white' : 
         'bg-white border-gray-300 text-gray-900';
+
+    // 📋 CHANGELOG DATA
+    const changelog = [
+        {
+            version: 'v3.0',
+            date: '2025-01-15',
+            changes: [
+                '🐛 FIX: Scadenza link ora parte dal momento della generazione, non dalla creazione foglio',
+                '🐛 FIX: Firma cancellabile e rifacibile senza problemi (responsabile + worker)',
+                '📋 NEW: Changelog integrato in Settings per tracciare tutte le versioni',
+                '🔧 IMPROVED: Sistema di gestione link più robusto con timestamp dedicato'
+            ]
+        },
+        {
+            version: 'v2.5',
+            date: '2025-01-14',
+            changes: [
+                '⚙️ NEW: Settings per scadenza link lavoratori (8h, 24h, 48h, 72h, 144h, Mai, Custom)',
+                '💾 NEW: Salvataggio automatico sessione lavoratore (auto-save ogni 2 secondi)',
+                '↩️ NEW: Ripristino sessione precedente per lavoratori',
+                '🌓 NEW: Dark mode locale per modalità lavoratore',
+                '📄 NEW: Possibilità per i lavoratori di rigenerare il proprio PDF',
+                '✏️ NEW: Modifica dati dopo invio (con re-firma)',
+                '🇫🇷🇷🇴 NEW: Supporto Francese e Rumeno (totale 5 lingue)'
+            ]
+        },
+        {
+            version: 'v2.0',
+            date: '2025-01-10',
+            changes: [
+                '📊 NEW: Dashboard avanzata con grafici animati',
+                '📈 NEW: Statistiche in tempo reale (ore oggi, settimana, mese)',
+                '🏆 NEW: Top 10 lavoratori e top 5 aziende',
+                '📉 NEW: Grafici: Barre animate, Torta distribuzione, Ore per fascia oraria',
+                '📋 NEW: Tabella attività recenti',
+                '🔔 NEW: Widget notifiche e performance',
+                '🎨 NEW: Animazioni fluide e responsive',
+                '📱 IMPROVED: Ottimizzazione mobile per dashboard'
+            ]
+        },
+        {
+            version: 'v1.5',
+            date: '2025-01-05',
+            changes: [
+                '🇬🇧🇪🇸 NEW: Supporto multilingua (IT, EN, ES)',
+                '🌓 NEW: Dark mode completo',
+                '📝 NEW: Modifica multipla lavoratori (bulk edit)',
+                '✏️ NEW: Modifica inline singolo lavoratore',
+                '🚫 NEW: Sistema blacklist con controllo automatico',
+                '📝 NEW: Audit log completo con filtri',
+                '📈 NEW: Report Manager (settimanali, mensili, custom)',
+                '📄 NEW: Export CSV',
+                '🔗 NEW: Link condivisione con copia automatica'
+            ]
+        },
+        {
+            version: 'v1.0',
+            date: '2024-12-20',
+            changes: [
+                '🎉 RELEASE: Prima versione pubblica',
+                '📋 NEW: Gestione fogli ore base',
+                '👷 NEW: Modalità lavoratore con form registrazione',
+                '✍️ NEW: Firma digitale touch-friendly',
+                '📄 NEW: Generazione PDF automatica',
+                '🔥 NEW: Integrazione Firebase (Firestore + Storage)',
+                '🖼️ NEW: Upload logo aziendale',
+                '📦 NEW: Archiviazione fogli',
+                '🗑️ NEW: Eliminazione fogli',
+                '📱 NEW: Design responsive mobile-first'
+            ]
+        }
+    ];
 
     // Predefined expiration options (in days)
     const expirationOptions = [
@@ -236,11 +309,11 @@ const Settings = ({ db, darkMode, language = 'it' }) => {
                             <li className="flex items-start gap-2">
                                 <span className="flex-shrink-0">•</span>
                                 <span>
-                                    {language === 'it' && 'I link generati scadranno dopo il tempo selezionato'}
-                                    {language === 'en' && 'Generated links will expire after the selected time'}
-                                    {language === 'es' && 'Los enlaces generados caducarán después del tiempo seleccionado'}
-                                    {language === 'fr' && 'Les liens générés expireront après le temps sélectionné'}
-                                    {language === 'ro' && 'Link-urile generate vor expira după timpul selectat'}
+                                    {language === 'it' && '✅ FIX v3.0: La scadenza ora parte dal momento in cui si preme "Genera Link"'}
+                                    {language === 'en' && '✅ FIX v3.0: Expiration now starts when you press "Generate Link"'}
+                                    {language === 'es' && '✅ FIX v3.0: La caducidad ahora comienza cuando se presiona "Generar Enlace"'}
+                                    {language === 'fr' && '✅ FIX v3.0: L\'expiration commence maintenant lorsque vous appuyez sur "Générer Lien"'}
+                                    {language === 'ro' && '✅ FIX v3.0: Expirarea începe acum când apăsați "Generează Link"'}
                                 </span>
                             </li>
                             <li className="flex items-start gap-2">
@@ -263,20 +336,80 @@ const Settings = ({ db, darkMode, language = 'it' }) => {
                                     {language === 'ro' && 'Muncitorii cu link-uri expirate vor vedea un mesaj de eroare'}
                                 </span>
                             </li>
-                            <li className="flex items-start gap-2">
-                                <span className="flex-shrink-0">•</span>
-                                <span>
-                                    {language === 'it' && 'La scadenza viene calcolata dalla data di creazione del foglio ore'}
-                                    {language === 'en' && 'Expiration is calculated from the timesheet creation date'}
-                                    {language === 'es' && 'La caducidad se calcula desde la fecha de creación de la hoja de horas'}
-                                    {language === 'fr' && 'L\'expiration est calculée depuis la date de création de la feuille de temps'}
-                                    {language === 'ro' && 'Expirarea este calculată de la data creării fișei de pontaj'}
-                                </span>
-                            </li>
                         </ul>
                     </div>
                 </div>
             </div>
+
+            {/* 📋 CHANGELOG BUTTON */}
+            <button
+                onClick={() => setShowChangelog(!showChangelog)}
+                className={`w-full py-4 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} rounded-xl font-bold text-base sm:text-lg transition-colors shadow-lg flex items-center justify-center gap-3`}
+            >
+                <span className="text-2xl">📋</span>
+                {showChangelog ? '▼ Nascondi Changelog' : '▶ Mostra Changelog'}
+            </button>
+
+            {/* 📋 CHANGELOG SECTION */}
+            {showChangelog && (
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 space-y-4`}>
+                    <div className="flex items-center gap-3 mb-4">
+                        <span className="text-3xl">📋</span>
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-bold">Changelog</h2>
+                            <p className={`text-sm ${textClass}`}>
+                                {language === 'it' && 'Storico versioni e aggiornamenti'}
+                                {language === 'en' && 'Version history and updates'}
+                                {language === 'es' && 'Historial de versiones y actualizaciones'}
+                                {language === 'fr' && 'Historique des versions et mises à jour'}
+                                {language === 'ro' && 'Istoricul versiunilor și actualizări'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {changelog.map((version, vIndex) => (
+                        <div 
+                            key={vIndex}
+                            className={`p-4 rounded-lg border-l-4 ${
+                                vIndex === 0 
+                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
+                                    : 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                            } animate-fade-in`}
+                            style={{ animationDelay: `${vIndex * 100}ms` }}
+                        >
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    {vIndex === 0 && <span className="text-xl">🆕</span>}
+                                    {version.version}
+                                </h3>
+                                <span className={`text-sm ${textClass}`}>
+                                    {new Date(version.date).toLocaleDateString(language === 'it' ? 'it-IT' : language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : language === 'fr' ? 'fr-FR' : 'ro-RO')}
+                                </span>
+                            </div>
+                            
+                            <ul className="space-y-2">
+                                {version.changes.map((change, cIndex) => (
+                                    <li key={cIndex} className={`text-sm flex items-start gap-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        <span className="flex-shrink-0 mt-0.5">•</span>
+                                        <span>{change}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+
+                    {/* Footer info */}
+                    <div className={`text-center pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                        <p className={`text-sm ${textClass}`}>
+                            {language === 'it' && '💡 Sviluppato con ❤️ per semplificare la gestione delle ore lavorative'}
+                            {language === 'en' && '💡 Developed with ❤️ to simplify work hours management'}
+                            {language === 'es' && '💡 Desarrollado con ❤️ para simplificar la gestión de horas laborales'}
+                            {language === 'fr' && '💡 Développé avec ❤️ pour simplifier la gestion des heures de travail'}
+                            {language === 'ro' && '💡 Dezvoltat cu ❤️ pentru a simplifica gestionarea orelor de lucru'}
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
