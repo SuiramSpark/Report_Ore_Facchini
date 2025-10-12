@@ -1,5 +1,5 @@
-// Settings Component - v3.0 CON CHANGELOG E BUG FIX
-const Settings = ({ db, darkMode, language = 'it' }) => {
+// Settings Component - v4.0 CON EXPORT EXCEL + CHANGELOG
+const Settings = ({ db, sheets = [], darkMode, language = 'it' }) => {
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [showChangelog, setShowChangelog] = React.useState(false);
@@ -17,6 +17,22 @@ const Settings = ({ db, darkMode, language = 'it' }) => {
 
     // 📋 CHANGELOG DATA
     const changelog = [
+        {
+            version: 'v4.0',
+            date: '2025-01-16',
+            changes: [
+                '📊 NEW: Export Excel (XLSX) con formattazione avanzata',
+                '🔔 NEW: Notifiche browser quando lavoratore invia dati',
+                '📆 NEW: Vista Calendario interattiva con FullCalendar',
+                '👤 NEW: Statistiche dettagliate per singolo lavoratore',
+                '💾 NEW: Sistema Backup/Restore completo (JSON)',
+                '🔍 NEW: Ricerca globale in tutti i fogli',
+                '📈 NEW: Comparazione periodi (questo mese vs scorso)',
+                '💡 NEW: Auto-completamento intelligente per campi ripetuti',
+                '🚀 NEW: PWA migliorata con offline mode e install prompt',
+                '⚡ NEW: Auto-save avanzato per admin draft'
+            ]
+        },
         {
             version: 'v3.0',
             date: '2025-01-15',
@@ -215,6 +231,69 @@ const Settings = ({ db, darkMode, language = 'it' }) => {
                 <p className={`${textClass} text-sm sm:text-base`}>
                     {t.systemSettings}
                 </p>
+            </div>
+
+            {/* ⭐ NEW: Export Section */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
+                    📥 {language === 'it' ? 'Esportazione Dati' : language === 'en' ? 'Data Export' : language === 'es' ? 'Exportación de Datos' : language === 'fr' ? 'Exportation de Données' : 'Exportare Date'}
+                </h2>
+                
+                <p className={`${textClass} text-sm mb-4`}>
+                    {language === 'it' && 'Esporta tutti i fogli ore in formato CSV o Excel'}
+                    {language === 'en' && 'Export all timesheets in CSV or Excel format'}
+                    {language === 'es' && 'Exportar todas las hojas de horas en formato CSV o Excel'}
+                    {language === 'fr' && 'Exporter toutes les feuilles d\'heures au format CSV ou Excel'}
+                    {language === 'ro' && 'Exportați toate fișele de ore în format CSV sau Excel'}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* CSV Export */}
+                    <button
+                        onClick={() => {
+                            if (sheets.length === 0) {
+                                showToast('❌ Nessun foglio da esportare', 'error');
+                                return;
+                            }
+                            const filename = `registro_ore_${new Date().toISOString().split('T')[0]}.csv`;
+                            exportToCSV(sheets, filename);
+                        }}
+                        className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                        <span>📄</span>
+                        <span>{t.exportCSV || 'Esporta CSV'}</span>
+                    </button>
+
+                    {/* ⭐ NEW: Excel Export */}
+                    <button
+                        onClick={() => {
+                            if (sheets.length === 0) {
+                                showToast('❌ Nessun foglio da esportare', 'error');
+                                return;
+                            }
+                            const filename = `registro_ore_${new Date().toISOString().split('T')[0]}.xlsx`;
+                            exportToExcel(sheets, filename);
+                        }}
+                        className="px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                        <span>📊</span>
+                        <span>{t.exportExcel || 'Esporta Excel'}</span>
+                    </button>
+                </div>
+
+                {/* Export Info */}
+                <div className={`mt-4 p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} text-sm ${textClass}`}>
+                    <p className="flex items-start gap-2">
+                        <span>💡</span>
+                        <span>
+                            {language === 'it' && `${sheets.length} fogli disponibili per l'esportazione`}
+                            {language === 'en' && `${sheets.length} sheets available for export`}
+                            {language === 'es' && `${sheets.length} hojas disponibles para exportar`}
+                            {language === 'fr' && `${sheets.length} feuilles disponibles pour l'exportation`}
+                            {language === 'ro' && `${sheets.length} fișe disponibile pentru export`}
+                        </span>
+                    </p>
+                </div>
             </div>
 
             {/* Link Expiration Settings */}
