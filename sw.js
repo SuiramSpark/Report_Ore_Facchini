@@ -1,4 +1,4 @@
-// Service Worker - v4.0 con Offline Support
+// Service Worker - v4.0 PWA con Offline Support
 const CACHE_NAME = 'registro-ore-v4.0';
 const urlsToCache = [
     '/Report_Ore_Facchini/',
@@ -6,11 +6,7 @@ const urlsToCache = [
     '/Report_Ore_Facchini/css/styles.css',
     '/Report_Ore_Facchini/manifest.json',
     '/Report_Ore_Facchini/icons/icon-192x192.png',
-    '/Report_Ore_Facchini/icons/icon-512x512.png',
-    'https://unpkg.com/react@18/umd/react.production.min.js',
-    'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
-    'https://cdn.tailwindcss.com',
-    'https://cdn.jsdelivr.net/npm/chart.js'
+    '/Report_Ore_Facchini/icons/icon-512x512.png'
 ];
 
 // Install
@@ -21,7 +17,9 @@ self.addEventListener('install', (event) => {
                 console.log('📦 Cache opened');
                 return cache.addAll(urlsToCache);
             })
+            .catch(err => console.error('Cache error:', err))
     );
+    self.skipWaiting();
 });
 
 // Activate
@@ -38,6 +36,7 @@ self.addEventListener('activate', (event) => {
             );
         })
     );
+    self.clients.claim();
 });
 
 // Fetch - Network First, fallback to Cache
@@ -62,7 +61,7 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-// Background Sync (per future implementazioni)
+// Background Sync
 self.addEventListener('sync', (event) => {
     if (event.tag === 'sync-sheets') {
         event.waitUntil(syncSheets());
@@ -70,6 +69,5 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncSheets() {
-    // TODO: Implementa sync dati quando torna online
     console.log('🔄 Syncing sheets...');
 }
