@@ -29,9 +29,9 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
     if (!selectedWorker) {
         return (
             <div className="space-y-4">
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-2xl font-bold">👤 {t.workerStatistics}</h2>
+                        <h2 className="text-xl sm:text-2xl font-bold">👤 {t.workerStatistics}</h2>
                         {onBack && (
                             <button
                                 onClick={onBack}
@@ -42,7 +42,7 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
                         )}
                     </div>
                     
-                    <p className={`${textClass} mb-4`}>
+                    <p className={`${textClass} mb-4 text-sm sm:text-base`}>
                         Seleziona un lavoratore per vedere le statistiche dettagliate
                     </p>
 
@@ -74,9 +74,9 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
                 <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-2xl font-bold">👤 {stats.name}</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold">👤 {stats.name}</h2>
                     <button
                         onClick={() => setSelectedWorker(null)}
                         className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold"
@@ -87,48 +87,49 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <p className={`text-sm ${textClass} mb-2`}>{t.totalPresences}</p>
-                    <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <p className={`text-xs sm:text-sm ${textClass} mb-2`}>{t.totalPresences}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-indigo-600 dark:text-indigo-400">
                         {stats.totalPresences}
                     </p>
                 </div>
 
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <p className={`text-sm ${textClass} mb-2`}>{t.totalHours}</p>
-                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <p className={`text-xs sm:text-sm ${textClass} mb-2`}>{t.totalHours}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
                         {stats.totalHours}h
                     </p>
                 </div>
 
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <p className={`text-sm ${textClass} mb-2`}>{t.avgHoursPerDay}</p>
-                    <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <p className={`text-xs sm:text-sm ${textClass} mb-2`}>{t.avgHoursPerDay}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
                         {stats.avgHours}h
                     </p>
                 </div>
 
-                <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                    <p className={`text-sm ${textClass} mb-2`}>Aziende</p>
-                    <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                    <p className={`text-xs sm:text-sm ${textClass} mb-2`}>Aziende</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
                         {stats.companies.length}
                     </p>
                 </div>
             </div>
 
             {/* Monthly Trend */}
-            <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                <h3 className="text-xl font-bold mb-4">📈 Trend Mensile</h3>
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className="text-lg sm:text-xl font-bold mb-4">📈 Trend Mensile</h3>
                 <div className="space-y-3">
                     {Object.entries(stats.monthlyTrend)
                         .sort(([a], [b]) => b.localeCompare(a))
+                        .slice(0, 6)
                         .map(([month, hours]) => (
                             <div key={month} className="flex items-center gap-3">
-                                <span className="font-semibold w-24">{month}</span>
+                                <span className="font-semibold w-20 text-sm">{month}</span>
                                 <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6">
                                     <div 
-                                        className="bg-gradient-to-r from-indigo-500 to-purple-500 h-6 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                                        className="bg-gradient-to-r from-indigo-500 to-purple-500 h-6 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-semibold"
                                         style={{ width: `${Math.min((hours / Math.max(...Object.values(stats.monthlyTrend))) * 100, 100)}%` }}
                                     >
                                         {hours.toFixed(1)}h
@@ -140,13 +141,13 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
             </div>
 
             {/* Companies */}
-            <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                <h3 className="text-xl font-bold mb-4">🏢 Aziende Lavorate</h3>
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className="text-lg sm:text-xl font-bold mb-4">🏢 Aziende Lavorate</h3>
                 <div className="flex flex-wrap gap-2">
                     {stats.companies.map((company, i) => (
                         <span 
                             key={i}
-                            className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-semibold"
+                            className="px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full text-xs sm:text-sm font-semibold"
                         >
                             {company}
                         </span>
@@ -155,8 +156,8 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
             </div>
 
             {/* Recent Entries */}
-            <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
-                <h3 className="text-xl font-bold mb-4">📋 Ultime Presenze</h3>
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className="text-lg sm:text-xl font-bold mb-4">📋 Ultime Presenze</h3>
                 <div className="space-y-2">
                     {stats.entries.slice(0, 10).map((entry, i) => (
                         <div 
@@ -166,14 +167,14 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack }) => {
                             }`}
                         >
                             <div className="flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold">{entry.company}</p>
-                                    <p className={`text-sm ${textClass}`}>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm sm:text-base truncate">{entry.company}</p>
+                                    <p className={`text-xs sm:text-sm ${textClass}`}>
                                         {formatDate(entry.date)} • {entry.oraIn} - {entry.oraOut}
                                     </p>
                                 </div>
-                                <div className="text-right">
-                                    <p className="font-bold text-lg text-indigo-600 dark:text-indigo-400">
+                                <div className="text-right flex-shrink-0 ml-3">
+                                    <p className="font-bold text-base sm:text-lg text-indigo-600 dark:text-indigo-400">
                                         {entry.oreTotali}h
                                     </p>
                                 </div>
