@@ -1,5 +1,238 @@
 // ========================================
-// ⭐ NUOVE FEATURE UTILITIES
+// UTILITY FUNCTIONS - BASE
+// ========================================
+
+// Toast Notification System
+window.showToast = (message, type = 'info', duration = 3000) => {
+    const container = document.getElementById('toast-container') || (() => {
+        const div = document.createElement('div');
+        div.id = 'toast-container';
+        div.className = 'fixed top-4 right-4 z-50 space-y-2';
+        document.body.appendChild(div);
+        return div;
+    })();
+
+    const toast = document.createElement('div');
+    const colors = {
+        success: 'bg-green-600',
+        error: 'bg-red-600',
+        warning: 'bg-yellow-600',
+        info: 'bg-blue-600'
+    };
+
+    toast.className = `${colors[type] || colors.info} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0`;
+    toast.textContent = message;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.classList.remove('translate-x-full', 'opacity-0');
+    }, 10);
+    
+    setTimeout(() => {
+        toast.classList.add('translate-x-full', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+};
+
+// Format Date (YYYY-MM-DD to DD/MM/YYYY)
+window.formatDate = (dateString) => {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+};
+
+// Format Time (HH:MM to readable)
+window.formatTime = (timeString) => {
+    return timeString || '00:00';
+};
+
+// Calculate Work Hours
+window.calculateWorkHours = (oraIn, oraOut, pausaMinuti = 0) => {
+    if (!oraIn || !oraOut) return 0;
+    
+    const [inHours, inMinutes] = oraIn.split(':').map(Number);
+    const [outHours, outMinutes] = oraOut.split(':').map(Number);
+    
+    const totalMinutes = (outHours * 60 + outMinutes) - (inHours * 60 + inMinutes) - pausaMinuti;
+    return (totalMinutes / 60).toFixed(2);
+};
+
+// Generate Random ID
+window.generateId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+// Copy to Clipboard
+window.copyToClipboard = async (text) => {
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('✅ Copiato negli appunti!', 'success');
+        return true;
+    } catch (err) {
+        showToast('❌ Errore copia', 'error');
+        return false;
+    }
+};
+
+// Export to CSV
+window.exportToCSV = (sheets, filename = 'registro_ore.csv') => {
+    const csvRows = [];
+    
+    // Header
+    csvRows.push([
+        'Data', 'Azienda', 'Responsabile', 'Località',
+        'Nome', 'Cognome', 'Ora In', 'Ora Out', 
+        'Pausa (min)', 'Ore Totali', 'CF', 'Telefono'
+    ].join(','));
+
+    // Rows
+    sheets.forEach(sheet => {
+        sheet.lavoratori?.forEach(worker => {
+            csvRows.push([
+                sheet.data,
+                `"${sheet.titoloAzienda || ''}"`,
+                `"${sheet.responsabile || ''}"`,
+                `"${sheet.location || ''}"`,
+                `"${worker.nome}"`,
+                `"${worker.cognome}"`,
+                worker.oraIn,
+                worker.oraOut,
+                worker.pausaMinuti || 0,
+                worker.oreTotali,
+                `"${worker.codiceFiscale || ''}"`,
+                `"${worker.telefono || ''}"`
+            ].join(','));
+        });
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    
+    showToast('✅ CSV esportato!', 'success');
+};
+
+// Export to PDF
+window.exportToPDF = async (sheet, filename = 'foglio_ore.pdf') => {
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Title
+        doc.setFontSize(18);
+        doc.text('Foglio Ore Lavoratori', 20, 20);
+        
+        // Sheet Info
+        doc.setFontSize(12);
+        doc.text(`Data: ${formatDate(sheet.data)}`, 20, 35);
+        doc.text(`Azienda: ${sheet.titoloAzienda || 'N/D'}`, 20, 42);
+        doc.text(`Responsabile: ${sheet.responsabile || 'N/D'}`, 20, 49);
+        
+        // Workers Table
+        let y = 65;
+        doc.setFontSize(10);
+        doc.text('Nome', 20, y);
+        doc.text('Cognome', 60, y);
+        doc.text('Ora In', 100, y);
+        doc.text('Ora Out', 130, y);
+        doc.text('Ore Tot', 160, y);
+        
+        y += 7;
+        sheet.lavoratori?.forEach(worker => {
+            doc.text(worker.nome, 20, y);
+            doc.text(worker.cognome, 60, y);
+            doc.text(worker.oraIn, 100, y);
+            doc.text(worker.oraOut, 130, y);
+            doc.text(worker.oreTotali.toString(), 160, y);
+            y += 7;
+        });
+        
+        doc.save(filename);
+        showToast('✅ PDF esportato!', 'success');
+    } catch (error) {
+        console.error('PDF export error:', error);
+        showToast('❌ Errore export PDF', 'error');
+    }
+};
+
+// Validate Italian Fiscal Code (CF)
+window.validateCodiceFiscale = (cf) => {
+    if (!cf) return false;
+    const regex = /^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$/;
+    return regex.test(cf.toUpperCase());
+};
+
+// Validate Phone Number
+window.validatePhone = (phone) => {
+    if (!phone) return false;
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length >= 9 && cleaned.length <= 15;
+};
+
+// Get Query Parameter from URL
+window.getQueryParam = (param) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+};
+
+// Set Query Parameter in URL
+window.setQueryParam = (param, value) => {
+    const url = new URL(window.location);
+    url.searchParams.set(param, value);
+    window.history.pushState({}, '', url);
+};
+
+// Debounce Function
+window.debounce = (func, wait = 300) => {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+};
+
+// Sort Array of Objects
+window.sortByKey = (array, key, order = 'asc') => {
+    return array.sort((a, b) => {
+        const aVal = a[key];
+        const bVal = b[key];
+        
+        if (order === 'asc') {
+            return aVal > bVal ? 1 : -1;
+        } else {
+            return aVal < bVal ? 1 : -1;
+        }
+    });
+};
+
+// Get Date Range (last N days)
+window.getDateRange = (days = 30) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    
+    return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+    };
+};
+
+// Format Number with Locale
+window.formatNumber = (number, decimals = 2) => {
+    return parseFloat(number).toFixed(decimals);
+};
+
+
+// ========================================
+// ⭐ v4.0 NEW FEATURES UTILITIES
 // ========================================
 
 // 1. EXPORT EXCEL
@@ -152,7 +385,6 @@ window.globalSearch = (sheets, query) => {
     sheets.forEach(sheet => {
         const matches = [];
         
-        // Search in sheet data
         if (sheet.titoloAzienda?.toLowerCase().includes(q)) {
             matches.push({ field: 'Azienda', value: sheet.titoloAzienda });
         }
@@ -166,7 +398,6 @@ window.globalSearch = (sheets, query) => {
             matches.push({ field: 'Note', value: sheet.note });
         }
 
-        // Search in workers
         sheet.lavoratori?.forEach(worker => {
             const workerName = `${worker.nome} ${worker.cognome}`.toLowerCase();
             if (workerName.includes(q)) {
@@ -226,7 +457,6 @@ window.backupAllData = async (db) => {
             }));
         }
 
-        // Download JSON
         const blob = new Blob([JSON.stringify(backup, null, 2)], { 
             type: 'application/json' 
         });
@@ -262,7 +492,6 @@ window.restoreFromBackup = async (db, file) => {
         
         if (!confirm(confirmMsg)) return;
 
-        // Restore each collection
         for (const [collection, documents] of Object.entries(backup.data)) {
             const batch = db.batch();
             
@@ -308,10 +537,9 @@ window.getWorkerDetailedStats = (sheets, workerName) => {
 
     const companies = [...new Set(workerEntries.map(e => e.company))];
 
-    // Trend mensile
     const monthlyTrend = {};
     workerEntries.forEach(e => {
-        const month = e.date.substring(0, 7); // YYYY-MM
+        const month = e.date.substring(0, 7);
         monthlyTrend[month] = (monthlyTrend[month] || 0) + parseFloat(e.oreTotali || 0);
     });
 
@@ -373,9 +601,9 @@ window.loadAdminDraft = (key = 'admin_draft') => {
         const draft = localStorage.getItem(key);
         if (draft) {
             const parsed = JSON.parse(draft);
-            const age = (new Date() - new Date(parsed.timestamp)) / 1000 / 60; // minutes
+            const age = (new Date() - new Date(parsed.timestamp)) / 1000 / 60;
             
-            if (age < 60 * 24) { // 24 hours
+            if (age < 60 * 24) {
                 return parsed.data;
             }
         }
@@ -396,7 +624,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
     
-    // Show install button
     const installBtn = document.getElementById('pwa-install-prompt');
     if (installBtn) {
         installBtn.style.display = 'block';
