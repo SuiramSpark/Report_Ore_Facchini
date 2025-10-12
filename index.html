@@ -14,7 +14,10 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512x512.png">
     <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-192x192.png">
+    <link rel="shortcut icon" href="icons/icon-192x192.png">
     
     <!-- React & Firebase -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -64,7 +67,7 @@
     <div id="root"></div>
     <div id="toast-container"></div>
     <!-- ⭐ PWA Install Prompt -->
-    <div id="pwa-install-prompt" style="display:none;"></div>
+    <div id="pwa-install-prompt"></div>
 
     <!-- Configurazione e Utilities -->
     <script src="js/config.js"></script>
@@ -95,8 +98,15 @@
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
                     .then(reg => console.log('✅ Service Worker registered'))
-                    .catch(err => console.log('❌ Service Worker registration failed:', err));
+                    .catch(err => console.log('❌ SW registration failed:', err));
             });
+        }
+        
+        // Request notification permission on load
+        if ('Notification' in window && Notification.permission === 'default') {
+            setTimeout(() => {
+                Notification.requestPermission();
+            }, 5000);
         }
     </script>
 </body>
