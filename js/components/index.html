@@ -2,8 +2,19 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro Ore Lavoratori - Completo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4F46E5">
+    <meta name="description" content="Sistema di gestione registro ore lavoratori">
+    
+    <title>Registro Ore Lavoratori</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-192x192.png">
     
     <!-- React & Firebase -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -14,22 +25,52 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
+    <!-- Dashboard Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    
+    <!-- ⭐ NUOVE LIBRERIE v4.0 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- CSS Custom -->
     <link rel="stylesheet" href="css/styles.css">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontSize: {
+                        'mobile-xs': '13px',
+                        'mobile-sm': '14px',
+                        'mobile-base': '15px',
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+                        'slide-in-left': 'slideInLeft 0.6s ease-out forwards',
+                        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body>
+<body class="antialiased">
     <div id="root"></div>
     <div id="toast-container"></div>
+    <div id="pwa-install-prompt"></div>
 
-    <!-- Configurazione e Utilities (CARICA PER PRIMI) -->
+    <!-- Configurazione e Utilities -->
     <script src="js/config.js"></script>
     <script src="js/translations.js"></script>
     <script type="text/babel" src="js/utils.js"></script>
     
-    <!-- Componenti (CARICA IN ORDINE) -->
+    <!-- Componenti -->
     <script type="text/babel" src="js/components/WorkerMode.js"></script>
     <script type="text/babel" src="js/components/Dashboard.js"></script>
     <script type="text/babel" src="js/components/Blacklist.js"></script>
@@ -37,8 +78,29 @@
     <script type="text/babel" src="js/components/SheetList.js"></script>
     <script type="text/babel" src="js/components/SheetEditor.js"></script>
     <script type="text/babel" src="js/components/ReportManager.js"></script>
+    <script type="text/babel" src="js/components/Settings.js"></script>
     
-    <!-- App Principale (CARICA PER ULTIMO) -->
+    <!-- ⭐ NUOVI COMPONENTI v4.0 -->
+    <script type="text/babel" src="js/components/WorkerStats.js"></script>
+    <script type="text/babel" src="js/components/Calendar.js"></script>
+    <script type="text/babel" src="js/components/BackupRestore.js"></script>
+    
+    <!-- App Principale -->
     <script type="text/babel" src="js/app.js"></script>
+    
+    <!-- ⭐ PWA Service Worker v4.0 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('✅ Service Worker registered'))
+                    .catch(err => console.log('❌ SW error:', err));
+            });
+        }
+        
+        if ('Notification' in window && Notification.permission === 'default') {
+            setTimeout(() => Notification.requestPermission(), 5000);
+        }
+    </script>
 </body>
 </html>
