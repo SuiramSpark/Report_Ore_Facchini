@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow read access to all users
+    match /{document=**} {
+      allow read: if true;
+    }
+
+    // Allow write access to modificationLogs collection for admins
+    match /modificationLogs/{docId} {
+      allow create: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Allow write access to workerNotifications collection for admins
+    match /workerNotifications/{docId} {
+      allow create: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Timesheets
+    match /timesheets/{sheetId} {
+      allow read, write: if true;
+    }
+
+    // Blacklist
+    match /blacklist/{blacklistId} {
+      allow read, write: if true;
+    }
+
+    // Audit Log
+    match /auditLog/{logId} {
+      allow read, write: if true;
+    }
+
+    // Worker Sessions
+    match /workerSessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    // Settings
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Scheduled Notifications - AGGIUNTA! ✨
+    match /scheduledNotifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // Deny all other write access
+    match /{document=**} {
+      allow write: if false;
+    }
+  }
+}
