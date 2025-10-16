@@ -29,3 +29,27 @@ npm-debug.log*
 # Build outputs (se usi build tools)
 dist/
 build/
+
+# Escludi directory personali
+OneDrive/
+Desktop/
+Documents/
+Immagini/
+Music/
+Videos/
+Saved Games/
+Searches/
+VirtualBox VMs/
+WireframeSketcher/
+
+# Escludi file di sistema
+*.ini
+*.log
+*.tmp
+NTUSER.DAT*
+firebase.json
+package-lock.json
+
+# Escludi file temporanei
+~$*
+~WRL*.tmp
