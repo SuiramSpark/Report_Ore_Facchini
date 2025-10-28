@@ -7,8 +7,91 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     overflow-x: hidden;
+    color: #0f172a; /* default text color (dark gray) */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure form inputs inherit app font for visual consistency */
+input, textarea, select, button {
+    font-family: inherit !important;
+}
+
+/* Dark theme readability overrides - target common dark container classes and .dark root */
+
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) input,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) textarea,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) select {
+    color: #e6eefc !important; /* lighter than pure white */
+    background-color: rgba(15, 23, 36, 0.85) !important; /* subtle dark bg */
+    border-color: #374151 !important;
+}
+
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) input::placeholder,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) textarea::placeholder {
+    color: #9ca3af !important; /* lighter placeholder */
+}
+
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .sheet-card-title,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .sheet-card h1,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .sheet-card h3 {
+    color: #e5e7eb !important;
+}
+
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .sheet-card {
+    background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(10,12,20,0.85)) !important;
+}
+
+/* Global dark-mode typography tweaks */
+.dark, :where(.bg-gray-800, .bg-gray-900, .bg-gray-700) {
+    color: #e6eefc; /* app-wide light text in dark theme */
+}
+
+/* Ensure sheet cards and their contents use readable font & colors in dark mode */
+.dark .sheet-card,
+:where(.bg-gray-800, .bg-gray-900, .bg-gray-700) .sheet-card {
+    color: #e6eefc !important;
+}
+
+.dark .sheet-card h1, .dark .sheet-card h2, .dark .sheet-card h3,
+.dark .sheet-card p, .dark .sheet-card .meta, .dark .sheet-card .sheet-card-title {
+    color: #e6eefc !important;
+}
+
+/* Smaller metadata and icons inside sheet cards should be slightly muted but readable */
+.dark .sheet-card .meta,
+.dark .sheet-card .small {
+    color: #cbd5e1 !important;
+}
+
+/* Improve contrast for action buttons inside cards */
+.dark .sheet-card .btn,
+.dark .sheet-card button {
+    color: #0f172a !important; /* dark text on colored buttons */
+}
+
+/* Ensure placeholders in dark inputs remain readable */
+.dark input::placeholder, .dark textarea::placeholder {
+    color: #9ca3af !important;
+}
+
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .weather-widget .weather-location,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .weather-widget .text-lg,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .weather-widget .text-4xl {
+    color: #f3f4f6 !important;
+}
+
+/* Make small metadata and list items slightly lighter in dark mode */
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .text-gray-700,
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) .text-gray-600 {
+    color: #cbd5e1 !important;
+}
+
+/* Buttons on dark cards - ensure text contrast */
+:where(.dark, .bg-gray-800, .bg-gray-900, .bg-gray-700) button {
+    color: inherit;
 }
 
 /* Loader Animation */
@@ -196,6 +279,87 @@ canvas.signature-canvas {
     border: 1px solid transparent;
 }
 
+/* Sheets page specific typography and buttons */
+.sheets-header {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+.sheet-card-title {
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+}
+
+.sheet-card {
+    border-radius: 12px;
+    padding: 12px;
+}
+
+/* Improve sheet title visibility in dark mode */
+.sheet-card h3, .sheet-card .sheet-card-title, .sheet-card .text-lg, .sheet-card .text-xl {
+    color: inherit;
+}
+.dark .sheet-card h3, .dark .sheet-card .sheet-card-title {
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
+
+/* Emphasize filter/tab buttons (Tutti, Attivi, Completati, Archiviati) */
+.rounded-lg.font-medium {
+    font-weight: 700 !important;
+    letter-spacing: 0.15px;
+}
+.dark .rounded-lg.font-medium {
+    color: #e6eefc !important;
+}
+
+/* Forms inside sheet cards/editor: increase label weight and ensure inputs readable */
+.bg-gray-800 label, .dark label {
+    color: #e6eefc !important;
+    font-weight: 600;
+}
+.bg-gray-800 input, .bg-gray-800 textarea, .bg-gray-800 select,
+.dark input, .dark textarea, .dark select {
+    background-color: #0b1220 !important; /* slightly lighter than container */
+    color: #e6eefc !important;
+    border: 1px solid #263043 !important;
+}
+.bg-gray-800 .form-control, .dark .form-control {
+    padding: 10px 12px;
+    border-radius: 8px;
+}
+
+/* Ensure small action labels inside the sheet header are visible */
+.dark .sheet-card .text-sm, .dark .sheet-card .meta {
+    color: #cbd5e1 !important;
+}
+
+.create-sheet-button {
+    font-weight: 700;
+    padding: 10px 14px;
+}
+
+.btn-update-weather {
+    font-weight: 700;
+    background: linear-gradient(90deg,#4f46e5,#7c3aed);
+    color: white;
+}
+.btn-update-weather:hover {
+    filter: brightness(1.05);
+}
+
+/* Weather widget location label font and contrast */
+.weather-widget .weather-location {
+    font-weight: 600 !important;
+    font-size: 15px !important;
+    color: #111827 !important; /* dark text by default */
+}
+.dark .weather-widget .weather-location {
+    color: #e5e7eb !important; /* lighter text for dark mode */
+}
+
 .dashboard-card:hover {
     transform: translateY(-5px);
     border-color: rgba(79, 70, 229, 0.2);
@@ -309,7 +473,208 @@ canvas.signature-canvas {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
 
+/* Weather area decorative animated background (subtle, non-distracting) */
+.weather-area {
+    position: relative;
+    overflow: visible;
+}
+
+.weather-area__bg {
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(28px) saturate(120%);
+    opacity: 0.55;
+    background: radial-gradient( circle at 10% 20%, rgba(79,70,229,0.25) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(16,185,129,0.20) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(99,102,241,0.12) 0%, transparent 30% );
+    transition: opacity 0.4s ease, transform 0.6s ease, background 0.6s linear;
+    animation: weatherBgMove var(--weather-bg-duration, 12s) linear infinite;
+    border-radius: 12px;
+}
+
+/* Smoothly cross-fade palettes when class changes */
+.weather-bg--sun,
+.weather-bg--cloud,
+.weather-bg--rain,
+.weather-bg--snow,
+.weather-bg--thunder,
+.weather-bg--unknown {
+    transition: background 0.6s ease, opacity 0.6s ease;
+}
+
+.weather-area:hover .weather-area__bg { opacity: 0.7; }
+
+.dark .weather-area__bg {
+    filter: blur(30px) saturate(90%);
+    opacity: 0.35;
+}
+
+@keyframes weatherBgMove {
+    0% { transform: translate3d(0,0,0) scale(1); }
+    25% { transform: translate3d(-6%, -3%, 0) scale(1.02); }
+    50% { transform: translate3d(-2%, 4%, 0) scale(0.98); }
+    75% { transform: translate3d(6%, -1%, 0) scale(1.01); }
+    100% { transform: translate3d(0,0,0) scale(1); }
+}
+
+/* Ensure the widget sits above the decorative background */
+.weather-area > div[style] { position: relative; z-index: 2; }
+
+/* Palettes for weather-dependent background */
+.weather-bg--sun {
+    background: radial-gradient( circle at 10% 20%, rgba(249, 115, 22, 0.22) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(245,158,11,0.18) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(250,204,21,0.10) 0%, transparent 30% );
+}
+.weather-bg--cloud {
+    background: radial-gradient( circle at 10% 20%, rgba(107,114,128,0.18) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(75,85,99,0.14) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(59,130,246,0.06) 0%, transparent 30% );
+}
+.weather-bg--rain {
+    background: radial-gradient( circle at 10% 20%, rgba(14,165,233,0.20) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(2,132,199,0.16) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(14,165,233,0.08) 0%, transparent 30% );
+}
+.weather-bg--snow {
+    background: radial-gradient( circle at 10% 20%, rgba(255,255,255,0.30) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(203,213,225,0.18) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(238,242,255,0.08) 0%, transparent 30% );
+}
+.weather-bg--thunder {
+    background: radial-gradient( circle at 10% 20%, rgba(124,58,237,0.20) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(79,70,229,0.16) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(99,102,241,0.08) 0%, transparent 30% );
+}
+.weather-bg--unknown {
+    background: radial-gradient( circle at 10% 20%, rgba(156,163,175,0.16) 0%, transparent 25% ),
+                radial-gradient( circle at 85% 70%, rgba(107,114,128,0.12) 0%, transparent 25% ),
+                radial-gradient( circle at 50% 50%, rgba(99,102,241,0.06) 0%, transparent 30% );
+}
+
+.dark .weather-bg--sun { opacity: 0.45; }
+.dark .weather-bg--rain { opacity: 0.35; }
+.dark .weather-bg--cloud { opacity: 0.28; }
+.dark .weather-bg--snow { opacity: 0.30; }
+.dark .weather-bg--thunder { opacity: 0.30; }
+.dark .weather-bg--unknown { opacity: 0.25; }
+
+/* WeatherWidget animated SVG background */
+.weather-widget { position: relative; overflow: hidden; }
+.weather-widget__bg svg { display: block; width: 100%; height: 100%; }
+.weather-widget__bg .blob { transform-origin: center; transition: transform 1s ease, opacity 0.8s ease; }
+.weather-widget__bg .blob-1 { opacity: 0.9; }
+.weather-widget__bg .blob-2 { opacity: 0.75; }
+
+/* default animation (slow drift) */
+.weather-widget .bg-blobs { animation: blobMove var(--weather-bg-duration, 18s) ease-in-out infinite; }
+
+@keyframes blobMove {
+    0% { transform: translate3d(0,0,0) scale(1); }
+    25% { transform: translate3d(-6%, -3%, 0) scale(1.03); }
+    50% { transform: translate3d(-2%, 4%, 0) scale(0.98); }
+    75% { transform: translate3d(6%, -1%, 0) scale(1.02); }
+    100% { transform: translate3d(0,0,0) scale(1); }
+}
+
+/* sun-specific: show rays and warm tint */
+.weather-widget.weather-key-sun .sun-rays { opacity: 1; transition: opacity 0.6s ease; }
+.weather-widget .sun-rays .rays rect { fill: rgba(250,204,21,0.12); }
+.weather-widget.weather-key-sun .bg-blobs { filter: drop-shadow(0 6px 18px rgba(250,204,21,0.06)); }
+
+/* rain-specific tint */
+.weather-widget.weather-key-rain .bg-blobs { filter: drop-shadow(0 6px 18px rgba(14,165,233,0.06)); }
+
+/* thunder-specific: faster motion + stronger shadow */
+.weather-widget.weather-key-thunder .bg-blobs { animation-duration: calc(var(--weather-bg-duration, 12s) / 1.6); filter: drop-shadow(0 6px 22px rgba(124,58,237,0.08)); }
+
+/* cloud / fog: more muted */
+.weather-widget.weather-key-cloud .bg-blobs, .weather-widget.weather-key-fog .bg-blobs { opacity: 0.8; filter: blur(2px) saturate(80%); }
+
+/* ensure foreground content remains readable */
+.weather-widget .weather-icon { color: inherit; }
+.weather-widget .text-2xl { line-height: 1; }
+
+/* canvas particle layer sits above svg blobs but below foreground content */
+.weather-widget__bg canvas { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.weather-widget__bg svg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.weather-widget.weather-key-rain .weather-widget__bg canvas { opacity: 0.95; }
+.weather-widget.weather-key-snow .weather-widget__bg canvas { opacity: 0.9; }
+.dark .weather-widget__bg canvas { mix-blend-mode: screen; opacity: 0.8; }
+
 /* TABLE STYLES */
+
+/* Forecast select - styled control with icon, coherent in dark/light */
+.forecast-select-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border-radius: 8px;
+}
+
+.forecast-select-wrapper .select-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.9);
+    color: #111827;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.forecast-select-wrapper select.forecast-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #111827;
+    font-weight: 600;
+}
+
+.forecast-select-wrapper select.forecast-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+}
+
+/* Dark mode variants */
+.dark .forecast-select-wrapper .select-icon,
+:where(.dark) .forecast-select-wrapper .select-icon {
+    background: rgba(255,255,255,0.04);
+    color: #e6eefc;
+}
+
+.dark .forecast-select-wrapper select.forecast-select,
+:where(.dark) .forecast-select-wrapper select.forecast-select {
+    background: rgba(15,23,36,0.6);
+    border: 1px solid #374151;
+    color: #e6eefc;
+}
+
+.forecast-select-wrapper .select-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Icon mount fade for select icons */
+.icon-fade {
+    animation: fadeIn .35s ease-out both;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}
 .dashboard-table {
     width: 100%;
     border-collapse: collapse;
@@ -918,4 +1283,71 @@ header > div {
 .fc-dark-theme .fc-scroller::-webkit-scrollbar-thumb:hover {
     background: #6b7280;
 }
+
+
+/* Worker-mode scoped input overrides driven by CSS variables set on #worker-root
+   This ensures inputs/selects/textarea inside the worker UI remain readable
+   and can be forced light even if some global dark-mode selectors leak. */
+#worker-root {
+    /* sensible defaults if JS doesn't set variables */
+    --worker-input-bg: #ffffff;
+    --worker-input-color: #0f172a;
+    --worker-input-border: #d1d5db;
+}
+
+#worker-root input,
+#worker-root select,
+#worker-root textarea,
+#worker-root .optional-title {
+    background-color: var(--worker-input-bg) !important;
+    color: var(--worker-input-color) !important;
+    border-color: var(--worker-input-border) !important;
+}
+
+#worker-root .signature-canvas {
+    /* ensure signature canvas stays white regardless of dark parent */
+    background-color: #ffffff !important;
+}
+
+/* PWA install bubble animation shown for the 10s while prompt is visible */
+.pwa-install-bubble {
+    transform-origin: center;
+    animation: pwa-bounce 1.6s ease-in-out infinite, pwa-pulse 2.8s ease-in-out infinite;
+    will-change: transform, box-shadow;
+}
+
+@keyframes pwa-bounce {
+    0% { transform: translateY(0); }
+    20% { transform: translateY(-6px); }
+    40% { transform: translateY(0); }
+    60% { transform: translateY(-4px); }
+    80% { transform: translateY(0); }
+    100% { transform: translateY(0); }
+}
+
+@keyframes pwa-pulse {
+    0% { box-shadow: 0 6px 18px rgba(79,70,229,0.18); }
+    50% { box-shadow: 0 12px 34px rgba(79,70,229,0.26); }
+    100% { box-shadow: 0 6px 18px rgba(79,70,229,0.18); }
+}
+
+/* Slightly increase z-index on mobile to float above other elements */
+.pwa-install-bubble { z-index: 99999; }
+
+/* Rich tooltip used by blacklist for hover/click info */
+.rich-tooltip {
+    position: fixed;
+    background: rgba(2,6,23,0.95);
+    color: #f8fafc;
+    padding: 8px 10px;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(2,6,23,0.6);
+    font-size: 13px;
+    z-index: 999999;
+    max-width: 320px;
+    pointer-events: auto;
+}
+
+.rich-tooltip p { margin: 0; }
+
 

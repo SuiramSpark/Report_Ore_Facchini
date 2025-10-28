@@ -1,5 +1,36 @@
 // Settings Component - v4.2 CON EXPORT EXCEL + CHANGELOG + NOTIFICHE + LOGO + NOTIFICHE PROGRAMMATE
 const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, setCompanyLogo }) => {
+    // GDPR Privacy Notice state
+    const [gdprText, setGdprText] = React.useState('');
+    const [editingGdpr, setEditingGdpr] = React.useState(false);
+    const [loadingGdpr, setLoadingGdpr] = React.useState(true);
+
+    // Load GDPR text from Firestore
+    React.useEffect(() => {
+        if (!db) return;
+        const loadGdpr = async () => {
+            try {
+                const doc = await db.collection('settings').doc('privacyGDPR').get();
+                if (doc.exists) setGdprText(doc.data().text || '');
+            } catch (e) { console.error('Error loading GDPR text:', e); }
+            setLoadingGdpr(false);
+        };
+        loadGdpr();
+    }, [db]);
+
+    // Save GDPR text to Firestore
+    const saveGdprText = async () => {
+        if (!db) return;
+        setLoadingGdpr(true);
+        try {
+            await db.collection('settings').doc('privacyGDPR').set({ text: gdprText, updatedAt: new Date().toISOString() }, { merge: true });
+            showToast('✅ Privacy aggiornata', 'success');
+            setEditingGdpr(false);
+        } catch (e) {
+            showToast('❌ Errore salvataggio privacy', 'error');
+        }
+        setLoadingGdpr(false);
+    };
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
     const [showChangelog, setShowChangelog] = React.useState(false);
@@ -12,12 +43,26 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             reminders: false
         }
     });
+    // weekStart: 0=Sunday,1=Monday,...6=Saturday. Default to Monday
+    const [weekStart, setWeekStart] = React.useState(1);
     const [customDays, setCustomDays] = React.useState('');
     const [notificationPermission, setNotificationPermission] = React.useState(
         typeof Notification !== 'undefined' ? Notification.permission : 'denied'
     );
     
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
     const inputClass = darkMode ? 
@@ -57,6 +102,10 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                             reminders: false
                         }
                     });
+                    // load weekStart if present
+                    if (typeof data.weekStart !== 'undefined' && data.weekStart !== null) {
+                        setWeekStart(Number(data.weekStart));
+                    }
                 }
                 
                 setLoading(false);
@@ -79,11 +128,13 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         setSaving(true);
         
         try {
+            // Use merge to avoid accidentally overwriting other fields stored in the same doc
             await db.collection('settings').doc('linkExpiration').set({
                 expirationDays: settings.expirationDays,
                 notifications: settings.notifications,
+                weekStart: weekStart,
                 updatedAt: new Date().toISOString()
-            });
+            }, { merge: true });
             
             showToast(`✅ ${t.settingsSaved}`, 'success');
         } catch (error) {
@@ -189,6 +240,21 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         });
     };
 
+    // Week start selector (UI)
+    const weekOptions = [
+        { value: 1, label: language === 'it' ? 'Lunedì' : language === 'en' ? 'Monday' : language === 'es' ? 'Lun' : language === 'fr' ? 'Lun' : 'Luni' },
+        { value: 2, label: language === 'it' ? 'Martedì' : language === 'en' ? 'Tuesday' : language === 'es' ? 'Mar' : language === 'fr' ? 'Mar' : 'Marți' },
+        { value: 3, label: language === 'it' ? 'Mercoledì' : language === 'en' ? 'Wednesday' : language === 'es' ? 'Mié' : language === 'fr' ? 'Mer' : 'Mier' },
+        { value: 4, label: language === 'it' ? 'Giovedì' : language === 'en' ? 'Thursday' : language === 'es' ? 'Jue' : language === 'fr' ? 'Jeu' : 'Joi' },
+        { value: 5, label: language === 'it' ? 'Venerdì' : language === 'en' ? 'Friday' : language === 'es' ? 'Vie' : language === 'fr' ? 'Ven' : 'Vin' },
+        { value: 6, label: language === 'it' ? 'Sabato' : language === 'en' ? 'Saturday' : language === 'es' ? 'Sáb' : language === 'fr' ? 'Sam' : 'Sâm' },
+        { value: 0, label: language === 'it' ? 'Domenica' : language === 'en' ? 'Sunday' : language === 'es' ? 'Dom' : language === 'fr' ? 'Dim' : 'Dum' }
+    ];
+
+    const handleWeekStartChange = (val) => {
+        setWeekStart(Number(val));
+    };
+
     // Get current expiration display
     const getExpirationDisplay = () => {
         if (settings.expirationDays === 0) {
@@ -268,15 +334,11 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             {/* ⭐ Export Section */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
                 <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
-                    📥 {language === 'it' ? 'Esportazione Dati' : language === 'en' ? 'Data Export' : language === 'es' ? 'Exportación de Datos' : language === 'fr' ? 'Exportation de Données' : 'Exportare Date'}
+                    📥 {t.exportData || 'Esportazione Dati'}
                 </h2>
                 
                 <p className={`${textClass} text-sm mb-4`}>
-                    {language === 'it' && 'Esporta tutti i fogli ore in formato CSV o Excel'}
-                    {language === 'en' && 'Export all timesheets in CSV or Excel format'}
-                    {language === 'es' && 'Exportar todas las hojas de horas en formato CSV o Excel'}
-                    {language === 'fr' && 'Exporter toutes les feuilles d\'heures au format CSV ou Excel'}
-                    {language === 'ro' && 'Exportați toate fișele de ore în format CSV sau Excel'}
+                    { (typeof window !== 'undefined' && typeof window.t === 'function') ? window.t('exportDataDescription') : 'Esporta tutti i fogli ore in formato CSV o Excel' }
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -315,14 +377,10 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
 
                 {/* Export Info */}
                 <div className={`mt-4 p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} text-sm ${textClass}`}>
-                    <p className="flex items-start gap-2">
+                        <p className="flex items-start gap-2">
                         <span>💡</span>
                         <span>
-                            {language === 'it' && `${sheets.length} fogli disponibili per l'esportazione`}
-                            {language === 'en' && `${sheets.length} sheets available for export`}
-                            {language === 'es' && `${sheets.length} hojas disponibles para exportar`}
-                            {language === 'fr' && `${sheets.length} feuilles disponibles pour l'exportation`}
-                            {language === 'ro' && `${sheets.length} fișe disponibile pentru export`}
+                            { (typeof window !== 'undefined' && typeof window.t === 'function') ? window.t('sheetsAvailable', { count: sheets.length }) : `${sheets.length} fogli disponibili per l'esportazione` }
                         </span>
                     </p>
                 </div>
@@ -399,12 +457,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} text-sm ${textClass}`}>
                         <p className="flex items-start gap-2">
                             <span>💡</span>
-                            <span>
-                                {language === 'it' && 'Il logo apparirà sui PDF generati ma non nell\'interfaccia'}
-                                {language === 'en' && 'Logo will appear on generated PDFs but not in the interface'}
-                                {language === 'es' && 'El logo aparecerá en los PDFs generados pero no en la interfaz'}
-                                {language === 'fr' && 'Le logo apparaîtra sur les PDFs générés mais pas dans l\'interface'}
-                                {language === 'ro' && 'Logo-ul va apărea pe PDF-urile generate dar nu în interfață'}
+                                <span>
+                                { (typeof window !== 'undefined' && typeof window.t === 'function') ? window.t('logoInfo') : 'Il logo apparirà sui PDF generati ma non nell\'interfaccia' }
                             </span>
                         </p>
                     </div>
@@ -484,6 +538,21 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                 </div>
 
                 {/* Save Button */}
+                {/* Week start selector - saved in the same settings doc */}
+                <div className="mb-4">
+                    <label className={`block text-sm font-semibold mb-2 ${textClass}`}>{t.weekStartLabel || 'Inizio settimana'}</label>
+                    <div className="flex items-center gap-3">
+                        <select value={weekStart} onChange={(e) => handleWeekStartChange(e.target.value)} className={`px-3 py-2 rounded border ${inputClass}`}>
+                            {weekOptions.map(opt => (
+                                React.createElement('option', { key: opt.value, value: opt.value }, opt.label)
+                            ))}
+                        </select>
+                        <div className={`text-sm ${textClass}`}>
+                            { (typeof window !== 'undefined' && typeof window.t === 'function') ? window.t('weekStartDescription') : 'Scegli il giorno con cui iniziare la settimana nel grafico settimanale' }
+                        </div>
+                    </div>
+                </div>
+
                 <button
                     onClick={saveSettings}
                     disabled={saving}
@@ -693,6 +762,34 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                 </button>
             </div>
 
+            {/* GDPR Privacy Section */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 mb-6`}>
+                <h2 className="text-xl font-bold mb-2">🔒 Privacy GDPR</h2>
+                {loadingGdpr ? (
+                    <div className="text-gray-500">Caricamento...</div>
+                ) : editingGdpr ? (
+                    <>
+                        <textarea
+                            className={`w-full min-h-[120px] p-2 rounded border mt-2 mb-2 ${inputClass}`}
+                            value={gdprText}
+                            onChange={e => setGdprText(e.target.value)}
+                            placeholder="Inserisci qui il testo della privacy GDPR..."
+                        />
+                        <div className="flex gap-2">
+                            <button onClick={saveGdprText} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold">Salva</button>
+                            <button onClick={() => setEditingGdpr(false)} className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded font-semibold">Annulla</button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className={`whitespace-pre-line p-2 rounded ${textClass} bg-gray-50 dark:bg-gray-900 mb-2`} style={{minHeight:'80px'}}>
+                            {gdprText || <span className="italic text-gray-400">Nessun testo privacy inserito</span>}
+                        </div>
+                        <button onClick={() => setEditingGdpr(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold">Modifica</button>
+                    </>
+                )}
+            </div>
+
             {/* 📋 CHANGELOG BUTTON */}
             <button
                 onClick={() => setShowChangelog(!showChangelog)}
@@ -764,4 +861,6 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )}
         </div>
     );
-};
+}
+// Expose globally for in-page usage
+window.Settings = Settings;

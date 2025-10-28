@@ -1,11 +1,26 @@
+// WeatherWidget is exposed globally as window.WeatherWidget
+const WeatherWidget = window.WeatherWidget;
 // Report Manager Component - 5 LINGUE COMPLETE
+if (!window.ReportManager) {
 const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
     const [reportType, setReportType] = React.useState('weekly'); // weekly, monthly, custom
     const [startDate, setStartDate] = React.useState('');
     const [endDate, setEndDate] = React.useState('');
     const [generating, setGenerating] = React.useState(false);
     
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
     const inputClass = darkMode ? 
@@ -44,36 +59,37 @@ const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
 
     // Calculate report statistics
     const reportStats = React.useMemo(() => {
+
         const stats = {
             totalSheets: filteredSheets.length,
             completedSheets: filteredSheets.filter(s => s.status === 'completed').length,
-            totalWorkers: 0,
+            totalWorkers: 0, // verrà sovrascritto con il numero di lavoratori unici
             totalHours: 0,
             workerBreakdown: {},
             companyBreakdown: {}
         };
 
-        filteredSheets.forEach(sheet => {
-            // Count workers
-            const workersCount = sheet.lavoratori?.length || 0;
-            stats.totalWorkers += workersCount;
+        const uniqueWorkersSet = new Set();
 
-            // Calculate hours
+        filteredSheets.forEach(sheet => {
+            const normalizeWorkerName = window.normalizeWorkerName;
             sheet.lavoratori?.forEach(worker => {
                 const hours = parseFloat(worker.oreTotali) || 0;
                 stats.totalHours += hours;
 
-                // Worker breakdown
-                const workerKey = `${worker.nome} ${worker.cognome}`;
-                if (!stats.workerBreakdown[workerKey]) {
-                    stats.workerBreakdown[workerKey] = {
-                        name: workerKey,
+                // Worker breakdown (normalized)
+                const normalizedKey = normalizeWorkerName(worker.nome, worker.cognome);
+                const displayName = `${worker.nome} ${worker.cognome}`.trim();
+                uniqueWorkersSet.add(normalizedKey);
+                if (!stats.workerBreakdown[normalizedKey]) {
+                    stats.workerBreakdown[normalizedKey] = {
+                        name: displayName,
                         hours: 0,
                         days: 0
                     };
                 }
-                stats.workerBreakdown[workerKey].hours += hours;
-                stats.workerBreakdown[workerKey].days += 1;
+                stats.workerBreakdown[normalizedKey].hours += hours;
+                stats.workerBreakdown[normalizedKey].days += 1;
 
                 // Company breakdown
                 const companyKey = sheet.titoloAzienda || t.company;
@@ -85,9 +101,10 @@ const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
                     };
                 }
                 stats.companyBreakdown[companyKey].hours += hours;
-                stats.companyBreakdown[companyKey].workers.add(workerKey);
+                stats.companyBreakdown[companyKey].workers.add(normalizedKey);
             });
         });
+        stats.totalWorkers = uniqueWorkersSet.size;
 
         // Convert to arrays and sort
         stats.topWorkers = Object.values(stats.workerBreakdown)
@@ -225,6 +242,12 @@ const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
 
     return (
         <div className="space-y-4 sm:space-y-6">
+            {/* External title for Report Manager */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className={`font-semibold text-lg ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    📊 {t.reports || 'Reports'}
+                </h3>
+            </div>
             {/* Header */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
                 <div className="flex items-center gap-3 mb-4">
@@ -278,9 +301,6 @@ const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
                         <p className={`text-xs sm:text-sm ${textClass}`}>
                             {reportType === 'weekly' && (
                                 <span>ℹ️ {t.reportWeeklyDesc}</span>
-                            )}
-                            {reportType === 'monthly' && (
-                                <span>ℹ️ {t.reportMonthlyDesc}</span>
                             )}
                             {reportType === 'custom' && (
                                 <span>ℹ️ {t.reportCustomDesc}</span>
@@ -448,6 +468,11 @@ const ReportManager = ({ sheets, darkMode, language = 'it', companyLogo }) => {
                     </p>
                 </div>
             )}
-        </div>
+        {/* Meteo rimosso dal report per richiesta privacy/funzionalità */}
+    </div>
     );
 };
+
+// Expose globally for in-page usage
+window.ReportManager = ReportManager;
+}

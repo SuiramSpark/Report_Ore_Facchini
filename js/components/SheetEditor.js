@@ -1,3 +1,5 @@
+// React and other libs are expected to be available globally (loaded via CDN in index.html)
+// Avoid ES module imports when using in-page Babel/UMD environment to prevent `require is not defined`.
 // Sheet Editor Component - v3.0 FIX BUG LINK + FIRMA
 const SheetEditor = ({ 
     sheet, 
@@ -12,15 +14,39 @@ const SheetEditor = ({
     language = 'it',
     companyLogo 
 }) => {
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    // We return a Proxy so existing code that uses `t.someKey` continues to work.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') {
+                    return window.t(key);
+                }
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) {
+                return String(prop);
+            }
+        }
+    });
+    // Canvas ref and key used to force re-initialization when signature is deleted
+    const respCanvasRef = React.useRef(null);
+    const [canvasKey, setCanvasKey] = React.useState(0);
+    // Resolve WeatherWidget from global scope to avoid bundler/import issues
+    const WeatherWidget = window.WeatherWidget || (() => React.createElement('div', null, t.weatherWidgetNotLoaded || (language === 'it' ? 'Widget Meteo non caricato' : 'WeatherWidget not loaded')));
     const [currentSheet, setCurrentSheet] = React.useState(sheet);
+    // Debounced localita update so WeatherWidget doesn't fetch on every keystroke
+    const localitaDebounceRef = React.useRef(null);
+    // Visible input value for localita (immediate) and debounced update applied to currentSheet.localita
+    const [weatherInput, setWeatherInput] = React.useState(sheet?.localita || sheet?.location || '');
     const [loading, setLoading] = React.useState(false);
     const [selectedWorkers, setSelectedWorkers] = React.useState([]);
     const [bulkEditMode, setBulkEditMode] = React.useState(false);
     const [bulkEditData, setBulkEditData] = React.useState({ pausaMinuti: '' });
     const [editingWorker, setEditingWorker] = React.useState(null);
-    
-    // � FIX: State per il form di aggiunta lavoratore
     const [showAddWorkerForm, setShowAddWorkerForm] = React.useState(false);
     const [newWorker, setNewWorker] = React.useState({
         nome: '',
@@ -32,17 +58,9 @@ const SheetEditor = ({
         numeroIdentita: '',
         telefono: ''
     });
-    
-    // �🐛 FIX BUG #2: State per forzare re-render canvas
-    const [canvasKey, setCanvasKey] = React.useState(0);
-    
-    const respCanvasRef = React.useRef(null);
-    
-    const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
-    const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
-    const inputClass = darkMode ? 
-        'bg-gray-700 border-gray-600 text-white' : 
-        'bg-white border-gray-300 text-gray-900';
+    const cardClass = darkMode ? 'bg-gray-800' : 'bg-white';
+    const inputClass = darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900';
+    const textClass = darkMode ? 'text-gray-300' : 'text-gray-700';
 
     // FUNZIONI HELPER LOCALI
     const showToastLocal = (message, type = 'info') => {
@@ -96,7 +114,6 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
     };
 
     // Initialize canvas responsabile - 🐛 FIX: Dipende da canvasKey per re-render
-    React.useEffect(() => {
         const initCanvas = (canvas) => {
             if (!canvas) return;
             
@@ -115,9 +132,9 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
-                
+
                 let clientX, clientY;
-                
+
                 if (e.touches && e.touches[0]) {
                     clientX = e.touches[0].clientX;
                     clientY = e.touches[0].clientY;
@@ -125,12 +142,12 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     clientX = e.clientX;
                     clientY = e.clientY;
                 }
-                
+
                 return {
                     x: (clientX - rect.left) * scaleX,
                     y: (clientY - rect.top) * scaleY
                 };
-            };
+            }
 
             const startDraw = (e) => {
                 isDrawing = true;
@@ -181,12 +198,49 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             return true;
         };
 
-        if (respCanvasRef.current) {
-            initCanvas(respCanvasRef.current);
-            respCanvasRef.current.clearCanvas = () => clearCanvas(respCanvasRef.current);
-            respCanvasRef.current.isCanvasBlank = () => isCanvasBlank(respCanvasRef.current);
-        }
-    }, [canvasKey]); // 🐛 FIX: Re-inizializza quando canvasKey cambia
+        React.useEffect(() => {
+            if (respCanvasRef.current) {
+                initCanvas(respCanvasRef.current);
+                respCanvasRef.current.clearCanvas = () => clearCanvas(respCanvasRef.current);
+                respCanvasRef.current.isCanvasBlank = () => isCanvasBlank(respCanvasRef.current);
+            }
+        }, [canvasKey]); // 🐛 FIX: Re-inizializza quando canvasKey cambia
+
+    // --- Static Weather Fetch Logic ---
+    // Copied/adapted from WeatherWidget.js for static weather snapshot
+    async function geocodeIt(name) {
+        const q = ('' + (name || '')).trim();
+        if (!q) return null;
+        try {
+            const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=it`);
+            if (!res.ok) return null;
+            const j = await res.json();
+            if (j && j.results && j.results.length) {
+                return j.results[0];
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    async function fetchWeather(lat, lon, dateStr) {
+        // dateStr: YYYY-MM-DD (for historical weather)
+        // Open-Meteo API for historical weather: https://open-meteo.com/en/docs#historical
+        // We'll fetch daily summary for the given date
+        try {
+            const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&start_date=${dateStr}&end_date=${dateStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=auto`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Errore meteo');
+            const j = await res.json();
+            if (!j || !j.daily) throw new Error('Dati non disponibili');
+            // Return summary for the day
+            return {
+                temp_max: j.daily.temperature_2m_max?.[0],
+                temp_min: j.daily.temperature_2m_min?.[0],
+                precipitation: j.daily.precipitation_sum?.[0],
+                weathercode: j.daily.weathercode?.[0]
+            };
+        } catch (e) { return null; }
+    }
 
     const saveSheet = async () => {
         if (!currentSheet.titoloAzienda || !currentSheet.responsabile) {
@@ -196,7 +250,19 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
 
         setLoading(true);
         try {
-            await onSave(currentSheet);
+            // --- Static Weather Fetch ---
+            let weatherStatic = null;
+            const loc = currentSheet.localita || currentSheet.location;
+            const dateStr = currentSheet.data || currentSheet.date; // Expect YYYY-MM-DD
+            if (loc && dateStr) {
+                const geo = await geocodeIt(loc);
+                if (geo && geo.latitude && geo.longitude) {
+                    weatherStatic = await fetchWeather(geo.latitude, geo.longitude, dateStr);
+                }
+            }
+            // Save static weather snapshot in sheet
+            const sheetToSave = { ...currentSheet, weatherStatic };
+            await onSave(sheetToSave);
             if (addAuditLog) {
                 await addAuditLog('SHEET_EDIT', `${t.edit}: ${currentSheet.titoloAzienda}`);
             }
@@ -326,7 +392,8 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 await addAuditLog('SIGNATURE_DELETE', `Firma responsabile cancellata: ${currentSheet.responsabile}`);
             }
             
-            showToastLocal(`✅ Firma cancellata. Puoi firmare di nuovo.`, 'success');
+            // Use localized message when available
+            showToastLocal(`✅ ${t.signatureCleared || 'Firma cancellata.'}`, 'success');
         } catch (error) {
             console.error(error);
             showToastLocal(`❌ ${t.errorDeleting}`, 'error');
@@ -370,7 +437,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 oreTotali: calculateHours(updatedData.oraIn, updatedData.oraOut, updatedData.pausaMinuti) 
             } : w
         );
-        
+    
         try {
             await db.collection('timesheets').doc(currentSheet.id).update({
                 lavoratori: updatedLavoratori
@@ -437,7 +504,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 await addAuditLog('WORKER_ADD', `Aggiunto: ${workerToAdd.nome} ${workerToAdd.cognome}`);
             }
 
-            showToastLocal(`✅ Lavoratore aggiunto con successo!`, 'success');
+            showToastLocal(`✅ ${t.workerAdded || 'Lavoratore aggiunto con successo!'}`, 'success');
         } catch (error) {
             console.error(error);
             showToastLocal(`❌ ${t.errorSaving}`, 'error');
@@ -528,6 +595,12 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
 
     return (
         <div className="space-y-4 sm:space-y-6">
+            {/* External card title for Sheet Editor */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className={`font-semibold text-lg ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    📋 {t.sheetManagement || t.sheets || 'Sheet Editor'}
+                </h3>
+            </div>
             {/* Header */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -564,13 +637,41 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                         onChange={(e) => setCurrentSheet({...currentSheet, responsabile: e.target.value})}
                         className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                     />
+                    <div className="flex items-center">
                     <input
                         type="text"
                         placeholder={t.location}
-                        value={currentSheet.location || ''}
-                        onChange={(e) => setCurrentSheet({...currentSheet, location: e.target.value})}
+                        value={weatherInput}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            // Update visible input immediately
+                            setWeatherInput(v);
+
+                            // Apply immediate compat fields to currentSheet.location for other logic
+                            setCurrentSheet(prev => ({ ...prev, location: v }));
+
+                            // Debounced update for currentSheet.localita so WeatherWidget fetches after pause
+                            if (localitaDebounceRef.current) clearTimeout(localitaDebounceRef.current);
+                            localitaDebounceRef.current = setTimeout(() => {
+                                setCurrentSheet(prev => ({ ...prev, localita: v }));
+                            }, 600);
+                        }}
                         className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                     />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (localitaDebounceRef.current) clearTimeout(localitaDebounceRef.current);
+                            setCurrentSheet(prev => ({ ...prev, localita: weatherInput }));
+                            // ensure compatibility location too
+                            setCurrentSheet(prev => ({ ...prev, location: weatherInput }));
+                        }}
+                        title={t.weatherUpdate}
+                        className="ml-3 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm"
+                    >
+                        {t.weatherUpdate}
+                    </button>
+                    </div>
                 </div>
 
                 <textarea
@@ -736,8 +837,6 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                         </div>
                     </div>
                 )}
-
-                {/* Bulk Edit Panel */}
                 {bulkEditMode && (
                     <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50'}`}>
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -929,7 +1028,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 
                 {currentSheet.firmaResponsabile ? (
                     <div>
-                        <img 
+                        <img
                             src={currentSheet.firmaResponsabile} 
                             alt={t.responsibleSignature}
                             className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white max-w-md w-full" 
@@ -947,7 +1046,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                         <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
                             {/* 🐛 FIX: Canvas con key per forzare re-render */}
                             <canvas 
-                                key={canvasKey}
+                                key={typeof canvasKey !== 'undefined' ? canvasKey : 0}
                                 ref={respCanvasRef} 
                                 width={800} 
                                 height={300} 
@@ -989,6 +1088,17 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             >
                 {loading ? `⏳ ${t.loading}...` : `✅ ${t.completePDF}`}
             </button>
+        {/* Widget Meteo per la località del foglio */}
+        {currentSheet?.localita && (
+                                <div className="my-2">
+                                    <WeatherWidget location={currentSheet.localita} darkMode={darkMode} />
+                                </div>
+        )}
         </div>
     );
-};
+}
+
+// Expose as global for in-page usage (no bundler) with guard to prevent redeclaration
+if (!window.SheetEditor) {
+    window.SheetEditor = SheetEditor;
+}

@@ -24,7 +24,19 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
     const [selectedLogs, setSelectedLogs] = React.useState([]);
     const [selectMode, setSelectMode] = React.useState(false);
     const [deleting, setDeleting] = React.useState(false);
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
 
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';

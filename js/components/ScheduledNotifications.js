@@ -13,7 +13,19 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
         typeof Notification !== 'undefined' ? Notification.permission : 'denied'
     );
 
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
     const inputClass = darkMode ? 
@@ -21,13 +33,13 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
         'bg-white border-gray-300 text-gray-900 placeholder-gray-500';
 
     const daysOfWeek = [
-        { key: 'monday', label: language === 'it' ? 'Lun' : language === 'en' ? 'Mon' : language === 'es' ? 'Lun' : language === 'fr' ? 'Lun' : 'Lun' },
-        { key: 'tuesday', label: language === 'it' ? 'Mar' : language === 'en' ? 'Tue' : language === 'es' ? 'Mar' : language === 'fr' ? 'Mar' : 'Mar' },
-        { key: 'wednesday', label: language === 'it' ? 'Mer' : language === 'en' ? 'Wed' : language === 'es' ? 'Mié' : language === 'fr' ? 'Mer' : 'Mie' },
-        { key: 'thursday', label: language === 'it' ? 'Gio' : language === 'en' ? 'Thu' : language === 'es' ? 'Jue' : language === 'fr' ? 'Jeu' : 'Joi' },
-        { key: 'friday', label: language === 'it' ? 'Ven' : language === 'en' ? 'Fri' : language === 'es' ? 'Vie' : language === 'fr' ? 'Ven' : 'Vin' },
-        { key: 'saturday', label: language === 'it' ? 'Sab' : language === 'en' ? 'Sat' : language === 'es' ? 'Sáb' : language === 'fr' ? 'Sam' : 'Sâm' },
-        { key: 'sunday', label: language === 'it' ? 'Dom' : language === 'en' ? 'Sun' : language === 'es' ? 'Dom' : language === 'fr' ? 'Dim' : 'Dum' }
+        { key: 'monday', label: t.weekday_short_monday || 'Lun' },
+        { key: 'tuesday', label: t.weekday_short_tuesday || 'Mar' },
+        { key: 'wednesday', label: t.weekday_short_wednesday || 'Mer' },
+        { key: 'thursday', label: t.weekday_short_thursday || 'Gio' },
+        { key: 'friday', label: t.weekday_short_friday || 'Ven' },
+        { key: 'saturday', label: t.weekday_short_saturday || 'Sab' },
+        { key: 'sunday', label: t.weekday_short_sunday || 'Dom' }
     ];
 
     // Load notifications from Firestore
@@ -39,6 +51,42 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             .onSnapshot(snapshot => {
                 const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setNotifications(data);
+                // Auto-link heuristic: for notifications without sheetId, attempt to find a candidate timesheet
+                (async () => {
+                    try {
+                        const missing = data.filter(n => !n.sheetId);
+                        if (!missing.length) return;
+
+                        console.log(`🔗 Auto-link: found ${missing.length} notifications without sheetId, attempting to link...`);
+
+                        // Fetch recent timesheets (limit 10) and pick first non-completed, non-archived; otherwise first
+                        const tsSnap = await db.collection('timesheets').orderBy('createdAt', 'desc').limit(10).get();
+                        const candidates = tsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                        for (const notif of missing) {
+                            // Skip if it was linked meanwhile
+                            const ref = db.collection('scheduledNotifications').doc(notif.id);
+                            const fresh = (await ref.get()).data() || {};
+                            if (fresh.sheetId) continue;
+
+                            let candidate = candidates.find(c => c.status !== 'completed' && !c.archived) || candidates[0];
+                            if (!candidate) {
+                                console.log('🔗 Auto-link: no candidate timesheets found');
+                                break;
+                            }
+
+                            try {
+                                await ref.set({ sheetId: candidate.id }, { merge: true });
+                                console.log(`🔗 Auto-linked notification ${notif.id} -> sheet ${candidate.id}`);
+                                try { showToast(`🔗 ${t.autoLinkedNotification?.replace('{id}', candidate.id) || `Notifica collegata a foglio ${candidate.id}`}`, 'info'); } catch (e) { }
+                            } catch (err) {
+                                console.error('🔗 Auto-link error updating notification:', err);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error during auto-link heuristic:', err);
+                    }
+                })();
                 setLoading(false);
             });
 
@@ -99,7 +147,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
     // Request notification permission
     const requestPermission = async () => {
         if (typeof Notification === 'undefined') {
-            showToast('❌ Notifiche non supportate su questo browser', 'error');
+            showToast(`❌ ${t.notificationsNotSupported || 'Notifiche non supportate su questo browser'}`, 'error');
             return;
         }
 
@@ -108,13 +156,13 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             setNotificationPermission(permission);
 
             if (permission === 'granted') {
-                showToast('✅ Notifiche autorizzate!', 'success');
+                showToast(`✅ ${t.notificationsAuthorized || 'Notifiche autorizzate!'}`, 'success');
             } else {
-                showToast('⚠️ Notifiche bloccate', 'warning');
+                showToast(`⚠️ ${t.notificationsBlocked || 'Notifiche bloccate'}`, 'warning');
             }
         } catch (error) {
             console.error('Error requesting permission:', error);
-            showToast('❌ Errore richiesta permessi', 'error');
+            showToast(`❌ ${t.errorRequestingPermissions || 'Errore richiesta permessi'}`, 'error');
         }
     };
 
@@ -122,7 +170,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
     const addNotification = async () => {
         if (!db) return;
         if (!newNotification.message.trim()) {
-            showToast('❌ Inserisci un messaggio', 'error');
+            showToast(`❌ ${t.insertMessage || 'Inserisci un messaggio'}`, 'error');
             return;
         }
 
@@ -139,10 +187,10 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                 days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
             });
 
-            showToast('✅ Notifica aggiunta!', 'success');
+            showToast(`✅ ${t.notificationAdded || 'Notifica aggiunta!'}`, 'success');
         } catch (error) {
             console.error('Error adding notification:', error);
-            showToast('❌ Errore durante l\'aggiunta', 'error');
+            showToast(`❌ ${t.errorAddingNotification || 'Errore durante l\'aggiunta'}`, 'error');
         }
     };
 
@@ -153,10 +201,10 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
         try {
             await db.collection('scheduledNotifications').doc(id).update(updates);
             setEditingId(null);
-            showToast('✅ Notifica aggiornata!', 'success');
+            showToast(`✅ ${t.notificationUpdated || 'Notifica aggiornata!'}`, 'success');
         } catch (error) {
             console.error('Error updating notification:', error);
-            showToast('❌ Errore durante l\'aggiornamento', 'error');
+            showToast(`❌ ${t.errorUpdatingNotification || 'Errore durante l\'aggiornamento'}`, 'error');
         }
     };
 
@@ -167,10 +215,10 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
 
         try {
             await db.collection('scheduledNotifications').doc(id).delete();
-            showToast('✅ Notifica eliminata!', 'success');
+            showToast(`✅ ${t.notificationDeleted || 'Notifica eliminata!'}`, 'success');
         } catch (error) {
             console.error('Error deleting notification:', error);
-            showToast('❌ Errore durante l\'eliminazione', 'error');
+            showToast(`❌ ${t.errorDeletingNotification || 'Errore durante l\'eliminazione'}`, 'error');
         }
     };
 
@@ -182,12 +230,12 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
     // Test notification immediately
     const testNotification = (notification) => {
         if (notificationPermission !== 'granted') {
-            showToast('❌ Autorizza prima le notifiche', 'error');
+            showToast(`❌ ${t.authorizeFirst || 'Autorizza prima le notifiche'}`, 'error');
             return;
         }
 
         sendScheduledNotification(notification);
-        showToast('✅ Test notifica inviato!', 'success');
+    showToast(`✅ ${t.testNotificationSent || 'Test notifica inviato!'}`, 'success');
     };
 
     // Toggle day selection
@@ -221,24 +269,22 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
 
     return (
         <div className="space-y-6">
+            {/* External title for Scheduled Notifications */}
+            <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                <h3 className={`font-semibold text-lg ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                    ⏰ {t.scheduledNotifications || 'Scheduled Notifications'}
+                </h3>
+            </div>
             {/* Header */}
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <div className="flex items-center gap-3 mb-4">
                     <span className="text-3xl">⏰</span>
                     <div>
                         <h2 className="text-2xl font-bold">
-                            {language === 'it' ? 'Notifiche Programmate' :
-                             language === 'en' ? 'Scheduled Notifications' :
-                             language === 'es' ? 'Notificaciones Programadas' :
-                             language === 'fr' ? 'Notifications Programmées' :
-                             'Notificări Programate'}
+                            {t.scheduledNotifications || (language === 'it' ? 'Notifiche Programmate' : 'Scheduled Notifications')}
                         </h2>
                         <p className={textClass}>
-                            {language === 'it' ? 'Ricevi notifiche automatiche agli orari che preferisci' :
-                             language === 'en' ? 'Receive automatic notifications at your preferred times' :
-                             language === 'es' ? 'Recibe notificaciones automáticas en tus horarios preferidos' :
-                             language === 'fr' ? 'Recevez des notifications automatiques aux heures de votre choix' :
-                             'Primește notificări automate la orele preferate'}
+                            {t.scheduledNotificationsDescription || (language === 'it' ? 'Ricevi notifiche automatiche agli orari che preferisci' : 'Receive automatic notifications at your preferred times')}
                         </p>
                     </div>
                 </div>
@@ -252,18 +298,14 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                             <span className="text-2xl">⚠️</span>
                             <div className="flex-1">
                                 <p className={`font-semibold ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>
-                                    {language === 'it' ? 'Autorizza le notifiche per usare questa funzione' :
-                                     language === 'en' ? 'Authorize notifications to use this feature' :
-                                     language === 'es' ? 'Autoriza las notificaciones para usar esta función' :
-                                     language === 'fr' ? 'Autorisez les notifications pour utiliser cette fonction' :
-                                     'Autorizează notificările pentru a folosi această funcție'}
+                                    {t.authorizeNotifications || (language === 'it' ? 'Autorizza le notifiche per usare questa funzione' : 'Authorize notifications to use this feature')}
                                 </p>
                             </div>
                             <button
                                 onClick={requestPermission}
                                 className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors"
                             >
-                                🔔 {t.requestPermission}
+                                🔔 {t.requestPermission || (language === 'it' ? 'Autorizza' : 'Request permission')}
                             </button>
                         </div>
                     </div>
@@ -274,18 +316,14 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <span>➕</span>
-                    {language === 'it' ? 'Nuova Notifica' :
-                     language === 'en' ? 'New Notification' :
-                     language === 'es' ? 'Nueva Notificación' :
-                     language === 'fr' ? 'Nouvelle Notification' :
-                     'Notificare Nouă'}
+                    {t.newNotificationTitle || (language === 'it' ? 'Nuova Notifica' : 'New Notification')}
                 </h3>
 
                 <div className="space-y-4">
                     {/* Time Input */}
                     <div>
                         <label className={`block text-sm font-semibold mb-2 ${textClass}`}>
-                            ⏰ {language === 'it' ? 'Orario' : language === 'en' ? 'Time' : language === 'es' ? 'Hora' : language === 'fr' ? 'Heure' : 'Oră'}
+                            ⏰ {t.timeLabel || (language === 'it' ? 'Orario' : 'Time')}
                         </label>
                         <input
                             type="time"
@@ -299,20 +337,12 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     {/* Message Input */}
                     <div>
                         <label className={`block text-sm font-semibold mb-2 ${textClass}`}>
-                            💬 {language === 'it' ? 'Messaggio Personalizzato' :
-                                language === 'en' ? 'Custom Message' :
-                                language === 'es' ? 'Mensaje Personalizado' :
-                                language === 'fr' ? 'Message Personnalisé' :
-                                'Mesaj Personalizat'}
+                            💬 {t.customMessageLabel || (language === 'it' ? 'Messaggio Personalizzato' : 'Custom Message')}
                         </label>
                         <textarea
                             value={newNotification.message}
                             onChange={(e) => setNewNotification({ ...newNotification, message: e.target.value })}
-                            placeholder={language === 'it' ? 'Es: Ciao Mario! ❤️ Ricorda di controllare i fogli ore 📋' :
-                                        language === 'en' ? 'E.g: Hi Mario! ❤️ Remember to check timesheets 📋' :
-                                        language === 'es' ? 'Ej: ¡Hola Mario! ❤️ Recuerda revisar las hojas 📋' :
-                                        language === 'fr' ? 'Ex: Salut Mario! ❤️ N\'oublie pas de vérifier les feuilles 📋' :
-                                        'Ex: Salut Mario! ❤️ Nu uita să verifici fișele 📋'}
+                            placeholder={t.notificationPlaceholder || 'Es: Ciao Mario! ❤️ Ricorda di controllare i fogli ore 📋'}
                             className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                             rows="3"
                         />
@@ -321,11 +351,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     {/* Example Messages */}
                     <div>
                         <p className={`text-sm font-semibold mb-2 ${textClass}`}>
-                            💡 {language === 'it' ? 'Messaggi di Esempio (clicca per usare):' :
-                                language === 'en' ? 'Example Messages (click to use):' :
-                                language === 'es' ? 'Mensajes de Ejemplo (clic para usar):' :
-                                language === 'fr' ? 'Messages Exemple (cliquez pour utiliser):' :
-                                'Mesaje Exemplu (clic pentru a folosi):'}
+                            💡 {t.exampleMessagesLabel || (language === 'it' ? 'Messaggi di esempio (clicca per usare):' : 'Example messages (click to use):')}
                         </p>
                         <div className="flex flex-wrap gap-2">
                             {exampleMessages.map((msg, i) => (
@@ -347,11 +373,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     {/* Days Selection */}
                     <div>
                         <label className={`block text-sm font-semibold mb-2 ${textClass}`}>
-                            📅 {language === 'it' ? 'Giorni della Settimana' :
-                                language === 'en' ? 'Days of the Week' :
-                                language === 'es' ? 'Días de la Semana' :
-                                language === 'fr' ? 'Jours de la Semaine' :
-                                'Zile ale Săptămânii'}
+                            📅 {t.daysOfWeekLabel || (language === 'it' ? 'Giorni della Settimana' : 'Days of the Week')}
                         </label>
                         <div className="flex flex-wrap gap-2">
                             {daysOfWeek.map(day => (
@@ -378,11 +400,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                         disabled={!newNotification.message.trim()}
                         className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400"
                     >
-                        ➕ {language === 'it' ? 'Aggiungi Notifica' :
-                            language === 'en' ? 'Add Notification' :
-                            language === 'es' ? 'Agregar Notificación' :
-                            language === 'fr' ? 'Ajouter Notification' :
-                            'Adaugă Notificare'}
+                        ➕ {t.addNotification || (language === 'it' ? 'Aggiungi Notifica' : 'Add Notification')}
                     </button>
                 </div>
             </div>
@@ -391,22 +409,14 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <span>📋</span>
-                    {language === 'it' ? `Notifiche Attive (${notifications.length})` :
-                     language === 'en' ? `Active Notifications (${notifications.length})` :
-                     language === 'es' ? `Notificaciones Activas (${notifications.length})` :
-                     language === 'fr' ? `Notifications Actives (${notifications.length})` :
-                     `Notificări Active (${notifications.length})`}
+                    {`${t.activeNotifications || (language === 'it' ? 'Notifiche Attive' : 'Active Notifications')} (${notifications.length})`}
                 </h3>
 
                 {notifications.length === 0 ? (
                     <div className="text-center py-8">
                         <p className="text-4xl mb-3">⏰</p>
                         <p className={textClass}>
-                            {language === 'it' ? 'Nessuna notifica programmata' :
-                             language === 'en' ? 'No scheduled notifications' :
-                             language === 'es' ? 'No hay notificaciones programadas' :
-                             language === 'fr' ? 'Aucune notification programmée' :
-                             'Nicio notificare programată'}
+                                {t.noScheduledNotifications || (language === 'it' ? 'Nessuna notifica programmata' : 'No scheduled notifications')}
                         </p>
                     </div>
                 ) : (
@@ -414,7 +424,19 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                         {notifications.map((notification) => (
                             <div
                                 key={notification.id}
-                                className={`p-4 rounded-lg border-l-4 ${
+                                onClick={() => {
+                                    if (notification.sheetId) {
+                                        try {
+                                            console.log('⤴️ Dispatching openSheet for', notification.sheetId, 'notifId:', notification.id);
+                                            window.dispatchEvent(new CustomEvent('openSheet', { detail: { sheetId: notification.sheetId } }));
+                                        } catch (e) { console.error('Error dispatching openSheet event', e); }
+                                    } else {
+                                        console.log('Clicked notification without sheetId', notification.id);
+                                    }
+                                }}
+                                role={notification.sheetId ? 'button' : undefined}
+                                title={notification.sheetId ? ( (t.openSheetTitle || (language === 'it' ? 'Apri foglio {id}' : 'Open sheet {id}')).replace('{id}', notification.sheetId) ) : undefined}
+                                className={`p-4 rounded-lg border-l-4 cursor-pointer ${
                                     notification.enabled
                                         ? 'border-green-500'
                                         : 'border-gray-500'
@@ -427,12 +449,17 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                                             <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                                                 {notification.time}
                                             </span>
+                                            {notification.sheetId && (
+                                                <span className="ml-2 text-sm" title={language === 'it' ? `Apri foglio ${notification.sheetId}` : language === 'en' ? `Open sheet ${notification.sheetId}` : `Open sheet ${notification.sheetId}`} aria-hidden>
+                                                    🔗
+                                                </span>
+                                            )}
                                             <span className={`px-2 py-1 rounded text-xs font-bold ${
                                                 notification.enabled
                                                     ? 'bg-green-600 text-white'
                                                     : 'bg-gray-500 text-white'
                                             }`}>
-                                                {notification.enabled ? '✓ Attiva' : '✗ Disattivata'}
+                                                {notification.enabled ? (t.enabled || '✓ Attiva') : (t.disabled || '✗ Disattivata')}
                                             </span>
                                         </div>
 
@@ -499,32 +526,20 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
                     <span>💡</span>
-                    {language === 'it' ? 'Informazioni' : language === 'en' ? 'Information' : language === 'es' ? 'Información' : language === 'fr' ? 'Informations' : 'Informații'}
+                    {t.infoTitle || (language === 'it' ? 'Informazioni' : 'Information')}
                 </h3>
                 <ul className={`space-y-2 text-sm ${textClass}`}>
                     <li className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{language === 'it' ? 'Le notifiche verranno inviate solo se la tab è aperta nel browser' :
-                                language === 'en' ? 'Notifications will only be sent if the tab is open in the browser' :
-                                language === 'es' ? 'Las notificaciones solo se enviarán si la pestaña está abierta en el navegador' :
-                                language === 'fr' ? 'Les notifications seront envoyées uniquement si l\'onglet est ouvert dans le navigateur' :
-                                'Notificările vor fi trimise doar dacă tab-ul este deschis în browser'}</span>
+                        <span>{t.info_tab_open || (language === 'it' ? 'Le notifiche verranno inviate solo se la tab è aperta nel browser' : 'Notifications will only be sent if the tab is open in the browser')}</span>
                     </li>
                     <li className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{language === 'it' ? 'Puoi usare emoji nei messaggi personalizzati ❤️ 🎉 👷' :
-                                language === 'en' ? 'You can use emoji in custom messages ❤️ 🎉 👷' :
-                                language === 'es' ? 'Puedes usar emoji en mensajes personalizados ❤️ 🎉 👷' :
-                                language === 'fr' ? 'Vous pouvez utiliser des emoji dans les messages personnalisés ❤️ 🎉 👷' :
-                                'Poți folosi emoji în mesajele personalizate ❤️ 🎉 👷'}</span>
+                        <span>{t.info_use_emoji || (language === 'it' ? 'Puoi usare emoji nei messaggi personalizzati ❤️ 🎉 👷' : 'You can use emoji in custom messages ❤️ 🎉 👷')}</span>
                     </li>
                     <li className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{language === 'it' ? 'Le notifiche disattivate non verranno inviate ma rimarranno salvate' :
-                                language === 'en' ? 'Disabled notifications won\'t be sent but will remain saved' :
-                                language === 'es' ? 'Las notificaciones desactivadas no se enviarán pero permanecerán guardadas' :
-                                language === 'fr' ? 'Les notifications désactivées ne seront pas envoyées mais resteront sauvegardées' :
-                                'Notificările dezactivate nu vor fi trimise dar vor rămâne salvate'}</span>
+                        <span>{t.info_disabled_saved || (language === 'it' ? 'Le notifiche disattivate non verranno inviate ma rimarranno salvate' : 'Disabled notifications won\'t be sent but will remain saved')}</span>
                     </li>
                 </ul>
             </div>

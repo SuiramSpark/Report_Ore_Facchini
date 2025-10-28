@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Sun">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="45%">
+      <stop offset="0%" stop-color="#fff59d" />
+      <stop offset="60%" stop-color="#ffd54f" />
+      <stop offset="100%" stop-color="#ffb300" />
+    </radialGradient>
+    <style>
+      .ray { transform-origin: 100px 100px; animation: spin 10s linear infinite; }
+      .pulse { animation: pulse 2.5s ease-in-out infinite; }
+      @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+      @keyframes pulse { 0% { transform: scale(1);} 50% { transform: scale(1.06);} 100% { transform: scale(1);} }
+    </style>
+  </defs>
+
+  <!-- rays -->
+  <g class="ray" fill="none" stroke="#ffd54f" stroke-width="6">
+    <g>
+      <rect x="98" y="8" width="4" height="28" rx="2" fill="#ffd54f"/>
+      <rect x="98" y="164" width="4" height="28" rx="2" fill="#ffd54f" transform="rotate(180 100 178)"/>
+      <rect x="8" y="98" width="28" height="4" rx="2" fill="#ffd54f" transform="rotate(-90 22 100)"/>
+      <rect x="164" y="98" width="28" height="4" rx="2" fill="#ffd54f" transform="rotate(90 178 100)"/>
+      <!-- diagonal -->
+      <rect x="142" y="30" width="4" height="28" rx="2" fill="#ffd54f" transform="rotate(45 144 44)"/>
+      <rect x="30" y="142" width="4" height="28" rx="2" fill="#ffd54f" transform="rotate(225 32 156)"/>
+      <rect x="30" y="30" width="4" height="28" rx="2" fill="#ffd54f" transform="rotate(-45 32 44)"/>
+      <rect x="142" y="142" width="4" height="28" rx="2" fill="#ffd54f" transform="rotate(135 144 156)"/>
+    </g>
+  </g>
+
+  <!-- core sun -->
+  <g class="pulse">
+    <circle cx="100" cy="100" r="44" fill="url(#g)" />
+    <circle cx="100" cy="100" r="60" fill="none" stroke="#ffecb3" stroke-width="6" opacity="0.18" />
+  </g>
+</svg>

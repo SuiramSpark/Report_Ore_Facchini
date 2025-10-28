@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Thunder">
+  <style>
+    .flash { animation: flash 1.6s linear infinite; }
+    @keyframes flash { 0% { opacity: 0 } 10% { opacity: 1 } 20% { opacity: 0 } 100% { opacity: 0 } }
+    .bolt { animation: drop 1.1s ease-in-out infinite; }
+    @keyframes drop { 0% { transform: translateY(-6px); } 50% { transform: translateY(6px); } 100% { transform: translateY(-6px); } }
+  </style>
+  <g fill="#cfe9ff">
+    <ellipse cx="90" cy="78" rx="52" ry="34" />
+    <rect x="54" y="94" width="124" height="36" rx="18" />
+  </g>
+  <g class="bolt" fill="#ffd54f" transform="translate(0,36)">
+    <path d="M110 70 L88 108 L110 108 L90 152 L126 110 L106 110 Z"/>
+  </g>
+  <g class="flash" fill="#fff3e0" opacity="0.0">
+    <circle cx="100" cy="100" r="64" />
+  </g>
+</svg>

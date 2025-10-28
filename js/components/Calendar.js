@@ -3,7 +3,19 @@ const Calendar = ({ sheets, darkMode, language = 'it', onSelectSheet }) => {
     const calendarRef = React.useRef(null);
     const [calendar, setCalendar] = React.useState(null);
     
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
 
@@ -78,19 +90,10 @@ const Calendar = ({ sheets, darkMode, language = 'it', onSelectSheet }) => {
             dayMaxEvents: 3,
             moreLinkClick: 'popover',
             buttonText: {
-                today: language === 'it' ? 'Oggi' : 
-                       language === 'en' ? 'Today' : 
-                       language === 'es' ? 'Hoy' : 
-                       language === 'fr' ? 'Aujourd\'hui' : 'Astăzi',
-                month: language === 'it' ? 'Mese' : 
-                       language === 'en' ? 'Month' : 
-                       language === 'es' ? 'Mes' : 
-                       language === 'fr' ? 'Mois' : 'Lună',
-                week: language === 'it' ? 'Settimana' : 
-                      language === 'en' ? 'Week' : 
-                      language === 'es' ? 'Semana' : 
-                      language === 'fr' ? 'Semaine' : 'Săptămână',
-                list: 'Lista'
+                today: t.calendar_today || 'Oggi',
+                month: t.calendar_month || 'Mese',
+                week: t.calendar_week || 'Settimana',
+                list: t.calendar_list || 'Lista'
             }
         });
 
@@ -153,8 +156,8 @@ const Calendar = ({ sheets, darkMode, language = 'it', onSelectSheet }) => {
             {/* Info */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 text-center`}>
                 <p className={`${textClass} text-sm`}>
-                    💡 Clicca su un evento per aprire il foglio ore
-                </p>
+                        💡 {t.calendar_click_event || 'Clicca su un evento per aprire il foglio ore'}
+                    </p>
             </div>
         </div>
     );

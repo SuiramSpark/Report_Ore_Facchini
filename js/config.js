@@ -13,6 +13,16 @@ const FIREBASE_CONFIG = {
 let db = null;
 let storage = null;
 
+// Optional: Google Geocoding API key. If you have a Google Maps Geocoding key,
+// paste it here (do NOT commit secrets to version control).
+// Example: const GOOGLE_GEOCODING_KEY = 'AIza...';
+const GOOGLE_GEOCODING_KEY = 'gzHZD0ATlItrSQNMnTdihgzBFTb6FwSs';
+
+// Optional: Tomorrow.io API key (weather). If you have a Tomorrow.io API key,
+// paste it here. The widget will use it for weather lookups when present.
+// Example: const TOMORROW_API_KEY = 'gzHZD0ATlItrSQNMnTdihgzBFTb6FwSs';
+const TOMORROW_API_KEY = 'gzHZD0ATlItrSQNMnTdihgzBFTb6FwSs';
+
 function initializeFirebase() {
     try {
         if (!firebase.apps.length) {

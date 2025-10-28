@@ -71,11 +71,13 @@
 
     <!-- Configurazione e Utilities -->
     <script src="js/config.js"></script>
-    <script src="js/translations.js"></script>
+    <!-- Runtime i18n pruner/loader: keeps only languages necessary for current mode -->
+    <script src="js/i18n.js"></script>
     <script src="js/changelogs.js"></script>
     <script type="text/babel" src="js/utils.js"></script>
     
     <!-- Componenti -->
+    <script type="text/babel" src="js/components/WeatherWidget.js"></script>
     <script type="text/babel" src="js/components/WorkerMode.js"></script>
     <script type="text/babel" src="js/components/Dashboard.js"></script>
     <script type="text/babel" src="js/components/Blacklist.js"></script>

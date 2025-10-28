@@ -1,52 +1,65 @@
 // Worker Statistics Component - v4.2 FIX DUPLICATI
-const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlacklist }) => {
+const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlacklist, blacklist = [] }) => {
     const [selectedWorker, setSelectedWorker] = React.useState(null);
     const [stats, setStats] = React.useState(null);
+    // Funzione per verificare se il lavoratore selezionato è già in blacklist
+    const isWorkerBlacklisted = React.useMemo(() => {
+        if (!selectedWorker || !Array.isArray(blacklist)) return false;
+        const normalizeWorkerName = window.normalizeWorkerName;
+        const [nome, ...cognomeParts] = selectedWorker.split(' ');
+        const cognome = cognomeParts.join(' ');
+        const normalizedSelected = normalizeWorkerName(nome, cognome);
+        return blacklist.some(bl => {
+            const n = normalizeWorkerName(bl.nome, bl.cognome);
+            return n === normalizedSelected;
+        });
+    }, [selectedWorker, blacklist]);
     
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
 
-    // 🔧 FIX DUPLICATI: Funzione per normalizzare nome e cognome
-    const normalizeWorkerName = React.useCallback((nome, cognome) => {
-        // Rimuovi spazi extra, converti a minuscolo
-        const cleanNome = (nome || '').trim().toLowerCase().replace(/\s+/g, ' ');
-        const cleanCognome = (cognome || '').trim().toLowerCase().replace(/\s+/g, ' ');
-        
-        // Separa i nomi multipli e ordina alfabeticamente
-        // Questo permette di riconoscere "Mario Rossi" e "Rossi Mario" come la stessa persona
-        const allParts = [...cleanNome.split(' '), ...cleanCognome.split(' ')].filter(p => p);
-        allParts.sort();
-        
-        // Crea una chiave unica ordinata alfabeticamente
-        return allParts.join('_');
-    }, []);
+    // Usa la funzione globale per normalizzare nome e cognome
+    const normalizeWorkerName = window.normalizeWorkerName;
 
-    // Get all unique workers con gestione duplicati
+    // Search state
+    const [search, setSearch] = React.useState("");
+
+    // Get all unique workers con gestione duplicati, filtered by search
     const workers = React.useMemo(() => {
         const workerMap = new Map(); // normalizedKey -> first occurrence worker data
-        
         sheets.forEach(sheet => {
             sheet.lavoratori?.forEach(w => {
                 const normalizedKey = normalizeWorkerName(w.nome, w.cognome);
-                
-                // Salva solo la prima occorrenza per il nome display
-                // In questo modo "Mario Rossi" e "Rossi Mario" verranno mostrati con il primo nome trovato
                 if (!workerMap.has(normalizedKey)) {
                     workerMap.set(normalizedKey, { 
                         nome: w.nome, 
                         cognome: w.cognome,
-                        displayName: `${w.nome} ${w.cognome}`.trim()
+                        displayName: `${w.nome} ${w.cognome}`.trim(),
+                        normalized: normalizedKey
                     });
                 }
             });
         });
-        
-        // Converti a array di nomi display e ordina
-        return Array.from(workerMap.values())
-            .map(worker => worker.displayName)
-            .sort();
-    }, [sheets, normalizeWorkerName]);
+        let arr = Array.from(workerMap.values());
+        if (search.trim()) {
+            const normSearch = normalizeWorkerName(search, "");
+            arr = arr.filter(worker => worker.normalized.includes(normSearch));
+        }
+        return arr.map(worker => worker.displayName).sort();
+    }, [sheets, normalizeWorkerName, search]);
 
     // Calculate stats when worker selected - CON NORMALIZZAZIONE
     React.useEffect(() => {
@@ -117,29 +130,58 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                             </button>
                         )}
                     </div>
-                    
+                    {/* Search input */}
+                    <div className="mb-4">
+                        <label htmlFor="worker-search" className={`block mb-1 font-semibold ${textClass}`}>
+                            {t.searchWorker || 'Cerca lavoratore'}
+                        </label>
+                        <input
+                            id="worker-search"
+                            type="text"
+                            className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${darkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                            placeholder={t.searchByName || 'Cerca per nome...'}
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
                     <p className={`${textClass} mb-4 text-sm sm:text-base`}>
                         {t.selectWorker}
                     </p>
-
                     {workers.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {workers.map((worker, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setSelectedWorker(worker)}
-                                    className={`p-4 rounded-lg text-left transition-all ${
-                                        darkMode 
-                                            ? 'bg-gray-700 hover:bg-gray-600' 
-                                            : 'bg-gray-50 hover:bg-gray-100'
-                                    } border-2 border-transparent hover:border-indigo-500 shadow-sm hover:shadow-md`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-2xl">👤</span>
-                                        <span className="font-semibold text-sm sm:text-base">{worker}</span>
-                                    </div>
-                                </button>
-                            ))}
+                            {workers.map((worker, i) => {
+                                // Evidenzia se in blacklist e prendi gravità
+                                let borderColor = 'border-transparent';
+                                if (Array.isArray(blacklist)) {
+                                    const normalizeWorkerName = window.normalizeWorkerName;
+                                    const [nome, ...cognomeParts] = worker.split(' ');
+                                    const cognome = cognomeParts.join(' ');
+                                    const normalized = normalizeWorkerName(nome, cognome);
+                                    const bl = blacklist.find(bl => normalizeWorkerName(bl.nome, bl.cognome) === normalized);
+                                    if (bl) {
+                                        if (bl.severity === 'high') borderColor = 'border-red-600';
+                                        else if (bl.severity === 'medium') borderColor = 'border-yellow-500';
+                                        else if (bl.severity === 'low') borderColor = 'border-blue-500';
+                                        else borderColor = 'border-gray-500';
+                                    }
+                                }
+                                return (
+                                    <button
+                                        key={i}
+                                        onClick={() => setSelectedWorker(worker)}
+                                        className={`p-4 rounded-lg text-left transition-all ${
+                                            darkMode 
+                                                ? 'bg-gray-700 hover:bg-gray-600' 
+                                                : 'bg-gray-50 hover:bg-gray-100'
+                                        } border-2 ${borderColor} hover:border-indigo-500 shadow-sm hover:shadow-md`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-2xl">👤</span>
+                                            <span className="font-semibold text-sm sm:text-base">{worker}</span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className={`text-center py-12 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -172,11 +214,12 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     <div className="flex gap-2">
                         {onAddToBlacklist && (
                             <button
-                                onClick={handleAddToBlacklist}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md"
-                                title={t.addToBlacklist}
+                                onClick={isWorkerBlacklisted ? undefined : handleAddToBlacklist}
+                                className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md ${isWorkerBlacklisted ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                                title={isWorkerBlacklisted ? t.blacklistWarning : t.addToBlacklist}
+                                disabled={isWorkerBlacklisted}
                             >
-                                🚫 <span className="hidden sm:inline">{t.addToBlacklist}</span>
+                                🚫 <span className="hidden sm:inline">{isWorkerBlacklisted ? t.blacklistWarning : t.addToBlacklist}</span>
                             </button>
                         )}
                         <button

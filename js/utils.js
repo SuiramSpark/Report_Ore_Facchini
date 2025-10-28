@@ -57,31 +57,33 @@ window.formatTime = (timeString) => {
 
 // Calculate Work Hours - PAUSA CORRETTA
 window.calculateWorkHours = (oraIn, oraOut, pausaMinuti = 0) => {
-    if (!oraIn || !oraOut) return 0;
-    
+    // Normalize inputs: treat placeholders like "--:--" or invalid formats as empty
     try {
-        const [inHours, inMinutes] = oraIn.split(':').map(Number);
-        const [outHours, outMinutes] = oraOut.split(':').map(Number);
-        
-        if (isNaN(inHours) || isNaN(inMinutes) || isNaN(outHours) || isNaN(outMinutes)) {
-            return 0;
+        if (!oraIn || !oraOut) return '0.00';
+        const sIn = ('' + oraIn).trim();
+        const sOut = ('' + oraOut).trim();
+
+        const timeRegex = /^\s*\d{1,2}:\d{2}\s*$/;
+        if (!timeRegex.test(sIn) || !timeRegex.test(sOut)) return '0.00';
+
+        const [inHours, inMinutes] = sIn.split(':').map((v) => Number(v));
+        const [outHours, outMinutes] = sOut.split(':').map((v) => Number(v));
+
+        if ([inHours, inMinutes, outHours, outMinutes].some(n => Number.isNaN(n))) {
+            return '0.00';
         }
-        
+
         let totalMinutes = (outHours * 60 + outMinutes) - (inHours * 60 + inMinutes);
-        
-        if (totalMinutes < 0) {
-            totalMinutes += 24 * 60;
-        }
-        
+        if (totalMinutes < 0) totalMinutes += 24 * 60; // handle overnight
+
         const pausa = parseInt(pausaMinuti) || 0;
         totalMinutes -= pausa;
-        
-        if (totalMinutes < 0) return 0;
-        
+        if (totalMinutes < 0) return '0.00';
+
         return (totalMinutes / 60).toFixed(2);
     } catch (error) {
         console.error('Errore calcolo ore:', error);
-        return 0;
+        return '0.00';
     }
 };
 
@@ -97,10 +99,10 @@ window.generateId = () => {
 window.copyToClipboard = async (text) => {
     try {
         await navigator.clipboard.writeText(text);
-        showToast('✅ Copiato negli appunti!', 'success');
+        showToast((typeof window !== 'undefined' && window.t) ? window.t('copySuccess') : '✅ Copiato negli appunti!', 'success');
         return true;
     } catch (err) {
-        showToast('❌ Errore copia', 'error');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('copyError') : '❌ Errore copia', 'error');
         return false;
     }
 };
@@ -143,7 +145,7 @@ window.exportToCSV = (sheets, filename = 'registro_ore.csv') => {
     link.download = filename;
     link.click();
     
-    showToast('✅ CSV esportato!', 'success');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('exportCSVSuccess') : '✅ CSV esportato!', 'success');
 };
 
 // ========================================
@@ -244,6 +246,33 @@ window.invertSignatureForPDF = (signatureDataURL) => {
     });
 };
 
+// Deterministic color for a given key (e.g., worker name or id)
+window.getColorForKey = (key) => {
+    try {
+        const palette = [
+            '#4f46e5', // indigo-600
+            '#7c3aed', // purple-600
+            '#06b6d4', // cyan-500
+            '#f97316', // orange-500
+            '#ef4444', // red-500
+            '#10b981', // emerald-500
+            '#eab308', // amber-500
+            '#3b82f6', // blue-500
+            '#8b5cf6', // violet-500
+            '#f472b6'  // pink-400
+        ];
+
+        let h = 0;
+        const s = ('' + (key || '')).split('').slice(0, 32);
+        for (let i = 0; i < s.length; i++) {
+            h = (h * 31 + s[i].charCodeAt(0)) >>> 0;
+        }
+        return palette[h % palette.length];
+    } catch (e) {
+        return '#4f46e5';
+    }
+};
+
 // Smart function: only inverts if needed
 window.prepareSignatureForPDF = async (signatureDataURL) => {
     try {
@@ -306,12 +335,12 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(255, 255, 255);
-        doc.text('FOGLIO PRESENZE', 35, 16);
+        doc.text((typeof window !== 'undefined' && window.t) ? window.t('pdfTitleSmall') : 'FOGLIO PRESENZE', 35, 16);
         
-        // Subtitle "Registro Ore Lavoratori" (smaller)
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Registro Ore Lavoratori', 35, 23);
+    // Subtitle (localized)
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text((typeof window !== 'undefined' && window.t) ? window.t('pdfSubtitle') : 'Registro Ore Lavoratori', 35, 23);
 
         yPos = 38;
 
@@ -350,7 +379,7 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
 
         if (sheet.location) {
             doc.setFont('helvetica', 'bold');
-            doc.text('LOCALITÀ:', pageWidth / 2 + 5, infoY + 6);
+            doc.text((typeof window !== 'undefined' && window.t) ? window.t('pdfLabelLocation') : 'LOCALITÀ:', pageWidth / 2 + 5, infoY + 6);
             doc.setFont('helvetica', 'normal');
             const locationText = sheet.location;
             doc.text(locationText.length > 30 ? locationText.substring(0, 30) + '...' : locationText, pageWidth / 2 + 28, infoY + 6);
@@ -534,7 +563,7 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
             doc.setFontSize(6);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(60, 60, 60);
-            doc.text('FIRMA RESP.', margin + 2, yPos + 3);
+            doc.text((typeof window !== 'undefined' && window.t) ? window.t('pdfResponsibleShort') : 'FIRMA RESP.', margin + 2, yPos + 3);
 
             try {
                 const sigWidth = 12;
@@ -584,7 +613,7 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(140, 140, 140);
             
-            const genDate = new Date().toLocaleDateString('it-IT', { 
+            const genDate = new Date().toLocaleDateString((typeof window !== 'undefined' && window.getLanguage && window.getLanguage()) === 'en' ? 'en-US' : 'it-IT', { 
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric',
@@ -592,7 +621,7 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
                 minute: '2-digit'
             });
             
-            doc.text(`Generato: ${genDate}`, margin, pageHeight - 6);
+            doc.text(((typeof window !== 'undefined' && window.t) ? window.t('pdfGeneratedAt') : 'Generato:') + ` ${genDate}`, margin, pageHeight - 6);
             doc.text(`Pag. ${i}/${totalPages}`, pageWidth - margin - 12, pageHeight - 6);
         }
 
@@ -600,13 +629,14 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
         // SAVE PDF
         // ========================================
         
-        const pdfFilename = filename || `foglio_presenze_${sheet.titoloAzienda || 'N_D'}_${sheet.data}.pdf`.replace(/\s+/g, '_');
+    const filenamePrefix = (typeof window !== 'undefined' && window.t) ? window.t('pdfFilenamePrefix') : 'foglio_presenze';
+    const pdfFilename = filename || `${filenamePrefix}_${sheet.titoloAzienda || 'N_D'}_${sheet.data}.pdf`.replace(/\s+/g, '_');
         doc.save(pdfFilename);
         
-        showToast('✅ PDF generato con successo!', 'success');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('pdfGeneratedSuccess') : '✅ PDF generato con successo!', 'success');
     } catch (error) {
         console.error('PDF generation error:', error);
-        showToast('❌ Errore generazione PDF', 'error');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('pdfGenerationError') : '❌ Errore generazione PDF', 'error');
     }
 };
 
@@ -687,7 +717,7 @@ window.formatNumber = (number, decimals = 2) => {
 // EXPORT EXCEL
 window.exportToExcel = (sheets, filename = 'registro_ore.xlsx') => {
     if (typeof XLSX === 'undefined') {
-        showToast('❌ Libreria XLSX non caricata', 'error');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('xlsxLibMissing') : '❌ Libreria XLSX non caricata', 'error');
         return;
     }
 
@@ -727,13 +757,13 @@ window.exportToExcel = (sheets, filename = 'registro_ore.xlsx') => {
     ws['!cols'] = Array(maxWidth).fill({ wch: 15 });
 
     XLSX.writeFile(wb, filename);
-    showToast('✅ Excel esportato!', 'success');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('exportExcelSuccess') : '✅ Excel esportato!', 'success');
 };
 
 // NOTIFICHE BROWSER
 window.requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
-        showToast('❌ Browser non supporta notifiche', 'error');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('browserNoNotifications') : '❌ Browser non supporta notifiche', 'error');
         return false;
     }
 
@@ -744,12 +774,12 @@ window.requestNotificationPermission = async () => {
     if (Notification.permission !== 'denied') {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            showToast('✅ Notifiche attivate', 'success');
+            showToast((typeof window !== 'undefined' && window.t) ? window.t('notificationsEnabled') : '✅ Notifiche attivate', 'success');
             return true;
         }
     }
 
-    showToast('⚠️ Notifiche bloccate', 'warning');
+    showToast((typeof window !== 'undefined' && window.t) ? window.t('notificationsBlocked') : '⚠️ Notifiche bloccate', 'warning');
     return false;
 };
 
@@ -911,10 +941,10 @@ window.backupAllData = async (db) => {
         a.click();
         URL.revokeObjectURL(url);
 
-        showToast('✅ Backup scaricato!', 'success');
+        showToast((typeof window !== 'undefined' && window.t) ? window.t('backupDownloadedSuccess') : '✅ Backup scaricato!', 'success');
     } catch (error) {
         console.error('Backup error:', error);
-        showToast('❌ Errore durante il backup', 'error');
+        showToast((typeof window !== 'undefined' && window.t) ? window.t('backupError') : '❌ Errore durante il backup', 'error');
     }
 };
 
@@ -929,10 +959,11 @@ window.restoreFromBackup = async (db, file) => {
         const backup = JSON.parse(text);
 
         if (!backup.version || !backup.data) {
-            throw new Error('Formato backup non valido');
+            throw new Error((typeof window !== 'undefined' && window.t) ? window.t('backupInvalidFormat') : 'Formato backup non valido');
         }
 
-        const confirmMsg = `Ripristinare backup del ${new Date(backup.timestamp).toLocaleString('it-IT')}?\n\n⚠️ ATTENZIONE: Tutti i dati attuali saranno sostituiti!`;
+        const dateStr = new Date(backup.timestamp).toLocaleString((typeof window !== 'undefined' && window.getLanguage && window.getLanguage()) === 'en' ? 'en-US' : 'it-IT');
+        const confirmMsg = (typeof window !== 'undefined' && window.t) ? window.t('backupRestoreConfirm').replace('{date}', dateStr) : `Ripristinare backup del ${dateStr}?\n\n⚠️ ATTENZIONE: Tutti i dati attuali saranno sostituiti!`;
         
         if (!confirm(confirmMsg)) return;
 
@@ -948,11 +979,11 @@ window.restoreFromBackup = async (db, file) => {
             await batch.commit();
         }
 
-        showToast('✅ Backup ripristinato! Ricarica pagina.', 'success');
+        showToast((typeof window !== 'undefined' && window.t) ? window.t('backupRestoreSuccess') : '✅ Backup ripristinato! Ricarica pagina.', 'success');
         setTimeout(() => window.location.reload(), 2000);
     } catch (error) {
         console.error('Restore error:', error);
-        showToast('❌ Errore durante il ripristino', 'error');
+        showToast((typeof window !== 'undefined' && window.t) ? window.t('backupRestoreError') : '❌ Errore durante il ripristino', 'error');
     }
 };
 
@@ -1073,34 +1104,86 @@ window.clearAdminDraft = (key = 'admin_draft') => {
 
 // PWA Install Prompt
 let deferredPrompt;
+let _pwaInstallTimer = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
+    // Safety: do not show install prompt to users who are in worker mode
+    // (worker links are single-sheet links and should not be encouraged to install the admin PWA)
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const urlMode = params.get('mode');
+        if (urlMode === 'worker') {
+            console.log('🚫 Skipping PWA install prompt for worker mode');
+            return;
+        }
+    } catch (err) {
+        // ignore parsing errors and proceed to show prompt
+    }
+
+    // Don't show the prompt if the app is already installed or running standalone
+    try {
+        const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator && window.navigator.standalone === true);
+        const installedFlag = localStorage.getItem('pwa_installed') === 'true';
+        if (isStandalone || installedFlag) {
+            console.log('✅ PWA already installed or running as standalone — skipping install prompt');
+            return;
+        }
+    } catch (e) {
+        // ignore and continue
+    }
+
     const installBtn = document.getElementById('pwa-install-prompt');
     if (installBtn) {
         installBtn.style.display = 'block';
         installBtn.innerHTML = `
-            <button class="fixed bottom-4 right-4 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all z-50 flex items-center gap-2">
+            <button class="pwa-install-bubble fixed bottom-4 right-4 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition-all z-50 flex items-center gap-2">
                 <span>📱</span>
                 <span>Installa App</span>
             </button>
         `;
-        
-        installBtn.querySelector('button').addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                
-                if (outcome === 'accepted') {
-                    showToast('✅ App installata!', 'success');
+
+        // Ensure any previous timer is cleared and set a 10s auto-hide
+        try { if (_pwaInstallTimer) clearTimeout(_pwaInstallTimer); } catch (e) {}
+        _pwaInstallTimer = setTimeout(() => {
+            try { installBtn.style.display = 'none'; } catch (e) {}
+            _pwaInstallTimer = null;
+        }, 10000); // hide after 10 seconds
+
+        const btn = installBtn.querySelector('button');
+        if (btn) {
+            btn.addEventListener('click', async () => {
+                // user clicked before timeout: cancel hide timer
+                try { if (_pwaInstallTimer) clearTimeout(_pwaInstallTimer); _pwaInstallTimer = null; } catch (e) {}
+
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    try {
+                        const { outcome } = await deferredPrompt.userChoice;
+                        if (outcome === 'accepted') {
+                            showToast('✅ App installata!', 'success');
+                        }
+                    } catch (e) {
+                        console.warn('PWA install choice error', e);
+                    }
+
+                    deferredPrompt = null;
                 }
-                
-                deferredPrompt = null;
-                installBtn.style.display = 'none';
-            }
-        });
+
+                try { installBtn.style.display = 'none'; } catch (e) {}
+            });
+        }
+    }
+});
+
+// When the app is installed, mark it so we don't show the prompt again
+window.addEventListener('appinstalled', (evt) => {
+    console.log('📦 PWA installed event received', evt);
+    try { localStorage.setItem('pwa_installed', 'true'); } catch (e) { console.warn('Could not persist pwa_installed flag', e); }
+    const installBtn = document.getElementById('pwa-install-prompt');
+    if (installBtn) {
+        try { installBtn.style.display = 'none'; } catch (e) {}
     }
 });
 
@@ -1110,85 +1193,148 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 window.initCanvas = (canvas, darkMode = false) => {
     if (!canvas) return null;
-    
-    const ctx = canvas.getContext('2d');
+
     let isDrawing = false;
     let lastX = 0;
     let lastY = 0;
+    let rafId = null;
+    let resizeObserver = null;
+    const listeners = [];
 
-    // ALWAYS use white background for signatures (professional for PDF export)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // ALWAYS use black stroke for signatures (professional and visible)
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    const getCoordinates = (e) => {
+    const setupCanvas = () => {
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
+        console.log('initCanvas: setupCanvas called, rect:', rect.width, 'x', rect.height, 'px');
+        console.log('initCanvas: devicePixelRatio =', window.devicePixelRatio);
+        // If layout not ready, try again on next frame and observe size changes
+        if (rect.width === 0 || rect.height === 0) {
+            // If ResizeObserver is available, use it to detect when the canvas gets sized
+            if (window.ResizeObserver && !resizeObserver) {
+                console.log('initCanvas: using ResizeObserver fallback');
+                resizeObserver = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        const cr = entry.contentRect || entry.target.getBoundingClientRect();
+                        console.log('initCanvas: ResizeObserver entry:', cr.width, 'x', cr.height);
+                        if (cr.width > 0 && cr.height > 0) {
+                            try { resizeObserver.disconnect(); } catch (e) { console.warn('initCanvas: resizeObserver disconnect failed', e); }
+                            resizeObserver = null;
+                            // call setup again on next frame to finalize DPR sizing
+                            rafId = requestAnimationFrame(setupCanvas);
+                            return;
+                        }
+                    }
+                });
 
-        if (e.touches && e.touches.length > 0) {
+                try {
+                    // Observe the canvas itself and its parent as a fallback
+                    resizeObserver.observe(canvas);
+                    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
+                } catch (e) {
+                    console.warn('initCanvas: ResizeObserver.observe failed, falling back to RAF', e);
+                    // If observe throws, fallback to RAF retry loop
+                    rafId = requestAnimationFrame(setupCanvas);
+                }
+                return;
+            }
+
+            rafId = requestAnimationFrame(setupCanvas);
+            return;
+        }
+
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.floor(rect.width * dpr));
+        const height = Math.max(1, Math.floor(rect.height * dpr));
+
+        // set internal canvas resolution to match display size * DPR
+        canvas.width = width;
+        canvas.height = height;
+        // keep CSS size in CSS pixels
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+
+    const ctx = canvas.getContext('2d');
+        // Fill white background using full pixel buffer
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Drawing style
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const getCoordinates = (e) => {
+            const r = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / r.width;
+            const scaleY = canvas.height / r.height;
+
+            if (e.touches && e.touches.length > 0) {
+                return {
+                    x: (e.touches[0].clientX - r.left) * scaleX,
+                    y: (e.touches[0].clientY - r.top) * scaleY
+                };
+            }
             return {
-                x: (e.touches[0].clientX - rect.left) * scaleX,
-                y: (e.touches[0].clientY - rect.top) * scaleY
+                x: (e.clientX - r.left) * scaleX,
+                y: (e.clientY - r.top) * scaleY
             };
-        }
-        return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
         };
-    };
 
-    const startDrawing = (e) => {
-        e.preventDefault();
-        isDrawing = true;
-        const coords = getCoordinates(e);
-        lastX = coords.x;
-        lastY = coords.y;
-    };
-
-    const draw = (e) => {
-        if (!isDrawing) return;
-        e.preventDefault();
-
-        const coords = getCoordinates(e);
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(coords.x, coords.y);
-        ctx.stroke();
-
-        lastX = coords.x;
-        lastY = coords.y;
-    };
-
-    const stopDrawing = (e) => {
-        if (isDrawing) {
+        const startDrawing = (e) => {
             e.preventDefault();
-            isDrawing = false;
-        }
+            isDrawing = true;
+            const coords = getCoordinates(e);
+            lastX = coords.x;
+            lastY = coords.y;
+        };
+
+        const draw = (e) => {
+            if (!isDrawing) return;
+            e.preventDefault();
+
+            const coords = getCoordinates(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(coords.x, coords.y);
+            ctx.stroke();
+
+            lastX = coords.x;
+            lastY = coords.y;
+        };
+
+        const stopDrawing = (e) => {
+            if (isDrawing) {
+                e.preventDefault();
+                isDrawing = false;
+            }
+        };
+
+        // Attach listeners and track them for cleanup
+        const add = (el, ev, fn, opts) => {
+            el.addEventListener(ev, fn, opts || false);
+            listeners.push({ el, ev, fn, opts });
+        };
+
+        add(canvas, 'mousedown', startDrawing);
+        add(canvas, 'mousemove', draw);
+        add(canvas, 'mouseup', stopDrawing);
+        add(canvas, 'mouseout', stopDrawing);
+
+        add(canvas, 'touchstart', startDrawing, { passive: false });
+        add(canvas, 'touchmove', draw, { passive: false });
+    add(canvas, 'touchend', stopDrawing, { passive: false });
+    console.log('initCanvas: listeners attached:', listeners.map(l => l.ev).join(','));
     };
 
-    canvas.addEventListener('mousedown', startDrawing);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDrawing);
-    canvas.addEventListener('mouseout', stopDrawing);
+    // Start setup (may wait for layout)
+    setupCanvas();
 
-    canvas.addEventListener('touchstart', startDrawing, { passive: false });
-    canvas.addEventListener('touchmove', draw, { passive: false });
-    canvas.addEventListener('touchend', stopDrawing, { passive: false });
-
+    // Return cleanup function
     return () => {
-        canvas.removeEventListener('mousedown', startDrawing);
-        canvas.removeEventListener('mousemove', draw);
-        canvas.removeEventListener('mouseup', stopDrawing);
-        canvas.removeEventListener('mouseout', stopDrawing);
-        canvas.removeEventListener('touchstart', startDrawing);
-        canvas.removeEventListener('touchmove', draw);
-        canvas.removeEventListener('touchend', stopDrawing);
+        if (rafId) cancelAnimationFrame(rafId);
+        try { if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null; } } catch (e) {}
+        listeners.forEach(({ el, ev, fn, opts }) => {
+            try { el.removeEventListener(ev, fn, opts || false); } catch (e) { /* ignore */ }
+        });
     };
 };
 
@@ -1215,4 +1361,11 @@ window.isCanvasBlank = (canvas) => {
 window.getCanvasDataURL = (canvas) => {
     if (!canvas) return null;
     return canvas.toDataURL('image/png');
+};
+
+// Normalize worker name (nome + cognome): trim, collapse spaces, lowercase
+window.normalizeWorkerName = function(nome, cognome) {
+    const cleanNome = (nome || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const cleanCognome = (cognome || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    return `${cleanNome} ${cleanCognome}`.replace(/\s+/g, ' ').trim();
 };

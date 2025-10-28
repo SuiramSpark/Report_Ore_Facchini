@@ -1,3 +1,7 @@
+// WeatherWidget is exposed globally as window.WeatherWidget
+const WeatherWidget = window.WeatherWidget;
+
+if (!window.WorkerMode) {
 // Worker Mode Component - v4.2 FIX CANVAS BIANCO + CALCOLO PAUSA
 const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' }) => {
     const [loading, setLoading] = React.useState(true);
@@ -12,9 +16,20 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     console.log('🌍 Language:', language);
     
     // 🌓 Dark Mode Local State
+    // localDarkMode: prefer global initialDarkMode unless the worker explicitly toggled theme before
     const [localDarkMode, setLocalDarkMode] = React.useState(() => {
-        const saved = localStorage.getItem('workerDarkMode');
-        return saved ? saved === 'true' : initialDarkMode;
+        try {
+            const explicit = localStorage.getItem('workerDarkModeExplicit');
+            const saved = localStorage.getItem('workerDarkMode');
+            // Only use a saved value if the worker explicitly toggled theme before.
+            if (explicit === 'true' && saved !== null) {
+                return saved === 'true';
+            }
+        } catch (e) {
+            // ignore storage errors
+        }
+        // Default to light mode for Worker UI unless the worker explicitly chose dark.
+        return false;
     });
     
     // 🌍 Language Local State
@@ -38,10 +53,29 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     });
     const [showOptionalFields, setShowOptionalFields] = React.useState(false);
     
+
     // ⭐ Session Persistence State
     const [showSessionPrompt, setShowSessionPrompt] = React.useState(false);
     const [savedSession, setSavedSession] = React.useState(null);
     const [sessionKey, setSessionKey] = React.useState(null);
+
+    // GDPR Privacy Notice State
+    const [gdprText, setGdprText] = React.useState('');
+    const [showGdpr, setShowGdpr] = React.useState(false);
+    const [loadingGdpr, setLoadingGdpr] = React.useState(true);
+
+    // Load GDPR text from Firestore
+    React.useEffect(() => {
+        if (!db) return;
+        const loadGdpr = async () => {
+            try {
+                const doc = await db.collection('settings').doc('privacyGDPR').get();
+                if (doc.exists) setGdprText(doc.data().text || '');
+            } catch (e) { console.error('Error loading GDPR text:', e); }
+            setLoadingGdpr(false);
+        };
+        loadGdpr();
+    }, [db]);
     
     // 📄 PDF Generation State
     const [generatingPDF, setGeneratingPDF] = React.useState(false);
@@ -55,43 +89,62 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     const canvasRef = React.useRef(null);
     const cleanupRef = React.useRef(null);
     const autoSaveTimeoutRef = React.useRef(null);
-    const t = translations[localLanguage];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    // We return a Proxy so existing code that uses `t.someKey` continues to work.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                // Prefer runtime helper if available (async loader)
+                if (typeof window !== 'undefined' && typeof window.t === 'function') {
+                    return window.t(key);
+                }
+                // Fallback to global translations object if present
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = localLanguage || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) {
+                return String(prop);
+            }
+        }
+    });
 
     const darkMode = localDarkMode; // Use local dark mode
 
     // 🌓 Save Dark Mode Preference
     React.useEffect(() => {
-        localStorage.setItem('workerDarkMode', localDarkMode);
-        console.log('🌓 Dark Mode salvato:', localDarkMode);
+        try {
+            // Only set explicit flag when user toggles (we'll set it when toggle is used below).
+            localStorage.setItem('workerDarkMode', localDarkMode);
+            console.log('🌓 Dark Mode salvato:', localDarkMode);
+        } catch (e) {
+            console.warn('Could not persist workerDarkMode:', e);
+        }
     }, [localDarkMode]);
 
-    // 🔧 FIX BUG CALCOLO PAUSA: Funzione per calcolare le ore totali
+    // NOTE: Do not modify global document 'dark' class here — WorkerMode uses localDarkMode
+    // to style its own elements. Removing global sync avoids changing the admin theme unexpectedly.
+
+    // Use global, validated calculator so placeholders like "--:--" are handled consistently
     const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
-        if (!oraIn || !oraOut) return '0.00';
-        
         try {
-            const [inHours, inMinutes] = oraIn.split(':').map(Number);
-            const [outHours, outMinutes] = oraOut.split(':').map(Number);
-            
-            if (isNaN(inHours) || isNaN(inMinutes) || isNaN(outHours) || isNaN(outMinutes)) {
-                return '0.00';
+            if (typeof window.calculateHours === 'function') {
+                return window.calculateHours(oraIn, oraOut, pausaMinuti);
             }
-            
+            // Fallback to local simple logic
+            if (!oraIn || !oraOut) return '0.00';
+            const [inHours, inMinutes] = (''+oraIn).split(':').map(Number);
+            const [outHours, outMinutes] = (''+oraOut).split(':').map(Number);
+            if ([inHours, inMinutes, outHours, outMinutes].some(n => Number.isNaN(n))) return '0.00';
             let totalMinutes = (outHours * 60 + outMinutes) - (inHours * 60 + inMinutes);
-            
-            if (totalMinutes < 0) {
-                totalMinutes += 24 * 60;
-            }
-            
+            if (totalMinutes < 0) totalMinutes += 24*60;
             const pausa = parseInt(pausaMinuti) || 0;
             totalMinutes -= pausa;
-            
             if (totalMinutes < 0) return '0.00';
-            
-            const hours = (totalMinutes / 60).toFixed(2);
-            return hours;
-        } catch (error) {
-            console.error('Errore calcolo ore:', error);
+            return (totalMinutes / 60).toFixed(2);
+        } catch (e) {
+            console.error('calculateHours fallback error', e);
             return '0.00';
         }
     };
@@ -179,6 +232,10 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                 }
             } catch (err) {
                 console.error('Error loading session:', err);
+                // If loading the session fails (for example due to missing index),
+                // don't keep the whole UI stuck in loading state — allow the
+                // form and canvas to initialize so the worker can still use the app.
+                try { setLoading(false); } catch (e) { /* ignore */ }
             }
         };
         
@@ -268,6 +325,14 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     // 🌍 Save Language Preference
     React.useEffect(() => {
         localStorage.setItem('workerLanguage', localLanguage);
+        // Ensure runtime i18n updates immediately for worker form
+        try {
+            if (typeof window !== 'undefined' && typeof window.setLanguage === 'function') {
+                window.setLanguage(localLanguage);
+            }
+        } catch (e) {
+            console.warn('Failed to sync workerLanguage to runtime i18n', e);
+        }
     }, [localLanguage]);
 
     // Listen to sheet changes
@@ -310,6 +375,30 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
             // 🔧 FIX: Usa localDarkMode per inizializzare correttamente il canvas
             console.log('🎨 Inizializzo canvas con darkMode =', localDarkMode);
             cleanupRef.current = initCanvas(canvasRef.current, localDarkMode);
+            // After init, verify canvas has non-blank pixels; retry initialization up to 3 times if blank
+            let retries = 0;
+            const maxRetries = 3;
+            const verifyAndRetry = () => {
+                try {
+                    const isBlank = window.isCanvasBlank(canvasRef.current);
+                    console.log('✍️ Canvas blank check:', isBlank);
+                    if (isBlank && retries < maxRetries) {
+                        retries++;
+                        console.log(`🔁 Canvas blank — retrying init (${retries}/${maxRetries})`);
+                        // cleanup and re-init
+                        if (cleanupRef.current) cleanupRef.current();
+                        // force re-render of canvas element to ensure DOM/layout update
+                        setCanvasKey(prev => prev + 1);
+                        // schedule another check after a short delay
+                        setTimeout(verifyAndRetry, 200);
+                    }
+                } catch (err) {
+                    console.warn('Canvas verify failed:', err);
+                }
+            };
+
+            // Run verification shortly after initialization
+            setTimeout(verifyAndRetry, 150);
         }
         
         return () => {
@@ -320,6 +409,59 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         };
     }, [canvasKey, localDarkMode]); // 🔧 FIX: Dipende da localDarkMode
 
+    // 🔧 SECONDARY MITIGATION: Force canvas init after a global timeout
+    // Sometimes other async failures or race conditions prevent the canvas
+    // from being initialized. This effect will try to initialize the canvas
+    // a few times after mount to guarantee the signature area becomes usable.
+    React.useEffect(() => {
+        let attempts = 0;
+        const maxAttempts = 3;
+        const attemptDelay = 700; // ms
+        let timerId = null;
+
+        const tryForceInit = () => {
+            attempts++;
+            try {
+                const c = canvasRef.current;
+                const alreadyInit = !!cleanupRef.current;
+                console.log(`🔁 forceInit attempt ${attempts}/${maxAttempts}, canvasRef:`, !!c, 'cleanup:', !!cleanupRef.current);
+
+                if (c && (!alreadyInit || (window.isCanvasBlank && window.isCanvasBlank(c)))) {
+                    // cleanup if any
+                    try { if (cleanupRef.current) cleanupRef.current(); } catch (e) { console.warn('forceInit cleanup failed', e); }
+                    try {
+                        cleanupRef.current = window.initCanvas(c, localDarkMode);
+                        console.log('✅ forceInit: canvas initialized');
+                    } catch (e) {
+                        console.warn('forceInit: initCanvas failed', e);
+                    }
+                }
+
+                // If still blank and attempts left, schedule another try
+                const isBlank = c && window.isCanvasBlank ? window.isCanvasBlank(c) : false;
+                if (( !c || isBlank ) && attempts < maxAttempts) {
+                    timerId = setTimeout(tryForceInit, attemptDelay);
+                }
+            } catch (err) {
+                console.warn('forceInit: unexpected error', err);
+            }
+        };
+
+        // Start first attempt after a short global delay so other async tasks can settle
+        timerId = setTimeout(tryForceInit, 1000);
+
+        return () => {
+            try { if (timerId) clearTimeout(timerId); } catch (e) {}
+        };
+    }, [/* run once per mount */]);
+
+    // Add character counter for 'nome', 'cognome', and 'oraIn' fields
+    const handleCharacterCount = (field, maxLength) => {
+        const value = workerData[field];
+        return `${value.length}/${maxLength}`;
+    };
+
+    // Update saveWorkerData to enforce required fields
     const saveWorkerData = async () => {
         // Validation
         if (!workerData.nome || !workerData.cognome || !workerData.oraIn || !workerData.oraOut) {
@@ -334,10 +476,12 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         }
 
         setLoading(true);
-        
+
         const firma = canvasRef.current.toDataURL('image/png');
-        const oreTotali = calculateHours(workerData.oraIn, workerData.oraOut, workerData.pausaMinuti);
-        
+        console.log('🖊️ Firma dataURL length:', firma ? firma.length : 0);
+    const oreTotali = calculateHours(workerData.oraIn, workerData.oraOut, workerData.pausaMinuti);
+    console.log('🧮 oreTotali computed:', oreTotali, 'from', workerData.oraIn, workerData.oraOut, 'pausa:', workerData.pausaMinuti);
+
         const worker = {
             ...workerData,
             firma,
@@ -432,6 +576,71 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         }
     };
 
+    // Function to log modifications
+    const logModification = async (field, oldValue, newValue) => {
+        if (!db || !sheetId) return;
+
+        const modificationLog = {
+            field,
+            oldValue,
+            newValue,
+            modifiedAt: new Date().toISOString(),
+            modifiedBy: 'Admin', // Replace with actual admin ID if available
+        };
+
+        try {
+            await db.collection('modificationLogs').add({
+                sheetId,
+                ...modificationLog,
+            });
+            console.log('Modification logged:', modificationLog);
+        } catch (error) {
+            console.error('Error logging modification:', error);
+        }
+    };
+
+    // Example usage of logModification
+    const updateWorkerData = (field, value) => {
+        const oldValue = workerData[field];
+        setWorkerData((prevData) => ({
+            ...prevData,
+            [field]: value,
+        }));
+        logModification(field, oldValue, value);
+    };
+
+    // Function to notify workers of modifications
+    const notifyWorker = async (workerId, modificationDetails) => {
+        if (!db || !sheetId) return;
+
+        const notification = {
+            workerId,
+            modificationDetails,
+            notifiedAt: new Date().toISOString(),
+            read: false,
+        };
+
+        try {
+            await db.collection('workerNotifications').add({
+                sheetId,
+                ...notification,
+            });
+            console.log('Worker notified:', notification);
+        } catch (error) {
+            console.error('Error notifying worker:', error);
+        }
+    };
+
+    // Example usage of notifyWorker
+    const handleWorkerNotification = (field, oldValue, newValue) => {
+        const modificationDetails = {
+            field,
+            oldValue,
+            newValue,
+        };
+        notifyWorker(workerData.id, modificationDetails);
+    };
+
     const bgClass = darkMode ? 'bg-gray-900' : 'bg-gray-50';
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
@@ -442,7 +651,11 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     // ⭐ Session Prompt Modal
     if (showSessionPrompt && savedSession) {
         return (
-            <div className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
+            <div id="worker-root" style={{
+                '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+                '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+                '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+            }} className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
                 <div className={`${cardClass} rounded-xl shadow-2xl p-6 max-w-md w-full`}>
                     <div className="text-center mb-6">
                         <div className="text-5xl mb-4">💾</div>
@@ -481,7 +694,11 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     // 🔥 Check DB Connection
     if (!db) {
         return (
-            <div className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
+            <div id="worker-root" style={{
+                '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+                '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+                '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+            }} className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
                 <div className={`${cardClass} p-6 sm:p-8 rounded-xl shadow-xl text-center max-w-md w-full`}>
                     <div className="text-6xl mb-4">🔌</div>
                     <h1 className="text-xl sm:text-2xl font-bold text-orange-600 mb-4">Database Non Connesso</h1>
@@ -499,7 +716,11 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
 
     if (loading) {
         return (
-            <div className={`min-h-screen ${bgClass} flex items-center justify-center`}>
+            <div id="worker-root" style={{
+                '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+                '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+                '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+            }} className={`min-h-screen ${bgClass} flex items-center justify-center`}>
                 <div className="loader"></div>
             </div>
         );
@@ -508,7 +729,11 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     // ⚙️ Link Expired View
     if (linkExpired) {
         return (
-            <div className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
+            <div id="worker-root" style={{
+                '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+                '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+                '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+            }} className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
                 <div className={`${cardClass} p-6 sm:p-8 rounded-xl shadow-xl text-center max-w-md w-full`}>
                     <div className="text-6xl mb-4">⏰</div>
                     <h1 className="text-xl sm:text-2xl font-bold text-red-600 mb-4">{t.linkExpired}</h1>
@@ -525,7 +750,11 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
 
     if (error) {
         return (
-            <div className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
+            <div id="worker-root" style={{
+                '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+                '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+                '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+            }} className={`min-h-screen ${bgClass} flex items-center justify-center p-3`}>
                 <div className={`${cardClass} p-6 sm:p-8 rounded-xl shadow-xl text-center max-w-md w-full`}>
                     <h1 className="text-lg sm:text-xl font-bold text-red-600">{error}</h1>
                 </div>
@@ -538,12 +767,20 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         const isCompleted = sheetData.status === 'completed';
 
         return (
-            <div className={`min-h-screen ${bgClass} p-3 sm:p-4`}>
+            <div id="worker-root" style={{
+                '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+                '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+                '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+            }} className={`min-h-screen ${bgClass} p-3 sm:p-4`}>
                 <div className="max-w-2xl mx-auto">
                     {/* 🌓 Dark Mode Toggle */}
                     <div className="flex justify-end mb-3">
                         <button
-                            onClick={() => setLocalDarkMode(!localDarkMode)}
+                            onClick={() => {
+                                const next = !localDarkMode;
+                                setLocalDarkMode(next);
+                                try { localStorage.setItem('workerDarkModeExplicit', 'true'); } catch (e) {}
+                            }}
                             className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-white'} shadow-md transition-colors`}
                             title={darkMode ? t.lightMode : t.darkModeWorker}
                         >
@@ -614,7 +851,11 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     }
 
     return (
-        <div className={`min-h-screen ${bgClass} p-3 sm:p-4`}>
+        <div id="worker-root" style={{
+            '--worker-input-bg': localDarkMode ? '#0f1724' : '#ffffff',
+            '--worker-input-color': localDarkMode ? '#e6eefc' : '#0f172a',
+            '--worker-input-border': localDarkMode ? '#374151' : '#d1d5db'
+        }} className={`min-h-screen ${bgClass} p-3 sm:p-4`}>
             <div className="max-w-2xl mx-auto">
                 {/* 🌓 Dark Mode Toggle + 🌍 Language Selector */}
                 <div className="flex justify-end items-center gap-2 mb-3">
@@ -628,11 +869,18 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                         className={`px-3 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white'} shadow-md transition-colors text-sm sm:text-base`}
                         style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                     >
-                        <option value="it">🇮🇹 Italiano</option>
-                        <option value="en">🇬🇧 English</option>
-                        <option value="es">🇪🇸 Español</option>
-                        <option value="fr">🇫🇷 Français</option>
-                        <option value="ro">🇷🇴 Română</option>
+                        {(
+                            (typeof window !== 'undefined' && window.availableLanguages) ? window.availableLanguages : ['it','en','es','fr','ro']
+                        ).map(langCode => {
+                            const meta = {
+                                it: '🇮🇹 Italiano',
+                                en: '🇬🇧 English',
+                                es: '🇪🇸 Español',
+                                fr: '🇫🇷 Français',
+                                ro: '🇷🇴 Română'
+                            };
+                            return <option key={langCode} value={langCode}>{meta[langCode] || langCode}</option>;
+                        })}
                     </select>
                     
                     {/* 🌓 Dark Mode Toggle */}
@@ -640,8 +888,10 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                         onClick={() => {
                             console.log('🌓 Toggle dark mode button clicked');
                             console.log('🌓 Current localDarkMode:', localDarkMode);
-                            setLocalDarkMode(!localDarkMode);
-                            console.log('🌓 New localDarkMode:', !localDarkMode);
+                            const next = !localDarkMode;
+                            setLocalDarkMode(next);
+                            try { localStorage.setItem('workerDarkModeExplicit', 'true'); } catch (e) {}
+                            console.log('🌓 New localDarkMode:', next);
                         }}
                         className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-white'} shadow-md transition-colors`}
                         title={darkMode ? t.lightMode : t.darkModeWorker}
@@ -796,6 +1046,22 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                             </div>
                         )}
 
+                        {/* GDPR Privacy Notice (collapsible) */}
+                        <div className="my-4">
+                            <button
+                                type="button"
+                                className={`px-4 py-2 rounded-lg font-medium shadow-md transition-colors text-sm sm:text-base ${showGdpr ? 'bg-gray-400 text-white hover:bg-gray-500' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+                                onClick={() => setShowGdpr(v => !v)}
+                            >
+                                {showGdpr ? (t.hideGdpr || 'Hide GDPR') : (t.showGdpr || 'Show GDPR')}
+                            </button>
+                            {showGdpr && (
+                                <div className={`mt-2 p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-800'}`} style={{ whiteSpace: 'pre-line' }}>
+                                    {loadingGdpr ? (t.loading || 'Loading...') : (gdprText || t.noGdprText || 'No privacy notice set.')}
+                                </div>
+                            )}
+                        </div>
+
                         {/* 🔧 FIX: Firma - CANVAS OTTIMIZZATO MOBILE con key per re-render */}
                         <div className="space-y-2">
                             <label className="block font-semibold text-sm sm:text-base">
@@ -863,6 +1129,17 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                     </div>
                 </div>
             </div>
-        </div>
-    );
+        {/* Widget Meteo per la località inserita dal lavoratore */}
+        {(workerData?.localita || workerData?.indirizzo) && (
+            <div className="my-4">
+                <WeatherWidget location={workerData.localita || workerData.indirizzo} darkMode={darkMode} />
+            </div>
+        )}
+    </div>
+);
 };
+
+// Expose globally for in-page usage
+window.WorkerMode = WorkerMode;
+
+}

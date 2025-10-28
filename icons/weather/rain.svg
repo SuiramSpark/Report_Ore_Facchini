@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Rain">
+  <defs>
+    <style>
+      .drop { animation: fall 0.9s linear infinite; }
+      .drop:nth-child(2) { animation-delay: 0.2s; }
+      .drop:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes fall { 0% { transform: translateY(-10px); opacity: 0; } 30% { opacity: 1 } 100% { transform: translateY(34px); opacity: 0; } }
+      .cloud { animation: cloudShift 6s ease-in-out infinite; }
+      @keyframes cloudShift { 0% { transform: translateX(-4px);} 50% { transform: translateX(4px);} 100% { transform: translateX(-4px);} }
+    </style>
+  </defs>
+  <g class="cloud" fill="#dbeeff">
+    <ellipse cx="90" cy="78" rx="52" ry="34" />
+    <ellipse cx="130" cy="88" rx="42" ry="28" />
+    <rect x="54" y="94" width="124" height="36" rx="18" />
+  </g>
+
+  <g fill="#4f46e5" stroke="none" transform="translate(0,30)">
+    <path class="drop" d="M60 120c0 6-6 14-6 14s-6-8-6-14a6 6 0 1 1 12 0z"/>
+    <path class="drop" d="M96 120c0 6-6 14-6 14s-6-8-6-14a6 6 0 1 1 12 0z"/>
+    <path class="drop" d="M132 120c0 6-6 14-6 14s-6-8-6-14a6 6 0 1 1 12 0z"/>
+  </g>
+</svg>

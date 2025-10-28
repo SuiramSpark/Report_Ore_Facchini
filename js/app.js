@@ -1,24 +1,37 @@
 // Main App Component - 5 LINGUE COMPLETE + SETTINGS + v4.2 NEW SCHEDULED NOTIFICATIONS
+// Se usi <script type="text/babel">, importa React e gli hook globalmente
+const { useState, useEffect, useCallback } = React;
+
 const App = () => {
-    const { useState, useEffect, useCallback, useMemo } = React;
-    
-    // State Management
-    const [db, setDb] = useState(null);
-    const [storage, setStorage] = useState(null);
-    const [mode, setMode] = useState('admin'); // admin, worker
-    const [sheetId, setSheetId] = useState(null);
-    const [darkMode, setDarkMode] = useState(false);
-    const [language, setLanguage] = useState('it');
-    const [loading, setLoading] = useState(true);
-    
-    // Admin State
-    const [currentView, setCurrentView] = useState('dashboard'); // dashboard, list, sheet, blacklist, audit, reports, settings, calendar, workerstats, backup, scheduledNotifications ⭐
-    const [sheets, setSheets] = useState([]);
-    const [blacklist, setBlacklist] = useState([]);
-    const [auditLog, setAuditLog] = useState([]);
+    // Importa RadioPlayer dal global scope se usi <script type="text/babel">
+    // Assicurati che js/components/RadioPlayer.js sia incluso in index.html prima di app.js
+    // Tutto il codice React qui dentro
     const [currentSheet, setCurrentSheet] = useState(null);
     const [companyLogo, setCompanyLogo] = useState(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    // Stati principali mancanti
+    const [darkMode, setDarkMode] = useState(false);
+    const [language, setLanguage] = useState('it');
+
+    // Wrapper to synchronize React state and the runtime i18n helper.
+    const setAppLanguage = (lang) => {
+        try {
+            setLanguage(lang);
+            if (typeof window !== 'undefined' && typeof window.setLanguage === 'function') {
+                window.setLanguage(lang);
+            }
+        } catch (e) { console.warn('setAppLanguage error', e); }
+    };
+    const [loading, setLoading] = useState(true);
+    const [mode, setMode] = useState('admin');
+    const [sheetId, setSheetId] = useState(null);
+    const [db, setDb] = useState(null);
+    const [storage, setStorage] = useState(null);
+    const [appSettings, setAppSettings] = useState({ weekStart: 1 });
+    const [sheets, setSheets] = useState([]);
+    const [blacklist, setBlacklist] = useState([]);
+    const [auditLog, setAuditLog] = useState([]);
+    const [currentView, setCurrentView] = useState('dashboard');
 
     // Initialize Firebase
     useEffect(() => {
@@ -31,8 +44,8 @@ const App = () => {
         const savedLanguage = localStorage.getItem('language') || 'it';
         const savedLogo = localStorage.getItem('companyLogo');
         
-        setDarkMode(savedDarkMode);
-        setLanguage(savedLanguage);
+    setDarkMode(savedDarkMode);
+    setAppLanguage(savedLanguage);
         if (savedLogo) setCompanyLogo(savedLogo);
         
         // Check URL params for worker mode
@@ -119,6 +132,22 @@ const App = () => {
         };
     }, [db, mode]);
 
+    // Load app settings (linkExpiration doc) and keep in state
+    useEffect(() => {
+        if (!db) return;
+
+        const unsub = db.collection('settings').doc('linkExpiration')
+            .onSnapshot(doc => {
+                if (!doc.exists) return;
+                const data = doc.data() || {};
+                setAppSettings(prev => ({ ...prev, weekStart: typeof data.weekStart !== 'undefined' ? Number(data.weekStart) : (prev.weekStart || 1) }));
+            }, (err) => {
+                console.error('Error loading app settings:', err);
+            });
+
+        return () => unsub && unsub();
+    }, [db]);
+
     // ⭐ NEW: Listen for custom view change events (from Settings button)
     useEffect(() => {
         const handleViewChange = (event) => {
@@ -129,6 +158,45 @@ const App = () => {
         window.addEventListener('changeView', handleViewChange);
         return () => window.removeEventListener('changeView', handleViewChange);
     }, []);
+
+    // ⭐ NEW: Listen for openSheet events dispatched by notifications (or other components)
+    useEffect(() => {
+        const handleOpenSheet = async (event) => {
+            const sheetId = event?.detail?.sheetId;
+            console.log('⬇️ Received openSheet event', sheetId, event);
+            if (!sheetId) return;
+
+            // Try to find sheet in current state first
+            const existing = sheets.find(s => s.id === sheetId);
+            if (existing) {
+                setCurrentSheet(existing);
+                setCurrentView('sheet');
+                setMobileMenuOpen(false);
+                return;
+            }
+
+            // Fallback: fetch from Firestore
+                    if (db) {
+                try {
+                    const doc = await db.collection('timesheets').doc(sheetId).get();
+                    if (doc.exists) {
+                        const data = { id: doc.id, ...doc.data() };
+                        setCurrentSheet(data);
+                        setCurrentView('sheet');
+                        setMobileMenuOpen(false);
+                    } else {
+                        showToast('❌ ' + t.sheetNotFound, 'error');
+                    }
+                } catch (err) {
+                    console.error('Error fetching sheet for openSheet event:', err);
+                        showToast('❌ ' + t.errorLoading, 'error');
+                }
+            }
+        };
+
+        window.addEventListener('openSheet', handleOpenSheet);
+        return () => window.removeEventListener('openSheet', handleOpenSheet);
+    }, [sheets, db, language]);
 
     // Add Audit Log
     const addAuditLog = useCallback(async (action, details) => {
@@ -154,9 +222,6 @@ const App = () => {
             showToast(`❌ ${t.dbNotConnected}`, 'error');
             return;
         }
-        
-        setLoading(true);
-        
         const newSheet = {
             data: new Date().toISOString().split('T')[0],
             titoloAzienda: '',
@@ -169,8 +234,28 @@ const App = () => {
             archived: false,
             createdAt: new Date().toISOString()
         };
-        
         try {
+            // Reserve a numeric sheetNumber using an atomic counter
+            let sheetNumber = null;
+            try {
+                const counterRef = db.collection('counters').doc('sheets');
+                await db.runTransaction(async (tx) => {
+                    const snap = await tx.get(counterRef);
+                    if (!snap.exists) {
+                        tx.set(counterRef, { next: 2 });
+                        sheetNumber = 1;
+                    } else {
+                        const next = snap.data().next || 1;
+                        sheetNumber = next;
+                        tx.update(counterRef, { next: next + 1 });
+                    }
+                });
+            } catch (e) {
+                console.error('Error reserving sheetNumber, proceeding without it', e);
+            }
+
+            if (sheetNumber !== null) newSheet.sheetNumber = sheetNumber;
+
             const docRef = await db.collection('timesheets').add(newSheet);
             setCurrentSheet({ id: docRef.id, ...newSheet });
             setCurrentView('sheet');
@@ -180,7 +265,6 @@ const App = () => {
             console.error(error);
             showToast(`❌ ${t.errorSaving}`, 'error');
         }
-        
         setLoading(false);
     }, [db, addAuditLog, language]);
 
@@ -326,7 +410,18 @@ const App = () => {
         }
     }, [language]);
 
-    const t = translations[language];
+    // Safe translations lookup: prefer runtime window.t() if available, fall back to legacy translations.js
+    const t = new Proxy({}, {
+        get(_, prop) {
+            try {
+                if (window && typeof window.t === 'function') return window.t(String(prop));
+            } catch (e) { /* ignore */ }
+            try {
+                if (window && window.translations) return (window.translations[language] || window.translations.it || {})[prop];
+            } catch (e) { /* ignore */ }
+            return undefined;
+        }
+    });
     const bgClass = darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 to-indigo-100';
 
     // Loading state
@@ -338,9 +433,23 @@ const App = () => {
         );
     }
 
+    // Resolve components from window with safe fallbacks to avoid React error #130
+    const DashboardComp = window.Dashboard || (() => React.createElement('div', null, t.dashboardNotLoaded || 'Dashboard non caricato'));
+    const WorkerModeComp = window.WorkerMode || (() => React.createElement('div', null, t.workerModeNotLoaded || 'WorkerMode non caricato'));
+    const SheetListComp = window.SheetList || (() => React.createElement('div', null, t.sheetListNotLoaded || 'SheetList non caricata'));
+    const SheetEditorComp = window.SheetEditor || (() => React.createElement('div', null, t.editorNotLoaded || 'Editor non caricato'));
+    const CalendarComp = window.Calendar || (() => React.createElement('div', null, t.calendarNotLoaded || 'Calendar non caricato'));
+    const WorkerStatsComp = window.WorkerStats || (() => React.createElement('div', null, t.workerStatsNotLoaded || 'WorkerStats non caricata'));
+    const BlacklistComp = window.Blacklist || (() => React.createElement('div', null, t.blacklistNotLoaded || 'Blacklist non caricata'));
+    const AuditLogComp = window.AuditLog || (() => React.createElement('div', null, t.auditLogNotLoaded || 'AuditLog non caricato'));
+    const ReportManagerComp = window.ReportManager || (() => React.createElement('div', null, t.reportManagerNotLoaded || 'ReportManager non caricato'));
+    const BackupRestoreComp = window.BackupRestore || (() => React.createElement('div', null, t.backupNotLoaded || 'Backup non caricato'));
+    const ScheduledNotificationsComp = window.ScheduledNotifications || (() => React.createElement('div', null, t.scheduledNotificationsNotLoaded || 'ScheduledNotifications non caricato'));
+    const SettingsComp = window.Settings || (() => React.createElement('div', null, t.settingsNotLoaded || 'Settings non caricato'));
+
     // Worker Mode
     if (mode === 'worker') {
-        return <WorkerMode sheetId={sheetId} db={db} darkMode={darkMode} language={language} />;
+        return <WorkerModeComp sheetId={sheetId} db={db} darkMode={darkMode} language={language} />;
     }
 
     // Admin Mode
@@ -364,9 +473,9 @@ const App = () => {
                                 } bg-clip-text text-transparent`}>
                                     {t.administrator}
                                 </h1>
-                                <p className={`text-xs sm:text-sm ${darkMode ? 'text-indigo-300' : 'text-indigo-500'} font-medium truncate`}>
-                                    📋 Report Ore Facchini
-                                </p>
+                                    <p className={`text-xs sm:text-sm ${darkMode ? 'text-indigo-300' : 'text-indigo-500'} font-medium truncate`}>
+                                        { t.appSubtitle || '📋 Report Ore Facchini' }
+                                    </p>
                             </div>
                         </div>
                         
@@ -381,7 +490,7 @@ const App = () => {
                                 { view: 'audit', icon: '📝', label: t.auditLog },
                                 { view: 'reports', icon: '📈', label: t.reports },
                                 { view: 'backup', icon: '💾', label: t.backupData || 'Backup' },
-                                { view: 'scheduledNotifications', icon: '⏰', label: language === 'it' ? 'Notifiche' : language === 'en' ? 'Notifications' : language === 'es' ? 'Notificaciones' : language === 'fr' ? 'Notifications' : 'Notificări' }, // ⭐ NEW
+                                { view: 'scheduledNotifications', icon: '⏰', label: t.notifications || 'Notifiche' }, // ⭐ NEW
                                 { view: 'settings', icon: '⚙️', label: t.settings }
                             ].map(item => (
                                 <button
@@ -408,7 +517,7 @@ const App = () => {
                             {/* Language Selector - GLASSMORPHISM */}
                             <select
                                 value={language}
-                                onChange={(e) => setLanguage(e.target.value)}
+                                onChange={(e) => setAppLanguage(e.target.value)}
                                 className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                                     darkMode
                                         ? 'bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20'
@@ -416,11 +525,20 @@ const App = () => {
                                 } shadow-lg`}
                                 style={darkMode ? { colorScheme: 'dark' } : {}}
                             >
-                                <option value="it" className={darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}>🇮🇹 IT</option>
-                                <option value="en" className={darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}>🇬🇧 EN</option>
-                                <option value="es" className={darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}>🇪🇸 ES</option>
-                                <option value="fr" className={darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}>🇫🇷 FR</option>
-                                <option value="ro" className={darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}>🇷🇴 RO</option>
+                                {(
+                                    (typeof window !== 'undefined' && window.availableLanguages) ? window.availableLanguages : ['it','en','es','fr','ro']
+                                ).map(langCode => {
+                                    const meta = {
+                                        it: '🇮🇹 IT',
+                                        en: '🇬🇧 EN',
+                                        es: '🇪🇸 ES',
+                                        fr: '🇫🇷 FR',
+                                        ro: '🇷🇴 RO'
+                                    };
+                                    return (
+                                        <option key={langCode} value={langCode} className={darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}>{meta[langCode] || langCode.toUpperCase()}</option>
+                                    );
+                                })}
                             </select>
 
                             {/* Dark Mode Toggle - ANIMATO */}
@@ -436,12 +554,13 @@ const App = () => {
                                 <span className="text-xl">{darkMode ? '☀️' : '🌙'}</span>
                             </button>
 
+
                             {/* Sync Button - PULSE ANIMATION */}
                             <button
                                 onClick={() => {
-                                    showToast('🔄 ' + (language === 'it' ? 'Sincronizzazione...' : language === 'en' ? 'Syncing...' : language === 'es' ? 'Sincronizando...' : language === 'fr' ? 'Synchronisation...' : 'Sincronizare...'), 'info');
+                                    showToast('🔄 ' + (t.syncing || 'Sincronizzazione...'), 'info');
                                     setTimeout(() => {
-                                        showToast('✅ ' + (language === 'it' ? 'Sincronizzato!' : language === 'en' ? 'Synced!' : language === 'es' ? '¡Sincronizado!' : language === 'fr' ? 'Synchronisé!' : 'Sincronizat!'), 'success');
+                                        showToast('✅ ' + (t.synced || 'Sincronizzato!'), 'success');
                                     }, 1000);
                                 }}
                                 className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 hover:rotate-180 ${
@@ -449,10 +568,12 @@ const App = () => {
                                         ? 'bg-green-500/20 hover:bg-green-500/30 text-green-300 shadow-lg shadow-green-500/20'
                                         : 'bg-green-500/20 hover:bg-green-500/30 text-green-700 shadow-lg shadow-green-500/20'
                                 }`}
-                                title="Sincronizza"
+                                title={t.syncButtonTitle || 'Sincronizza'}
                             >
                                 🔄
                             </button>
+
+                            {/* RadioPlayer ora solo nel Dashboard widget */}
 
                             {/* Logo Upload - GRADIENT BORDER */}
                             <label className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all duration-300 hover:scale-110 ${
@@ -498,7 +619,7 @@ const App = () => {
                                 { view: 'audit', icon: '📝', label: t.auditLog },
                                 { view: 'reports', icon: '📈', label: t.reports },
                                 { view: 'backup', icon: '💾', label: t.backupData || 'Backup' },
-                                { view: 'scheduledNotifications', icon: '⏰', label: language === 'it' ? 'Notifiche' : language === 'en' ? 'Notifications' : language === 'es' ? 'Notificaciones' : language === 'fr' ? 'Notifications' : 'Notificări' }, // ⭐ NEW
+                                { view: 'scheduledNotifications', icon: '⏰', label: t.notifications || 'Notifiche' }, // ⭐ NEW
                                 { view: 'settings', icon: '⚙️', label: t.settings }
                             ].map(item => (
                                 <button
@@ -526,7 +647,7 @@ const App = () => {
             {/* Main Content */}
             <main className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
                 {currentView === 'dashboard' && (
-                    <Dashboard sheets={sheets} darkMode={darkMode} language={language} />
+                    <DashboardComp sheets={sheets} darkMode={darkMode} language={language} weekStart={appSettings.weekStart} />
                 )}
 
                 {currentView === 'list' && (
@@ -537,7 +658,7 @@ const App = () => {
                         >
                             ➕ {t.createNewSheet}
                         </button>
-                        <SheetList
+                        <SheetListComp
                             sheets={sheets}
                             onSelectSheet={(sheet) => {
                                 setCurrentSheet(sheet);
@@ -553,7 +674,7 @@ const App = () => {
                 )}
 
                 {currentView === 'sheet' && currentSheet && (
-                    <SheetEditor
+                    <SheetEditorComp
                         sheet={currentSheet}
                         onSave={saveSheet}
                         onComplete={completeSheet}
@@ -570,7 +691,7 @@ const App = () => {
 
                 {/* Calendar View */}
                 {currentView === 'calendar' && (
-                    <Calendar 
+                    <CalendarComp 
                         sheets={sheets}
                         darkMode={darkMode}
                         language={language}
@@ -583,17 +704,18 @@ const App = () => {
 
                 {/* Worker Stats View */}
                 {currentView === 'workerstats' && (
-                    <WorkerStats
+                    <WorkerStatsComp
                         sheets={sheets}
                         darkMode={darkMode}
                         language={language}
                         onBack={() => setCurrentView('dashboard')}
                         onAddToBlacklist={addToBlacklist}
+                        blacklist={blacklist}
                     />
                 )}
 
                 {currentView === 'blacklist' && (
-                    <Blacklist
+                    <BlacklistComp
                         blacklist={blacklist}
                         removeFromBlacklist={removeFromBlacklist}
                         darkMode={darkMode}
@@ -602,7 +724,7 @@ const App = () => {
                 )}
 
                 {currentView === 'audit' && (
-                    <AuditLog
+                    <AuditLogComp
                         auditLog={auditLog}
                         darkMode={darkMode}
                         language={language}
@@ -611,7 +733,7 @@ const App = () => {
                 )}
 
                 {currentView === 'reports' && (
-                    <ReportManager
+                    <ReportManagerComp
                         sheets={sheets}
                         darkMode={darkMode}
                         language={language}
@@ -621,7 +743,7 @@ const App = () => {
 
                 {/* Backup View */}
                 {currentView === 'backup' && (
-                    <BackupRestore
+                    <BackupRestoreComp
                         db={db}
                         darkMode={darkMode}
                         language={language}
@@ -630,7 +752,7 @@ const App = () => {
 
                 {/* ⭐ NEW: Scheduled Notifications View */}
                 {currentView === 'scheduledNotifications' && (
-                    <ScheduledNotifications
+                    <ScheduledNotificationsComp
                         db={db}
                         darkMode={darkMode}
                         language={language}
@@ -638,7 +760,7 @@ const App = () => {
                 )}
 
                 {currentView === 'settings' && (
-                    <Settings
+                    <SettingsComp
                         db={db}
                         sheets={sheets}
                         darkMode={darkMode}
@@ -652,6 +774,86 @@ const App = () => {
     );
 };
 
-// Render App
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+// Diagnostic: log which components are available on window to debug React error #130
+try {
+    const componentList = [
+        'Dashboard','WorkerMode','SheetList','SheetEditor','Calendar','WorkerStats','Blacklist','AuditLog','ReportManager','BackupRestore','ScheduledNotifications','Settings'
+    ];
+    const availability = {};
+    componentList.forEach(name => {
+        availability[name] = typeof window[name] !== 'undefined' ? (typeof window[name] === 'function' || typeof window[name] === 'object') : false;
+    });
+    console.log('🧭 Component availability at render time:', availability);
+} catch (err) {
+    console.warn('Diagnostic logging failed:', err);
+}
+
+// ErrorBoundary to capture render errors and surface diagnostics
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { error: null, info: null };
+    }
+
+    componentDidCatch(error, info) {
+        // Log full error and component availability at the moment of crash
+        try {
+            const componentList = [
+                'Dashboard','WorkerMode','SheetList','SheetEditor','Calendar','WorkerStats','Blacklist','AuditLog','ReportManager','BackupRestore','ScheduledNotifications','Settings'
+            ];
+            const availability = {};
+            componentList.forEach(name => {
+                availability[name] = typeof window[name] !== 'undefined' ? (typeof window[name] === 'function' || typeof window[name] === 'object') : false;
+            });
+            console.error('❌ Render error caught by ErrorBoundary:', error, info);
+            console.log('🧭 Component availability at error time:', availability);
+        } catch (e) {
+            console.error('Error while reporting diagnostics:', e);
+        }
+
+        this.setState({ error, info });
+    }
+
+    render() {
+        if (this.state && this.state.error) {
+            const msg = this.state.error && this.state.error.message ? this.state.error.message : String(this.state.error);
+            return (
+                <div style={{ padding: 20, fontFamily: 'system-ui, sans-serif' }}>
+                    <h2 style={{ color: '#c53030' }}>Application error</h2>
+                    <p>{msg}</p>
+                    <details style={{ whiteSpace: 'pre-wrap' }}>
+                        {this.state.info && this.state.info.componentStack ? this.state.info.componentStack : 'No stack available'}
+                    </details>
+                    <p>Open the console to see component availability diagnostics (🧭).</p>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
+// Render App inside ErrorBoundary
+function renderApp() {
+    try {
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        );
+    } catch (e) {
+        console.error('Render failed:', e);
+    }
+}
+
+// If the i18n loader exposes a readiness Promise, wait for it before rendering.
+if (window.i18nReady && typeof window.i18nReady.then === 'function') {
+    window.i18nReady.then(() => {
+        renderApp();
+    }).catch((err) => {
+        console.warn('i18n readiness promise rejected, rendering anyway', err);
+        renderApp();
+    });
+} else {
+    renderApp();
+}

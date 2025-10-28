@@ -1,5 +1,7 @@
 // Blacklist Component - 5 LINGUE COMPLETE + Advanced Features
 const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }) => {
+    // Usa la funzione globale per normalizzare nome e cognome
+    const normalizeWorkerName = window.normalizeWorkerName;
     const [searchTerm, setSearchTerm] = React.useState('');
     const [severityFilter, setSeverityFilter] = React.useState('all');
     const [expiryFilter, setExpiryFilter] = React.useState('all');
@@ -7,7 +9,19 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
     const [selectedItems, setSelectedItems] = React.useState([]);
     const [showStats, setShowStats] = React.useState(true);
     const [showNotesModal, setShowNotesModal] = React.useState(null);
-    const t = translations[language];
+    // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
+    // Keep a safe fallback to the legacy `translations` object so migration is incremental.
+    const t = new Proxy({}, {
+        get: (_target, prop) => {
+            try {
+                const key = String(prop);
+                if (typeof window !== 'undefined' && typeof window.t === 'function') return window.t(key);
+                const all = (typeof window !== 'undefined' && window.translations) || (typeof translations !== 'undefined' && translations) || {};
+                const lang = language || 'it';
+                return (all[lang] && all[lang][key]) || (all['it'] && all['it'][key]) || key;
+            } catch (e) { return String(prop); }
+        }
+    });
 
     // Severity badge colors
     const getSeverityColor = (severity) => {
@@ -30,11 +44,12 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
         const total = blacklist.length;
         const activeBlacklist = blacklist.filter(item => !isExpired(item));
         
-        // Top 5 reasons
+        // Top 5 reasons (skip empty / placeholder reasons)
         const reasonCounts = {};
         blacklist.forEach(item => {
-            const reason = item.reason || 'Unknown';
-            reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+            const raw = (item.reason || '').toString().trim();
+            const reason = raw.length > 0 ? raw : null;
+            if (reason) reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
         });
         const topReasons = Object.entries(reasonCounts)
             .sort((a, b) => b[1] - a[1])
@@ -69,16 +84,19 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
     const filteredBlacklist = React.useMemo(() => {
         let result = blacklist;
 
-        // Search filter
+        // Search filter (normalizza nome/cognome)
         if (searchTerm) {
-            result = result.filter(item => 
-                item.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.cognome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.codiceFiscale?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.numeroIdentita?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.reason?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.addedBy?.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const normSearch = searchTerm.trim().toLowerCase().replace(/\s+/g, ' ');
+            result = result.filter(item => {
+                const normName = normalizeWorkerName(item.nome, item.cognome);
+                return (
+                    normName.includes(normSearch) ||
+                    item.codiceFiscale?.toLowerCase().includes(normSearch) ||
+                    item.numeroIdentita?.toLowerCase().includes(normSearch) ||
+                    item.reason?.toLowerCase().includes(normSearch) ||
+                    item.addedBy?.toLowerCase().includes(normSearch)
+                );
+            });
         }
 
         // Severity filter
@@ -163,6 +181,34 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
         await removeFromBlacklist(id, reason, signature);
     };
 
+    // --- Rich tooltip state & helpers (lightweight, works on desktop hover and mobile click)
+    const [tooltip, setTooltip] = React.useState({ visible: false, x: 0, y: 0, content: '' });
+
+    const showTooltip = (e, content) => {
+        // prefer clientX/Y for fixed positioning
+        const x = e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
+        const y = (e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0) - 12;
+        setTooltip({ visible: true, x, y, content });
+    };
+
+    const moveTooltip = (e) => {
+        if (!tooltip.visible) return;
+        const x = e.clientX || 0;
+        const y = (e.clientY || 0) - 12;
+        setTooltip(t => ({ ...t, x, y }));
+    };
+
+    const hideTooltip = () => setTooltip({ visible: false, x: 0, y: 0, content: '' });
+
+    // Calcola il numero di lavoratori unici (nome+cognome normalizzati)
+    const uniqueWorkersCount = React.useMemo(() => {
+        const set = new Set();
+        filteredBlacklist.forEach(item => {
+            set.add(normalizeWorkerName(item.nome, item.cognome));
+        });
+        return set.size;
+    }, [filteredBlacklist, normalizeWorkerName]);
+
     return (
         <div className="space-y-4 sm:space-y-6">
             {/* Header */}
@@ -171,8 +217,12 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                     <span className="text-2xl sm:text-3xl">🚫</span>
                     <div className="flex-1">
                         <h1 className="text-xl sm:text-2xl font-bold">{t.blacklist}</h1>
-                        <p className={`${textClass} text-sm sm:text-base`}>
-                            {filteredBlacklist.length} {filteredBlacklist.length === 1 ? t.workers.slice(0, -1).toLowerCase() : t.workers.toLowerCase()}
+                                <p className={`text-sm sm:text-base font-medium ${textClass} mb-1`}>
+                                    {uniqueWorkersCount} {uniqueWorkersCount === 1 ? (t.worker || 'lavoratore').toLowerCase() : (t.workers || 'lavoratori').toLowerCase()}
+                        </p>
+                        {/* Short description to clarify page purpose */}
+                        <p className={`text-xs ${textClass}`}>
+                            {t.blacklistDescription || 'Elenco dei lavoratori segnalati: usa i filtri per trovare, seleziona più elementi per azioni in blocco.'}
                         </p>
                     </div>
                     <button
@@ -205,6 +255,11 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                 <p className={`text-xs ${textClass}`}>{t.topReasons}</p>
                             </div>
                         </div>
+
+                        {/* Filters helper description */}
+                        <p className={`text-xs ${textClass} mt-2`}>
+                            {t.filterHelp || 'Usa i filtri per restringere i risultati: gravità, scadenza e ordinamento.'}
+                        </p>
                         
                         {/* Severity Breakdown */}
                         <div className="flex gap-2 flex-wrap mb-3">
@@ -223,12 +278,14 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                         {stats.topReasons.length > 0 && (
                             <div className="mt-3">
                                 <p className="font-semibold text-sm mb-2">{t.topReasons}:</p>
-                                {stats.topReasons.map(([reason, count], idx) => (
-                                    <div key={idx} className="flex justify-between text-xs mb-1">
-                                        <span className="truncate">{idx + 1}. {reason}</span>
-                                        <span className="font-bold ml-2">{count}</span>
-                                    </div>
-                                ))}
+                                        {stats.topReasons.map(([reason, count], idx) => (
+                                            reason && (
+                                                <div key={idx} className="flex justify-between text-xs mb-1">
+                                                    <span className="truncate">{idx + 1}. {reason}</span>
+                                                    <span className="font-bold ml-2">{count}</span>
+                                                </div>
+                                            )
+                                        ))}
                             </div>
                         )}
                     </div>
@@ -253,6 +310,8 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                 value={severityFilter}
                                 onChange={(e) => setSeverityFilter(e.target.value)}
                                 className={`px-3 py-2 rounded-lg border ${inputClass} text-sm`}
+                                title={t.filterSeverityDesc || 'Filtra per gravità: Alta, Media, Bassa.'}
+                                aria-label={t.filterSeverityDesc || 'Filtra per gravità'}
                             >
                                 <option value="all">{t.all} ({t.severity})</option>
                                 <option value="high">🔴 {t.high}</option>
@@ -265,6 +324,8 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                 value={expiryFilter}
                                 onChange={(e) => setExpiryFilter(e.target.value)}
                                 className={`px-3 py-2 rounded-lg border ${inputClass} text-sm`}
+                                title={t.filterExpiryDesc || 'Filtra per tipo: Permanente, Temporanea, Scaduta.'}
+                                aria-label={t.filterExpiryDesc || 'Filtra per scadenza'}
                             >
                                 <option value="all">{t.all}</option>
                                 <option value="permanent">♾️ {t.permanent}</option>
@@ -277,6 +338,8 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}
                                 className={`px-3 py-2 rounded-lg border ${inputClass} text-sm`}
+                                title={t.filterSortDesc || 'Ordina i risultati: per data, alfabetico, gravità.'}
+                                aria-label={t.filterSortDesc || 'Ordina i risultati'}
                             >
                                 <option value="dateAdded">📅 {t.dateAdded}</option>
                                 <option value="alphabetical">🔤 {t.alphabetical}</option>
@@ -295,17 +358,26 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                 </button>
                                 {selectedItems.length > 0 && (
                                     <>
-                                        <span className={`text-sm ${textClass}`}>
+                                        <span className={`text-sm ${textClass}`} title={`${selectedItems.length} ${t.selectedItems}`}>
                                             {selectedItems.length} {t.selectedItems}
                                         </span>
                                         <button
                                             onClick={handleBulkRemove}
                                             className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs sm:text-sm"
+                                            title={`${t.removeSelected}: ${t.bulkActionHint || 'Richiede motivo e firma per audit.'}`}
                                         >
                                             ↩️ {t.removeSelected}
                                         </button>
                                     </>
                                 )}
+
+                                {/* Bulk action helper / description */}
+                                <div className={`ml-2 text-xs ${textClass} hidden sm:inline-flex items-center gap-2`}> 
+                                    <span className="font-semibold">{t.bulkActions || 'Azioni in blocco'}:</span>
+                                    <span title={t.bulkActionTooltip || 'Seleziona elementi e usa Rimuovi selezionati per rimuovere; verrà richiesto motivo e firma.'}>
+                                        {t.bulkActionShort || 'Seleziona più elementi e premi Rimuovi selezionati.'}
+                                    </span>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -354,51 +426,64 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                                     </h3>
                                                     
                                                     {/* Severity Badge */}
-                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${getSeverityColor(severity)}`}>
+                                                    <span
+                                                        className={`px-2 py-1 rounded text-xs font-bold ${getSeverityColor(severity)}`}
+                                                        title={severity === 'high' ? t.highDesc || 'Alta gravità' : severity === 'medium' ? t.mediumDesc || 'Gravità media' : t.lowDesc || 'Bassa gravità'}
+                                                        aria-label={`Severity: ${severity}`}
+                                                        onMouseEnter={(e) => showTooltip(e, severity === 'high' ? (t.highDesc || 'Alta gravità') : severity === 'medium' ? (t.mediumDesc || 'Gravità media') : (t.lowDesc || 'Bassa gravità'))}
+                                                        onMouseMove={moveTooltip}
+                                                        onMouseLeave={hideTooltip}
+                                                        onClick={(e) => showTooltip(e, severity === 'high' ? (t.highDesc || 'Alta gravità') : severity === 'medium' ? (t.mediumDesc || 'Gravità media') : (t.lowDesc || 'Bassa gravità'))}
+                                                    >
                                                         {severity === 'high' ? t.high : severity === 'medium' ? t.medium : t.low}
                                                     </span>
 
                                                     {/* Expiry Badge */}
                                                     {item.expiryDate && (
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                            expired ? 'bg-gray-500 text-white' : 
-                                                            'bg-orange-500 text-white'
-                                                        }`}>
+                                                        <span
+                                                            className={`px-2 py-1 rounded text-xs font-bold ${
+                                                                expired ? 'bg-gray-500 text-white' : 
+                                                                'bg-orange-500 text-white'
+                                                            }`}
+                                                            title={expired ? t.expired : `${t.expiresOn}: ${formatDate(item.expiryDate)}`}
+                                                        >
                                                             {expired ? `❌ ${t.expired}` : `⏳ ${t.expiresOn}: ${formatDate(item.expiryDate)}`}
                                                         </span>
                                                     )}
                                                     {!item.expiryDate && (
-                                                        <span className="px-2 py-1 rounded text-xs font-bold bg-purple-600 text-white">
+                                                        <span className="px-2 py-1 rounded text-xs font-bold bg-purple-600 text-white" title={t.permanent}>
                                                             ♾️ {t.permanent}
                                                         </span>
                                                     )}
                                                 </div>
 
-                                                <p className={`text-sm sm:text-base ${textClass} mb-2`}>
-                                                    <span className="font-semibold">{t.blacklistReason}:</span> {item.reason}
-                                                </p>
+                                                {item.reason && item.reason.toString().trim().length > 0 && (
+                                                    <p className={`text-sm sm:text-base ${textClass} mb-2`}>
+                                                        <span className="font-semibold">{t.blacklistReason}:</span> {item.reason}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 
                                         {/* Additional Info */}
                                         <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm ${textClass}`}>
                                             {item.codiceFiscale && (
-                                                <p className="truncate">
-                                                    <span className="font-semibold">🆔 {t.taxCode}:</span> {item.codiceFiscale}
-                                                </p>
+                                                        <p className="truncate" title={`${t.taxCode}: ${item.codiceFiscale}`} onMouseEnter={(e)=>showTooltip(e, `${t.taxCode}: ${item.codiceFiscale}`)} onMouseMove={moveTooltip} onMouseLeave={hideTooltip} onClick={(e)=>showTooltip(e, `${t.taxCode}: ${item.codiceFiscale}`)}>
+                                                            <span className="font-semibold">🆔 {t.taxCode}:</span> {item.codiceFiscale}
+                                                        </p>
                                             )}
                                             {item.numeroIdentita && (
-                                                <p className="truncate">
+                                                <p className="truncate" title={`${t.idNumber}: ${item.numeroIdentita}`} onMouseEnter={(e)=>showTooltip(e, `${t.idNumber}: ${item.numeroIdentita}`)} onMouseMove={moveTooltip} onMouseLeave={hideTooltip} onClick={(e)=>showTooltip(e, `${t.idNumber}: ${item.numeroIdentita}`)}>
                                                     <span className="font-semibold">📇 {t.idNumber}:</span> {item.numeroIdentita}
                                                 </p>
                                             )}
                                             {item.telefono && (
-                                                <p className="truncate">
+                                                <p className="truncate" title={`${t.phone}: ${item.telefono}`} onMouseEnter={(e)=>showTooltip(e, `${t.phone}: ${item.telefono}`)} onMouseMove={moveTooltip} onMouseLeave={hideTooltip} onClick={(e)=>showTooltip(e, `${t.phone}: ${item.telefono}`)}>
                                                     <span className="font-semibold">📱 {t.phone}:</span> {item.telefono}
                                                 </p>
                                             )}
                                             {item.email && (
-                                                <p className="truncate">
+                                                <p className="truncate" title={`${t.email}: ${item.email}`} onMouseEnter={(e)=>showTooltip(e, `${t.email}: ${item.email}`)} onMouseMove={moveTooltip} onMouseLeave={hideTooltip} onClick={(e)=>showTooltip(e, `${t.email}: ${item.email}`)}>
                                                     <span className="font-semibold">📧 {t.email}:</span> {item.email}
                                                 </p>
                                             )}
@@ -421,6 +506,17 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Tooltip element (fixed) */}
+                                    {tooltip.visible && (
+                                        <div
+                                            className="rich-tooltip"
+                                            style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
+                                            onClick={hideTooltip}
+                                        >
+                                            {tooltip.content}
+                                        </div>
+                                    )}
 
                                     {/* Actions */}
                                     <div className="flex sm:flex-col gap-2">

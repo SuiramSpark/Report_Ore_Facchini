@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Wind">
+  <style>
+    .path { stroke: #9fbff6; stroke-width: 6; fill: none; stroke-linecap: round; animation: flow 2.6s linear infinite; }
+    @keyframes flow { 0% { stroke-dashoffset: 0 } 100% { stroke-dashoffset: -120 } }
+  </style>
+  <path class="path" d="M20 80 C60 60, 100 60, 140 80" stroke-dasharray="40 20" />
+  <path class="path" d="M30 108 C70 88, 110 88, 150 108" stroke-dasharray="30 20" style="animation-duration:3s" />
+  <path class="path" d="M40 136 C80 116, 120 116, 160 136" stroke-dasharray="20 20" style="animation-duration:2s" />
+</svg>
