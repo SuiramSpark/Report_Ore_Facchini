@@ -533,10 +533,10 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                 }
                             }
                             const dayTotal = segments.reduce((s, seg) => s + seg.hours, 0);
-                            return (
-                                <div key={label} className={`flex items-center gap-3 group ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `${i * 50}ms` }}>
+                                return (
+                                <div key={label} className={`flex items-center gap-3 group relative ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `${i * 50}ms`, zIndex: activeTooltip && activeTooltip.startsWith(label) ? 1000 : 'auto' }}>
                                     <span className={`text-xs font-medium w-16 text-right truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>{label}</span>
-                                    <div className="flex-1 h-5 rounded bg-gray-200 dark:bg-gray-700 overflow-hidden relative flex items-center">
+                                    <div className="flex-1 h-5 rounded bg-gray-200 dark:bg-gray-700 overflow-visible relative flex items-center">
                                         {/* Render stacked segments */}
                                         {segments.length === 0 ? (
                                             <div className="w-full h-full text-center text-xs text-gray-500 flex items-center justify-center">{t.noData}</div>
@@ -544,12 +544,10 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                             segments.map((seg, idx) => {
                                                 const width = maxHours > 0 ? (seg.hours / maxHours) * 100 : 0;
                                                 const tooltipId = `${label}-${idx}`;
-                                                const isActive = activeTooltip === tooltipId;
-                                                
-                                                return (
+                                                const isActive = activeTooltip === tooltipId;                                                return (
                                                     <div
                                                         key={seg.name + idx}
-                                                        className={`h-full relative cursor-pointer transition-opacity ${isActive ? 'z-[100]' : ''}`}
+                                                        className={`h-full relative cursor-pointer transition-opacity ${isActive ? 'z-[9999]' : 'z-10'}`}
                                                         style={{ width: `${width}%`, backgroundColor: seg.color, transition: 'width 600ms ease, opacity 200ms ease' }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -571,21 +569,32 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                         {/* Custom modern tooltip - NO native title attribute */}
                                                         {isActive && (
                                                             <div 
-                                                                className={`fixed px-4 py-3 rounded-xl shadow-2xl whitespace-nowrap animate-fade-in pointer-events-none ${
-                                                                    darkMode ? 'bg-gray-900/98 text-white border-2 border-indigo-400' : 'bg-white/98 text-gray-900 border-2 border-indigo-500'
+                                                                className={`fixed px-5 py-4 rounded-xl shadow-2xl whitespace-nowrap animate-fade-in pointer-events-none ${
+                                                                    darkMode 
+                                                                        ? 'bg-gradient-to-br from-gray-900 to-gray-800 text-white border-2 border-indigo-400 shadow-indigo-500/50' 
+                                                                        : 'bg-gradient-to-br from-white to-gray-50 text-gray-900 border-2 border-indigo-600 shadow-indigo-400/40'
                                                                 }`}
                                                                 style={{ 
-                                                                    minWidth: '150px',
-                                                                    zIndex: 9999,
+                                                                    minWidth: '160px',
+                                                                    zIndex: 999999,
                                                                     left: '50%',
                                                                     top: '50%',
-                                                                    transform: 'translate(-50%, -150%)',
-                                                                    backdropFilter: 'blur(16px)'
+                                                                    transform: 'translate(-50%, -180%)',
+                                                                    backdropFilter: 'blur(20px)',
+                                                                    boxShadow: darkMode 
+                                                                        ? '0 25px 50px -12px rgba(99, 102, 241, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.3)' 
+                                                                        : '0 25px 50px -12px rgba(79, 70, 229, 0.35), 0 0 0 1px rgba(99, 102, 241, 0.2)'
                                                                 }}
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
-                                                                <div className="text-lg font-bold mb-1">{seg.name}</div>
-                                                                <div className={`text-base font-bold ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>
+                                                                <div className={`text-lg font-bold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                                    {seg.name}
+                                                                </div>
+                                                                <div className={`text-xl font-extrabold ${
+                                                                    darkMode 
+                                                                        ? 'bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent' 
+                                                                        : 'bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent'
+                                                                }`}>
                                                                     {seg.hours.toFixed(1)} ore
                                                                 </div>
                                                                 {/* Arrow */}
@@ -595,9 +604,10 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                                         bottom: '-10px',
                                                                         width: 0,
                                                                         height: 0,
-                                                                        borderLeft: '8px solid transparent',
-                                                                        borderRight: '8px solid transparent',
-                                                                        borderTop: `10px solid ${darkMode ? 'rgba(17, 24, 39, 0.98)' : 'rgba(255, 255, 255, 0.98)'}`
+                                                                        borderLeft: '10px solid transparent',
+                                                                        borderRight: '10px solid transparent',
+                                                                        borderTop: `12px solid ${darkMode ? '#1F2937' : '#FFFFFF'}`,
+                                                                        filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1))'
                                                                     }}
                                                                 ></div>
                                                             </div>
@@ -1193,7 +1203,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                 WIDGET METEO ADMIN
                 ======================================== */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className={`${cardClass} p-4 sm:p-6`}>
+                <div className={`${cardClass} p-4 sm:p-6 relative`} style={{ zIndex: activeTooltip ? 9999 : 'auto' }}>
                     <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>📊 {t.hoursProgress || 'Andamento ore'}</h3>
                     {renderAdvancedBarChart({ hideTitle: true })}
                 </div>
