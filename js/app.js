@@ -1047,25 +1047,6 @@ const App = () => {
                                 <span className="text-xl">🚪</span>
                             </button>
 
-
-                            {/* Sync Button - PULSE ANIMATION */}
-                            <button
-                                onClick={() => {
-                                    showToast('🔄 ' + (t.syncing || 'Sincronizzazione...'), 'info');
-                                    setTimeout(() => {
-                                        showToast('✅ ' + (t.synced || 'Sincronizzato!'), 'success');
-                                    }, 1000);
-                                }}
-                                className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 hover:rotate-180 ${
-                                    darkMode
-                                        ? 'bg-green-500/20 hover:bg-green-500/30 text-green-300 shadow-lg shadow-green-500/20'
-                                        : 'bg-green-500/20 hover:bg-green-500/30 text-green-700 shadow-lg shadow-green-500/20'
-                                }`}
-                                title={t.syncButtonTitle || 'Sincronizza'}
-                            >
-                                🔄
-                            </button>
-
                             {/* RadioPlayer ora solo nel Dashboard widget */}
                         </div>
                     </div>

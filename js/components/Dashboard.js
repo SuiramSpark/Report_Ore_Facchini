@@ -1096,6 +1096,26 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                     </div>
                     <div className="text-right">
                         <div className="flex items-center justify-end gap-3">
+                            {/* Sync Button - A SINISTRA dell'orologio */}
+                            <button
+                                onClick={() => {
+                                    if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+                                        window.showToast('🔄 ' + (t.syncing || 'Sincronizzazione...'), 'info');
+                                        setTimeout(() => {
+                                            window.showToast('✅ ' + (t.synced || 'Sincronizzato!'), 'success');
+                                        }, 1000);
+                                    }
+                                }}
+                                className={`px-3 py-2 rounded-lg transition-all duration-300 hover:rotate-180 ${
+                                    darkMode
+                                        ? 'bg-green-500/20 hover:bg-green-500/30 text-green-300 shadow-lg shadow-green-500/20'
+                                        : 'bg-green-500/20 hover:bg-green-500/30 text-green-700 shadow-lg shadow-green-500/20'
+                                }`}
+                                title={t.syncButtonTitle || 'Sincronizza'}
+                            >
+                                🔄
+                            </button>
+
                             <div className="text-sm mr-4">
                                 <div className={`${textClass}`}>{t.updated}</div>
                                 <div className="text-lg font-semibold">
