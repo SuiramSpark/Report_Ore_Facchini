@@ -470,6 +470,7 @@
   "workingHours": "Orario lavorativo",
   "xlsxLibMissing": "❌ Libreria XLSX non caricata",
   "yourNameSurname": "Il tuo nome e cognome",
+  "password": "Password",
   "adminLoginDescription": "Inserisci la password per accedere alla dashboard amministratore",
   "wrongPassword": "Password errata! Riprova.",
   "login": "Accedi",

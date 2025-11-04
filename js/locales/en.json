@@ -432,6 +432,7 @@
   "workingHours": "Working Hours",
   "xlsxLibMissing": "❌ XLSX library not loaded",
   "yourNameSurname": "Your name and surname",
+  "password": "Password",
   "adminLoginDescription": "Enter the password to access the admin dashboard",
   "wrongPassword": "Wrong password! Please try again.",
   "login": "Login",
