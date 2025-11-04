@@ -3,6 +3,27 @@
 const changelogs = {
     it: [
         {
+            version: 'v5.1',
+            date: '4 Novembre 2025',
+            changes: [
+                '🔐 NEW: Sistema completo autenticazione admin con password',
+                '🔑 NEW: Recupero password tramite domande di sicurezza',
+                '💾 NEW: Password e domande salvate in Firebase (non più hardcoded)',
+                '⚙️ NEW: Cambio password direttamente dalle Impostazioni',
+                '🛡️ NEW: Sezione Sicurezza dedicata in Settings',
+                '✅ NEW: Password reimpostata automaticamente senza interventi manuali',
+                '🔒 NEW: Hash SHA-256 per password e risposte di sicurezza',
+                '📱 NEW: Schermata login moderna con dark mode',
+                '🔓 NEW: Link "Password dimenticata?" nel form login',
+                '💡 NEW: Sistema sessioni 24h con localStorage',
+                '🌐 FIX: Tooltip Dashboard ore in andamento ora visibile correttamente',
+                '🎯 FIX: Tooltip con z-index 9999 sopra tutti gli elementi',
+                '📊 FIX: Rimosso tooltip nativo browser (title attribute)',
+                '🔥 NEW: Firestore Rules aggiornate per proteggere dati sensibili',
+                '📝 NEW: Traduzioni complete IT/EN per sistema autenticazione'
+            ]
+        },
+        {
             version: 'v5.0',
             date: '4 Novembre 2025',
             changes: [
@@ -149,6 +170,27 @@ const changelogs = {
         }
     ],
     en: [
+        {
+            version: 'v5.1',
+            date: 'November 4, 2025',
+            changes: [
+                '🔐 NEW: Complete admin authentication system with password',
+                '🔑 NEW: Password recovery via security questions',
+                '💾 NEW: Password and questions saved in Firebase (no longer hardcoded)',
+                '⚙️ NEW: Change password directly from Settings',
+                '🛡️ NEW: Dedicated Security section in Settings',
+                '✅ NEW: Password reset automatically without manual intervention',
+                '🔒 NEW: SHA-256 hash for passwords and security answers',
+                '📱 NEW: Modern login screen with dark mode',
+                '🔓 NEW: "Forgot password?" link in login form',
+                '💡 NEW: 24h session system with localStorage',
+                '🌐 FIX: Dashboard hours in progress tooltip now visible correctly',
+                '🎯 FIX: Tooltip with z-index 9999 above all elements',
+                '📊 FIX: Removed native browser tooltip (title attribute)',
+                '🔥 NEW: Firestore Rules updated to protect sensitive data',
+                '📝 NEW: Complete IT/EN translations for authentication system'
+            ]
+        },
         {
             version: 'v5.0',
             date: 'November 4, 2025',

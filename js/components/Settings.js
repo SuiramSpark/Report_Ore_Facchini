@@ -67,6 +67,19 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
     const [selectMode, setSelectMode] = React.useState(false);
     const [deletingLogs, setDeletingLogs] = React.useState(false);
 
+    // Security Questions states
+    const [securityConfig, setSecurityConfig] = React.useState({
+        question1: '',
+        answer1: '',
+        question2: '',
+        answer2: ''
+    });
+    const [passwordChange, setPasswordChange] = React.useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
+
     // ==================== TRANSLATION HELPER ====================
     const t = new Proxy({}, {
         get: (_target, prop) => {
@@ -183,6 +196,108 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             showToast('❌ Errore salvataggio privacy', 'error');
         }
         setLoadingGdpr(false);
+    };
+
+    // 🔐 Save Security Questions
+    const saveSecurityQuestions = async () => {
+        if (!db) {
+            showToast('❌ Database non disponibile', 'error');
+            return;
+        }
+
+        if (!securityConfig.question1 || !securityConfig.answer1 || !securityConfig.question2 || !securityConfig.answer2) {
+            showToast('❌ ' + (t.fillAllFields || 'Compila tutti i campi'), 'error');
+            return;
+        }
+
+        try {
+            const encoder = new TextEncoder();
+            // Hash delle risposte (case-insensitive, trimmed)
+            const answer1Buffer = await crypto.subtle.digest('SHA-256', encoder.encode(securityConfig.answer1.toLowerCase().trim()));
+            const answer2Buffer = await crypto.subtle.digest('SHA-256', encoder.encode(securityConfig.answer2.toLowerCase().trim()));
+            const question1Hash = Array.from(new Uint8Array(answer1Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const question2Hash = Array.from(new Uint8Array(answer2Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // 💾 Salva in Firebase (le domande in chiaro, le risposte hashate)
+            await db.collection('settings').doc('securityQuestions').set({
+                question1: securityConfig.question1,
+                question2: securityConfig.question2,
+                question1Hash,
+                question2Hash,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            showToast('✅ ' + (t.securityQuestionsSaved || 'Domande di sicurezza salvate!'), 'success');
+            setSecurityConfig({ question1: '', answer1: '', question2: '', answer2: '' });
+        } catch (e) {
+            console.error('Error saving security questions:', e);
+            showToast('❌ Errore salvataggio', 'error');
+        }
+    };
+
+    // 🔑 Change Admin Password
+    const changeAdminPassword = async () => {
+        if (!db) {
+            showToast('❌ Database non disponibile', 'error');
+            return;
+        }
+
+        try {
+            // Carica hash attuale da Firebase
+            const authDoc = await db.collection('settings').doc('adminAuth').get();
+            if (!authDoc.exists) {
+                showToast('❌ Configurazione autenticazione non trovata', 'error');
+                return;
+            }
+
+            const currentHashFromDB = authDoc.data().passwordHash;
+
+            // Verifica password attuale
+            const encoder = new TextEncoder();
+            const currentBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(passwordChange.currentPassword));
+            const currentHash = Array.from(new Uint8Array(currentBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            if (currentHash !== currentHashFromDB) {
+                showToast('❌ ' + (t.wrongPassword || 'Password attuale errata'), 'error');
+                return;
+            }
+
+            // Valida nuova password
+            if (passwordChange.newPassword.length < 6) {
+                showToast('❌ ' + (t.passwordTooShort || 'Password troppo corta (minimo 6 caratteri)'), 'error');
+                return;
+            }
+
+            if (passwordChange.newPassword !== passwordChange.confirmPassword) {
+                showToast('❌ ' + (t.passwordMismatch || 'Le password non corrispondono'), 'error');
+                return;
+            }
+
+            // Genera nuovo hash
+            const newBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(passwordChange.newPassword));
+            const newHash = Array.from(new Uint8Array(newBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // 💾 Salva in Firebase
+            await db.collection('settings').doc('adminAuth').set({
+                passwordHash: newHash,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedVia: 'settings'
+            }, { merge: true });
+
+            showToast('✅ ' + (t.passwordChanged || 'Password cambiata con successo!'), 'success');
+            setPasswordChange({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+            // Invalida sessione corrente per forzare nuovo login
+            localStorage.removeItem('adminAuth');
+            
+            // Mostra conferma con opzione di fare logout
+            if (confirm((t.passwordChangedLogout || 'Password cambiata! Vuoi fare logout ora per testare la nuova password?'))) {
+                window.location.reload();
+            }
+        } catch (e) {
+            console.error('Error changing password:', e);
+            showToast('❌ Errore cambio password', 'error');
+        }
     };
 
     // ==================== NOTIFICATION FUNCTIONS ====================
@@ -799,6 +914,103 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                             className: 'mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors'
                         }, '✏️ ' + (t.edit || 'Modifica'))
                     )
+            )
+        ),
+
+        // ========== SEZIONE: SICUREZZA (NUOVA) ==========
+        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '🔐', 
+                title: t.securitySettings || 'Impostazioni di Sicurezza', 
+                sectionKey: 'security' 
+            }),
+            
+            expandedSection === 'security' && React.createElement('div', { className: 'p-4 space-y-6 animate-fade-in' },
+                // Cambio Password Admin
+                React.createElement('div', {},
+                    React.createElement('h3', { className: subSectionHeaderClass },
+                        '🔑 ' + (t.changeAdminPassword || 'Cambia Password Admin')
+                    ),
+                    React.createElement('div', { className: 'space-y-3' },
+                        React.createElement('input', {
+                            type: 'password',
+                            value: passwordChange.currentPassword,
+                            onChange: (e) => setPasswordChange({...passwordChange, currentPassword: e.target.value}),
+                            placeholder: t.currentPassword || 'Password Attuale',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('input', {
+                            type: 'password',
+                            value: passwordChange.newPassword,
+                            onChange: (e) => setPasswordChange({...passwordChange, newPassword: e.target.value}),
+                            placeholder: t.newPassword || 'Nuova Password',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('input', {
+                            type: 'password',
+                            value: passwordChange.confirmPassword,
+                            onChange: (e) => setPasswordChange({...passwordChange, confirmPassword: e.target.value}),
+                            placeholder: t.confirmPassword || 'Conferma Password',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('button', {
+                            onClick: changeAdminPassword,
+                            className: 'w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors'
+                        }, '🔄 ' + (t.changePassword || 'Cambia Password'))
+                    ),
+                    React.createElement('div', { className: `mt-3 p-3 rounded-lg ${darkMode ? 'bg-indigo-900/30 border border-indigo-700/50' : 'bg-indigo-50 border border-indigo-200'}` },
+                        React.createElement('p', { className: textClass + ' text-xs' },
+                            '✅ ' + (t.passwordHashInfo || 'La password viene salvata automaticamente in Firebase (nessun intervento manuale richiesto)')
+                        )
+                    )
+                ),
+
+                // Domande di Sicurezza
+                React.createElement('div', {},
+                    React.createElement('h3', { className: subSectionHeaderClass },
+                        '🛡️ ' + (t.configureSecurityQuestions || 'Configura Domande di Sicurezza')
+                    ),
+                    React.createElement('p', { className: textClass + ' text-sm mb-3' },
+                        t.securityQuestionsDescription || 'Imposta 2 domande di sicurezza per recuperare l\'accesso in caso di password dimenticata'
+                    ),
+                    React.createElement('div', { className: 'space-y-3' },
+                        React.createElement('input', {
+                            type: 'text',
+                            value: securityConfig.question1,
+                            onChange: (e) => setSecurityConfig({...securityConfig, question1: e.target.value}),
+                            placeholder: t.question1Placeholder || 'Es: Qual è il nome del tuo primo animale domestico?',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: securityConfig.answer1,
+                            onChange: (e) => setSecurityConfig({...securityConfig, answer1: e.target.value}),
+                            placeholder: t.answer1Placeholder || 'Rispondi alla prima domanda',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: securityConfig.question2,
+                            onChange: (e) => setSecurityConfig({...securityConfig, question2: e.target.value}),
+                            placeholder: t.question2Placeholder || 'Es: In che città sei nato?',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: securityConfig.answer2,
+                            onChange: (e) => setSecurityConfig({...securityConfig, answer2: e.target.value}),
+                            placeholder: t.answer2Placeholder || 'Rispondi alla seconda domanda',
+                            className: inputClass + ' p-3 rounded-lg border w-full'
+                        }),
+                        React.createElement('button', {
+                            onClick: saveSecurityQuestions,
+                            className: 'w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors'
+                        }, '💾 ' + (t.saveSecurityQuestions || 'Salva Domande di Sicurezza'))
+                    ),
+                    React.createElement('p', { className: textClass + ' text-xs mt-2' },
+                        '💡 ' + (t.securityQuestionsHint || 'Le risposte saranno salvate in modo sicuro (hash SHA-256)')
+                    )
+                )
             )
         ),
 

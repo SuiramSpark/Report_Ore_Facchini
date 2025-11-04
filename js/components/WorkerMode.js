@@ -641,12 +641,12 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         notifyWorker(workerData.id, modificationDetails);
     };
 
-    const bgClass = darkMode ? 'bg-gray-900' : 'bg-gray-50';
-    const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
-    const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
+    const bgClass = darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50';
+    const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white/90 backdrop-blur-sm text-gray-900 border border-indigo-100';
+    const textClass = darkMode ? 'text-gray-300' : 'text-gray-700';
     const inputClass = darkMode ? 
         'bg-gray-700 border-gray-600 text-white' : 
-        'bg-white border-gray-300 text-gray-900';
+        'bg-white/80 border-indigo-200 text-gray-900 focus:border-indigo-400 focus:ring-indigo-200';
 
     // ⭐ Session Prompt Modal
     if (showSessionPrompt && savedSession) {
@@ -665,7 +665,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                         </p>
                     </div>
                     
-                    <div className={`p-4 rounded-lg mb-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                    <div className={`p-4 rounded-lg mb-6 ${darkMode ? 'bg-gray-700' : 'bg-indigo-50 border border-indigo-200'}`}>
                         <p className="font-semibold mb-2">{savedSession.workerData.nome} {savedSession.workerData.cognome}</p>
                         <p className={`text-sm ${textClass}`}>
                             {savedSession.workerData.oraIn && `${t.startTime}: ${savedSession.workerData.oraIn}`}
@@ -781,7 +781,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                 setLocalDarkMode(next);
                                 try { localStorage.setItem('workerDarkModeExplicit', 'true'); } catch (e) {}
                             }}
-                            className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-white'} shadow-md transition-colors`}
+                            className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-white/90 border border-indigo-100'} shadow-md transition-colors`}
                             title={darkMode ? t.lightMode : t.darkModeWorker}
                         >
                             {darkMode ? '☀️' : '🌙'}
@@ -800,7 +800,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                         
                         {mySubmission ? (
                             <>
-                                <div className={`border-l-4 ${isCompleted ? 'border-green-500' : 'border-yellow-500'} p-3 sm:p-4 rounded-r-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-4`}>
+                                <div className={`border-l-4 ${isCompleted ? 'border-green-500' : 'border-yellow-500'} p-3 sm:p-4 rounded-r-lg ${darkMode ? 'bg-gray-700' : 'bg-gradient-to-r from-indigo-50 to-purple-50'} mb-4`}>
                                     <h2 className="font-bold text-base sm:text-lg mb-2">
                                         👋 {t.hello}, {mySubmission.nome}!
                                     </h2>
@@ -866,7 +866,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                             setLocalLanguage(e.target.value);
                             localStorage.setItem('workerLanguage', e.target.value);
                         }}
-                        className={`px-3 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white'} shadow-md transition-colors text-sm sm:text-base`}
+                        className={`px-3 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white/90 border border-indigo-100'} shadow-md transition-colors text-sm sm:text-base`}
                         style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                     >
                         {(
@@ -893,7 +893,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                             try { localStorage.setItem('workerDarkModeExplicit', 'true'); } catch (e) {}
                             console.log('🌓 New localDarkMode:', next);
                         }}
-                        className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-white'} shadow-md transition-colors`}
+                        className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-white/90 border border-indigo-100'} shadow-md transition-colors`}
                         title={darkMode ? t.lightMode : t.darkModeWorker}
                     >
                         {darkMode ? '☀️' : '🌙'}
@@ -1000,7 +1000,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                         <button
                             type="button"
                             onClick={() => setShowOptionalFields(!showOptionalFields)}
-                            className={`w-full py-2 px-3 rounded-lg border ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'} transition-colors text-sm sm:text-base font-medium`}
+                            className={`w-full py-2 px-3 rounded-lg border ${darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-indigo-200 hover:bg-indigo-50'} transition-colors text-sm sm:text-base font-medium`}
                         >
                             {showOptionalFields ? '▼' : '▶'} {t.optionalFields}
                         </button>
@@ -1068,7 +1068,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                 {t.signature} *
                             </label>
                             
-                            <div className={`border-2 ${darkMode ? 'border-indigo-400 bg-gray-800' : 'border-indigo-500 bg-white'} rounded-lg p-1 sm:p-2`}>
+                            <div className={`border-2 ${darkMode ? 'border-indigo-400 bg-gray-800' : 'border-indigo-400 bg-white/80'} rounded-lg p-1 sm:p-2`}>
                                 <canvas
                                     key={canvasKey} // 🔧 FIX: Forza re-render quando cambia
                                     ref={canvasRef}

@@ -549,9 +549,8 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                 return (
                                                     <div
                                                         key={seg.name + idx}
-                                                        className={`h-full relative cursor-pointer transition-opacity ${isActive ? 'z-10' : ''}`}
+                                                        className={`h-full relative cursor-pointer transition-opacity ${isActive ? 'z-[100]' : ''}`}
                                                         style={{ width: `${width}%`, backgroundColor: seg.color, transition: 'width 600ms ease, opacity 200ms ease' }}
-                                                        title={`${seg.name}: ${seg.hours}h`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setActiveTooltip(isActive ? null : tooltipId);
@@ -569,28 +568,36 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                             }
                                                         }}
                                                     >
-                                                        {/* Mobile-friendly tooltip */}
+                                                        {/* Custom modern tooltip - NO native title attribute */}
                                                         {isActive && (
                                                             <div 
-                                                                className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fade-in ${
-                                                                    darkMode ? 'bg-gray-800 text-white border border-gray-600' : 'bg-white text-gray-900 border border-gray-200'
+                                                                className={`fixed px-4 py-3 rounded-xl shadow-2xl whitespace-nowrap animate-fade-in pointer-events-none ${
+                                                                    darkMode ? 'bg-gray-800/95 text-white border-2 border-indigo-500/50' : 'bg-white/95 text-gray-900 border-2 border-indigo-400/50'
                                                                 }`}
-                                                                style={{ minWidth: '120px' }}
+                                                                style={{ 
+                                                                    minWidth: '150px',
+                                                                    zIndex: 9999,
+                                                                    left: '50%',
+                                                                    top: '50%',
+                                                                    transform: 'translate(-50%, -150%)',
+                                                                    backdropFilter: 'blur(12px)'
+                                                                }}
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
-                                                                <div className="text-sm font-semibold">{seg.name}</div>
-                                                                <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                                                    {seg.hours.toFixed(1)}h
+                                                                <div className="text-base font-bold mb-1">{seg.name}</div>
+                                                                <div className={`text-sm font-semibold ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
+                                                                    {seg.hours.toFixed(1)} ore
                                                                 </div>
                                                                 {/* Arrow */}
                                                                 <div 
-                                                                    className={`absolute top-full left-1/2 transform -translate-x-1/2 -mt-px`}
+                                                                    className="absolute left-1/2 transform -translate-x-1/2"
                                                                     style={{
+                                                                        bottom: '-10px',
                                                                         width: 0,
                                                                         height: 0,
-                                                                        borderLeft: '6px solid transparent',
-                                                                        borderRight: '6px solid transparent',
-                                                                        borderTop: `6px solid ${darkMode ? '#374151' : '#E5E7EB'}`
+                                                                        borderLeft: '8px solid transparent',
+                                                                        borderRight: '8px solid transparent',
+                                                                        borderTop: `10px solid ${darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)'}`
                                                                     }}
                                                                 ></div>
                                                             </div>

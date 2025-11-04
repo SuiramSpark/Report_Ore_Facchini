@@ -3,6 +3,20 @@
 const { useState, useEffect, useCallback } = React;
 
 const App = () => {
+    // 🔒 ADMIN PASSWORD PROTECTION + RECOVERY
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [showPasswordError, setShowPasswordError] = useState(false);
+    const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+    const [securityAnswers, setSecurityAnswers] = useState({ answer1: '', answer2: '' });
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [recoveryError, setRecoveryError] = useState('');
+    const [adminPasswordHash, setAdminPasswordHash] = useState(null); // Caricato da Firebase invece di hardcoded
+    
+    // ⚠️ DEPRECATO: Questo hash non viene più usato, viene caricato da Firebase
+    // const ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // "admin123"
+    
     // Importa RadioPlayer dal global scope se usi <script type="text/babel">
     // Assicurati che js/components/RadioPlayer.js sia incluso in index.html prima di app.js
     // Tutto il codice React qui dentro
@@ -47,10 +61,36 @@ const App = () => {
         const savedLogo = localStorage.getItem('companyLogo');
         const savedAutoArchiveDay = parseInt(localStorage.getItem('autoArchiveDay')) || 5;
         
-    setDarkMode(savedDarkMode);
-    setAppLanguage(savedLanguage);
+        setDarkMode(savedDarkMode);
+        setAppLanguage(savedLanguage);
         setAutoArchiveDay(savedAutoArchiveDay);
         if (savedLogo) setCompanyLogo(savedLogo);
+
+        // 🔐 Carica password hash da Firebase
+        if (firebaseDb) {
+            firebaseDb.collection('settings').doc('adminAuth').get()
+                .then(doc => {
+                    if (doc.exists && doc.data().passwordHash) {
+                        setAdminPasswordHash(doc.data().passwordHash);
+                        console.log('✅ Password hash caricato da Firebase');
+                    } else {
+                        // Prima installazione - usa hash default e salvalo
+                        const defaultHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // "admin123"
+                        setAdminPasswordHash(defaultHash);
+                        firebaseDb.collection('settings').doc('adminAuth').set({
+                            passwordHash: defaultHash,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            note: 'Password default: admin123 - CAMBIARLA SUBITO!'
+                        }, { merge: true });
+                        console.log('⚠️ Password default impostata - CAMBIARLA SUBITO!');
+                    }
+                })
+                .catch(err => {
+                    console.error('Errore caricamento password:', err);
+                    // Fallback a hash default
+                    setAdminPasswordHash('240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9');
+                });
+        }
         
         // Check URL params for worker mode
         const params = new URLSearchParams(window.location.search);
@@ -64,12 +104,130 @@ const App = () => {
             console.log('✅ Worker mode detected! Sheet ID:', urlSheet);
             setMode('worker');
             setSheetId(urlSheet);
+            setIsAuthenticated(true); // Worker mode non richiede password
         } else {
             console.log('👤 Admin mode (default)');
+            // Verifica se c'è una sessione valida (24 ore)
+            const savedAuth = localStorage.getItem('adminAuth');
+            if (savedAuth) {
+                try {
+                    const { timestamp } = JSON.parse(savedAuth);
+                    const now = Date.now();
+                    const twentyFourHours = 24 * 60 * 60 * 1000;
+                    if (now - timestamp < twentyFourHours) {
+                        setIsAuthenticated(true);
+                        console.log('✅ Sessione admin valida');
+                    } else {
+                        localStorage.removeItem('adminAuth');
+                        console.log('⏰ Sessione admin scaduta');
+                    }
+                } catch (e) {
+                    localStorage.removeItem('adminAuth');
+                }
+            }
         }
         
         setLoading(false);
     }, []);
+
+    // 🔒 Funzione verifica password admin
+    const handleAdminLogin = async () => {
+        if (!adminPasswordHash) {
+            setShowPasswordError(true);
+            setTimeout(() => setShowPasswordError(false), 3000);
+            return;
+        }
+
+        try {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(passwordInput);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            if (hashHex === adminPasswordHash) {
+                setIsAuthenticated(true);
+                setShowPasswordError(false);
+                // Salva sessione per 24 ore
+                localStorage.setItem('adminAuth', JSON.stringify({ timestamp: Date.now() }));
+            } else {
+                setShowPasswordError(true);
+                setTimeout(() => setShowPasswordError(false), 3000);
+            }
+        } catch (e) {
+            console.error('Errore verifica password:', e);
+            setShowPasswordError(true);
+        }
+    };
+
+    // 🔐 Password Recovery - Verifica risposte sicurezza
+    const handlePasswordRecovery = async () => {
+        if (!db) {
+            setRecoveryError('Database non disponibile');
+            return;
+        }
+
+        try {
+            // Carica domande di sicurezza da Firebase
+            const securityDoc = await db.collection('settings').doc('securityQuestions').get();
+            
+            if (!securityDoc.exists || !securityDoc.data().question1Hash) {
+                setRecoveryError(t.noRecoverySet || 'Nessun sistema di recupero configurato! Vai in Impostazioni per configurarlo.');
+                return;
+            }
+
+            const { question1Hash, question2Hash } = securityDoc.data();
+            
+            // Hash delle risposte fornite
+            const encoder = new TextEncoder();
+            const answer1Buffer = await crypto.subtle.digest('SHA-256', encoder.encode(securityAnswers.answer1.toLowerCase().trim()));
+            const answer2Buffer = await crypto.subtle.digest('SHA-256', encoder.encode(securityAnswers.answer2.toLowerCase().trim()));
+            const answer1Hash = Array.from(new Uint8Array(answer1Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const answer2Hash = Array.from(new Uint8Array(answer2Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+            if (answer1Hash === question1Hash && answer2Hash === question2Hash) {
+                // Risposte corrette - permetti reset password
+                if (newPassword.length < 6) {
+                    setRecoveryError(t.passwordTooShort || 'Password troppo corta (minimo 6 caratteri)');
+                    return;
+                }
+                if (newPassword !== confirmPassword) {
+                    setRecoveryError(t.passwordMismatch || 'Le password non corrispondono');
+                    return;
+                }
+
+                // Genera nuovo hash password
+                const newPassBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(newPassword));
+                const newPassHash = Array.from(new Uint8Array(newPassBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                // 💾 SALVA in Firebase invece di mostrare alert
+                await db.collection('settings').doc('adminAuth').set({
+                    passwordHash: newPassHash,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedVia: 'recovery'
+                }, { merge: true });
+
+                // Aggiorna lo state locale
+                setAdminPasswordHash(newPassHash);
+                
+                showToast('✅ Password reimpostata con successo!', 'success');
+                
+                // Resetta il form e torna al login
+                setShowPasswordRecovery(false);
+                setSecurityAnswers({ answer1: '', answer2: '' });
+                setNewPassword('');
+                setConfirmPassword('');
+                setRecoveryError('');
+                setPasswordInput('');
+            } else {
+                setRecoveryError(t.wrongSecurityAnswers || 'Risposte di sicurezza errate!');
+                setTimeout(() => setRecoveryError(''), 3000);
+            }
+        } catch (e) {
+            console.error('Errore recupero password:', e);
+            setRecoveryError(t.recoveryError || 'Errore durante il recupero');
+        }
+    };
 
     // Save preferences
     useEffect(() => {
@@ -534,6 +692,242 @@ const App = () => {
         return <WorkerModeComp sheetId={sheetId} db={db} darkMode={darkMode} language={language} />;
     }
 
+    // 🔒 SCHERMATA LOGIN ADMIN
+    if (!isAuthenticated) {
+        // Se è attiva la schermata di recupero password
+        if (showPasswordRecovery) {
+            // Hook per caricare domande di sicurezza da Firebase
+            const [recoveryData, setRecoveryData] = React.useState(null);
+            const [loadingRecovery, setLoadingRecovery] = React.useState(true);
+
+            React.useEffect(() => {
+                if (!db) return;
+                db.collection('settings').doc('securityQuestions').get()
+                    .then(doc => {
+                        if (doc.exists) {
+                            setRecoveryData(doc.data());
+                        }
+                        setLoadingRecovery(false);
+                    })
+                    .catch(() => setLoadingRecovery(false));
+            }, [db]);
+
+            if (loadingRecovery) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+                        <div className="loader"></div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
+                    <div className={`max-w-md w-full mx-4 p-8 rounded-2xl shadow-2xl ${darkMode ? 'bg-gray-800/90 backdrop-blur-lg border border-indigo-500/20' : 'bg-white/90 backdrop-blur-lg border border-indigo-200'}`}>
+                        <div className="text-center mb-8">
+                            <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                🔑 {t.passwordRecovery || 'Recupero Password'}
+                            </h1>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {t.answerSecurityQuestions || 'Rispondi alle domande di sicurezza'}
+                            </p>
+                        </div>
+
+                        {!recoveryData || !recoveryData.question1 ? (
+                            <div className="text-center space-y-4">
+                                <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm">
+                                    ❌ {t.noRecoverySet || 'Nessun sistema di recupero configurato!'}
+                                </div>
+                                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    {t.configureRecoveryInSettings || 'Configura le domande di sicurezza nelle Impostazioni dopo il login.'}
+                                </p>
+                                <button
+                                    onClick={() => setShowPasswordRecovery(false)}
+                                    className={`w-full py-2 rounded-lg font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+                                >
+                                    ← {t.backToLogin || 'Torna al Login'}
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={(e) => { e.preventDefault(); handlePasswordRecovery(); }} className="space-y-4">
+                                <div>
+                                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                        {recoveryData.question1 || t.securityQuestion1}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={securityAnswers.answer1}
+                                        onChange={(e) => setSecurityAnswers({...securityAnswers, answer1: e.target.value})}
+                                        className={`w-full px-4 py-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-indigo-200 text-gray-900'} focus:ring-2 focus:ring-indigo-500/50`}
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                        {recoveryData.question2 || t.securityQuestion2}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={securityAnswers.answer2}
+                                        onChange={(e) => setSecurityAnswers({...securityAnswers, answer2: e.target.value})}
+                                        className={`w-full px-4 py-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-indigo-200 text-gray-900'} focus:ring-2 focus:ring-indigo-500/50`}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                        {t.newPassword || 'Nuova Password'}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className={`w-full px-4 py-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-indigo-200 text-gray-900'} focus:ring-2 focus:ring-indigo-500/50`}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                        {t.confirmPassword || 'Conferma Password'}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className={`w-full px-4 py-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-indigo-200 text-gray-900'} focus:ring-2 focus:ring-indigo-500/50`}
+                                    />
+                                </div>
+
+                                {recoveryError && (
+                                    <div className="animate-shake bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm">
+                                        ❌ {recoveryError}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <button
+                                        type="submit"
+                                        className={`w-full py-3 rounded-lg font-semibold ${darkMode ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white' : 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white'}`}
+                                    >
+                                        🔓 {t.resetPassword || 'Reimposta Password'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowPasswordRecovery(false);
+                                            setSecurityAnswers({ answer1: '', answer2: '' });
+                                            setNewPassword('');
+                                            setConfirmPassword('');
+                                            setRecoveryError('');
+                                        }}
+                                        className={`w-full py-2 rounded-lg font-medium ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}`}
+                                    >
+                                        ← {t.backToLogin || 'Torna al Login'}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        <div className="mt-6 flex justify-center">
+                            <button
+                                onClick={() => setDarkMode(!darkMode)}
+                                className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                            >
+                                {darkMode ? '☀️' : '🌙'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Schermata login normale
+        return (
+            <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
+                <div className={`max-w-md w-full mx-4 p-8 rounded-2xl shadow-2xl ${darkMode ? 'bg-gray-800/90 backdrop-blur-lg border border-indigo-500/20' : 'bg-white/90 backdrop-blur-lg border border-indigo-200'}`}>
+                    {/* Logo/Title */}
+                    <div className="text-center mb-8">
+                        <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            🔒 Admin Access
+                        </h1>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {t.adminLoginDescription || 'Inserisci la password per accedere alla dashboard amministratore'}
+                        </p>
+                    </div>
+
+                    {/* Password Form */}
+                    <form onSubmit={(e) => { e.preventDefault(); handleAdminLogin(); }} className="space-y-6">
+                        <div>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                                {t.password || 'Password'}
+                            </label>
+                            <input
+                                type="password"
+                                value={passwordInput}
+                                onChange={(e) => setPasswordInput(e.target.value)}
+                                placeholder="••••••••"
+                                className={`w-full px-4 py-3 rounded-lg border ${
+                                    darkMode 
+                                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-indigo-500' 
+                                        : 'bg-white border-indigo-200 text-gray-900 placeholder-gray-400 focus:border-indigo-400'
+                                } focus:ring-2 focus:ring-indigo-500/50 transition-all`}
+                                autoFocus
+                            />
+                        </div>
+
+                        {showPasswordError && (
+                            <div className="animate-shake bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm">
+                                ❌ {t.wrongPassword || 'Password errata! Riprova.'}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className={`w-full py-3 rounded-lg font-semibold transition-all transform hover:scale-105 ${
+                                darkMode
+                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/50'
+                                    : 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg shadow-indigo-300/50'
+                            }`}
+                        >
+                            🔓 {t.login || 'Accedi'}
+                        </button>
+
+                        {/* Password dimenticata? */}
+                        <div className="text-center">
+                            <button
+                                type="button"
+                                onClick={() => setShowPasswordRecovery(true)}
+                                className={`text-sm font-medium ${darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'} transition-colors`}
+                            >
+                                🔑 {t.forgotPassword || 'Password dimenticata?'}
+                            </button>
+                        </div>
+                    </form>
+
+                    {/* Dark Mode Toggle */}
+                    <div className="mt-6 flex justify-center">
+                        <button
+                            onClick={() => setDarkMode(!darkMode)}
+                            className={`p-2 rounded-lg transition-colors ${
+                                darkMode ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            }`}
+                            title={darkMode ? 'Light Mode' : 'Dark Mode'}
+                        >
+                            {darkMode ? '☀️' : '🌙'}
+                        </button>
+                    </div>
+
+                    {/* Info */}
+                    <p className={`mt-6 text-center text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                        💡 {t.adminLoginHint || 'Password predefinita: admin123 (CAMBIARLA in app.js!)'}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     // Admin Mode
     return (
         <div className={`min-h-screen ${bgClass}`}>
@@ -631,6 +1025,25 @@ const App = () => {
                                 title={darkMode ? 'Light Mode' : 'Dark Mode'}
                             >
                                 <span className="text-xl">{darkMode ? '☀️' : '🌙'}</span>
+                            </button>
+
+                            {/* Logout Button */}
+                            <button
+                                onClick={() => {
+                                    localStorage.removeItem('adminAuth');
+                                    setIsAuthenticated(false);
+                                    setPasswordInput('');
+                                    setShowPasswordError(false);
+                                    showToast('🔒 ' + (t.logout || 'Disconnesso!'), 'info');
+                                }}
+                                className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 transform hover:scale-110 ${
+                                    darkMode
+                                        ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 shadow-lg shadow-red-500/20'
+                                        : 'bg-red-500/20 hover:bg-red-500/30 text-red-600 shadow-lg shadow-red-500/20'
+                                }`}
+                                title={t.logout || 'Esci'}
+                            >
+                                <span className="text-xl">🚪</span>
                             </button>
 
 
