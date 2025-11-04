@@ -2,7 +2,23 @@
 
 const changelogs = {
     it: [
-       
+        {
+            version: 'v5.0',
+            date: '4 Novembre 2025',
+            changes: [
+                '🎨 NEW: Redesign completo interfaccia Settings con sezioni collassabili',
+                '📱 NEW: Bottom Navigation moderna per mobile (5 icone + menu popup)',
+                '💾 NEW: Backup & Restore integrati in Settings',
+                '📝 NEW: Audit Log integrato in Settings con filtri e selezione multipla',
+                '📋 NEW: Card fogli più compatte con bordo colorato verticale per stato',
+                '🟢 NEW: Verde per completati, 🟡 Giallo per bozze, ⚪ Grigio per archiviati',
+                '⚡ FIX: Dashboard sfarfallio risolto (rimosso loading inutile)',
+                '🌐 IMPROVED: Traduzioni complete in inglese per tutte le nuove funzioni',
+                '📊 FIX: Dati Dashboard ora sempre visibili e aggiornati',
+                '🎯 IMPROVED: Performance migliorate rimuovendo stati ridondanti',
+                '🔧 FIX: Changelog rendering sicuro con controlli null safety'
+            ]
+        },
         {
             version: 'v4.3',
             date: '10 Luglio 2025',
@@ -134,7 +150,21 @@ const changelogs = {
     ],
     en: [
         {
-           
+            version: 'v5.0',
+            date: 'November 4, 2025',
+            changes: [
+                '🎨 NEW: Complete Settings interface redesign with collapsible sections',
+                '📱 NEW: Modern Bottom Navigation for mobile (5 icons + popup menu)',
+                '💾 NEW: Backup & Restore integrated in Settings',
+                '📝 NEW: Audit Log integrated in Settings with filters and multi-selection',
+                '📋 NEW: More compact sheet cards with colored vertical border by status',
+                '🟢 NEW: Green for completed, 🟡 Yellow for drafts, ⚪ Gray for archived',
+                '⚡ FIX: Dashboard flickering resolved (removed useless loading)',
+                '🌐 IMPROVED: Complete English translations for all new features',
+                '📊 FIX: Dashboard data now always visible and updated',
+                '🎯 IMPROVED: Improved performance removing redundant states',
+                '🔧 FIX: Changelog rendering safe with null safety checks'
+            ]
         },
         {
             version: 'v4.3',

@@ -314,13 +314,15 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
     }), []);
     const weatherBgDuration = (weatherBgDurations[weatherIconKey] || weatherBgDurations.unknown);
     const [selectedPeriod, setSelectedPeriod] = React.useState('week');
-    const [loading, setLoading] = React.useState(false);
     const [animated, setAnimated] = React.useState(false);
-    const [hasMounted, setHasMounted] = React.useState(false);
     // Visible count for recent activities (pagination) — default 5
     const [activityVisibleCount, setActivityVisibleCount] = React.useState(5);
     // Real-time clock state (used only on desktop web to save mobile battery)
     const [now, setNow] = React.useState(new Date());
+    // State for mobile tooltip in bar chart
+    const [activeTooltip, setActiveTooltip] = React.useState(null);
+    // State for visible days in bar chart (pagination)
+    const [visibleDays, setVisibleDays] = React.useState(7);
 
     // Detect desktop-like interaction (fine pointer + hover) to avoid enabling on mobile
     const isDesktop = (typeof window !== 'undefined' && window.matchMedia) ? window.matchMedia('(pointer: fine) and (hover: hover)').matches : true;
@@ -363,6 +365,15 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
         setLastDataUpdate(new Date());
     }, [sheets]);
 
+    // Close tooltip when clicking outside (for mobile bar chart)
+    React.useEffect(() => {
+        const handleClickOutside = () => setActiveTooltip(null);
+        if (activeTooltip) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [activeTooltip]);
+
     // 📊 Calcolo statistiche avanzate
     const stats = React.useMemo(() => {
         return calculateAdvancedStats(sheets, selectedPeriod, weekStart);
@@ -398,19 +409,16 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
         );
     };
 
-    // Stabilize loading state to prevent flickering
+    // Trigger animation on mount
     React.useEffect(() => {
-        setHasMounted(true);
         setAnimated(true);
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
     }, []);
 
-    // Real-time clock: run only on desktop and only when component has mounted and user enabled.
+    // Real-time clock: run only on desktop and only when user enabled.
     // Uses Page Visibility API to pause updates when the tab is hidden and aligns
     // the first tick to the next full second to minimize drift.
     React.useEffect(() => {
-        if (!hasMounted || !isDesktop || !liveClockEnabled || typeof document === 'undefined') return;
+        if (!isDesktop || !liveClockEnabled || typeof document === 'undefined') return;
 
         let intervalId = null;
         let timeoutId = null;
@@ -444,11 +452,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
             stopTimer();
             document.removeEventListener('visibilitychange', handleVisibility);
         };
-    }, [hasMounted, isDesktop, liveClockEnabled]);
-
-    if (!hasMounted) {
-        return null; // Avoid rendering until the component has mounted
-    }
+    }, [isDesktop, liveClockEnabled]);
 
     // ========================================
     // 🎯 GRAFICO A BARRE AVANZATO - FIXED
@@ -456,9 +460,14 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
     const renderAdvancedBarChart = (opts = {}) => {
         // Build per-day segments based on workerMap
         const dayKeys = stats.chartDayKeys || stats.chartData.map(d => ({ label: d.label }));
+        
+        // Paginate days (using state from parent component)
+        const displayedDays = dayKeys.slice(0, visibleDays);
+        const hasMoreDays = visibleDays < dayKeys.length;
+        const canShowLess = visibleDays > 7;
 
         // Compute max daily total for scaling
-        const dailyTotals = dayKeys.map(dk => {
+        const dailyTotals = displayedDays.map(dk => {
             const label = dk.label;
             let total = 0;
             for (const wName in stats.workerMap) {
@@ -467,6 +476,36 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
             return total;
         });
         const maxHours = Math.max(...dailyTotals, 1);
+        
+        // Helper: assign unique colors per day to avoid duplicates in same row
+        const getUniqueColorForDay = (workerName, usedColors) => {
+            const palette = [
+                '#EF4444', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6', '#8B5CF6',
+                '#EC4899', '#F97316', '#84CC16', '#14B8A6', '#6366F1', '#A855F7',
+                '#F43F5E', '#FBBF24', '#34D399', '#22D3EE', '#60A5FA', '#A78BFA',
+                '#F472B6', '#FB923C', '#A3E635', '#2DD4BF', '#818CF8', '#C084FC'
+            ];
+            
+            // Get deterministic hash for worker
+            let hash = 0;
+            for (let i = 0; i < workerName.length; i++) {
+                hash = ((hash << 5) - hash) + workerName.charCodeAt(i);
+                hash = hash & hash;
+            }
+            
+            // Start from hash position and find first unused color
+            const startIdx = Math.abs(hash) % palette.length;
+            for (let i = 0; i < palette.length; i++) {
+                const idx = (startIdx + i) % palette.length;
+                const color = palette[idx];
+                if (!usedColors.has(color)) {
+                    return color;
+                }
+            }
+            
+            // Fallback: return any color (shouldn't happen with 24 colors)
+            return palette[startIdx % palette.length];
+        };
 
         return (
             <div className="space-y-4">
@@ -480,12 +519,18 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
 
                 {stats.hasData ? (
                     <div className="space-y-3">
-                        {dayKeys.map((dk, i) => {
+                        {displayedDays.map((dk, i) => {
                             const label = dk.label;
                             const segments = [];
+                            const usedColors = new Set(); // Track colors used in this day
+                            
                             for (const wName in stats.workerMap) {
                                 const h = stats.workerMap[wName].perDay[label] || 0;
-                                if (h > 0) segments.push({ name: wName, hours: h, color: window.getColorForKey ? window.getColorForKey(wName) : '#4f46e5' });
+                                if (h > 0) {
+                                    const color = getUniqueColorForDay(wName, usedColors);
+                                    usedColors.add(color);
+                                    segments.push({ name: wName, hours: h, color: color });
+                                }
                             }
                             const dayTotal = segments.reduce((s, seg) => s + seg.hours, 0);
                             return (
@@ -498,14 +543,58 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                         ) : (
                                             segments.map((seg, idx) => {
                                                 const width = maxHours > 0 ? (seg.hours / maxHours) * 100 : 0;
+                                                const tooltipId = `${label}-${idx}`;
+                                                const isActive = activeTooltip === tooltipId;
+                                                
                                                 return (
                                                     <div
                                                         key={seg.name + idx}
-                                                        className={`h-full`} 
-                                                        style={{ width: `${width}%`, backgroundColor: seg.color, transition: 'width 600ms ease' }}
+                                                        className={`h-full relative cursor-pointer transition-opacity ${isActive ? 'z-10' : ''}`}
+                                                        style={{ width: `${width}%`, backgroundColor: seg.color, transition: 'width 600ms ease, opacity 200ms ease' }}
                                                         title={`${seg.name}: ${seg.hours}h`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActiveTooltip(isActive ? null : tooltipId);
+                                                        }}
+                                                        onMouseEnter={() => {
+                                                            // Desktop hover - show immediately
+                                                            if (window.matchMedia('(hover: hover)').matches) {
+                                                                setActiveTooltip(tooltipId);
+                                                            }
+                                                        }}
+                                                        onMouseLeave={() => {
+                                                            // Desktop hover - hide on leave
+                                                            if (window.matchMedia('(hover: hover)').matches) {
+                                                                setActiveTooltip(null);
+                                                            }
+                                                        }}
                                                     >
-                                                                    {/* native title tooltip shows worker and hours */}
+                                                        {/* Mobile-friendly tooltip */}
+                                                        {isActive && (
+                                                            <div 
+                                                                className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 rounded-lg shadow-lg whitespace-nowrap z-50 animate-fade-in ${
+                                                                    darkMode ? 'bg-gray-800 text-white border border-gray-600' : 'bg-white text-gray-900 border border-gray-200'
+                                                                }`}
+                                                                style={{ minWidth: '120px' }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <div className="text-sm font-semibold">{seg.name}</div>
+                                                                <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                                                    {seg.hours.toFixed(1)}h
+                                                                </div>
+                                                                {/* Arrow */}
+                                                                <div 
+                                                                    className={`absolute top-full left-1/2 transform -translate-x-1/2 -mt-px`}
+                                                                    style={{
+                                                                        width: 0,
+                                                                        height: 0,
+                                                                        borderLeft: '6px solid transparent',
+                                                                        borderRight: '6px solid transparent',
+                                                                        borderTop: `6px solid ${darkMode ? '#374151' : '#E5E7EB'}`
+                                                                    }}
+                                                                ></div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })
@@ -516,7 +605,33 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                             );
                         })}
 
-                        {/* legend removed as requested */}
+                        {/* Pagination controls */}
+                        {dayKeys.length > 7 && (
+                            <div className="flex justify-center pt-3">
+                                <button
+                                    onClick={() => {
+                                        if (hasMoreDays) {
+                                            // Show 7 more days
+                                            setVisibleDays(prev => Math.min(prev + 7, dayKeys.length));
+                                        } else if (canShowLess) {
+                                            // Show less (back to 7)
+                                            setVisibleDays(7);
+                                        }
+                                    }}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                                        darkMode 
+                                            ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                                            : 'bg-indigo-500 hover:bg-indigo-600 text-white'
+                                    }`}
+                                >
+                                    {hasMoreDays ? (
+                                        <>📅 {t.showMore || 'Mostra altro'} ({Math.min(7, dayKeys.length - visibleDays)} {t.days || 'giorni'})</>
+                                    ) : canShowLess ? (
+                                        <>📅 {t.showLess || 'Mostra meno'}</>
+                                    ) : null}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -593,14 +708,32 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
     // 📋 TABELLA ATTIVITÀ RECENTI - FIXED
     // ========================================
     const renderActivityTable = (opts = {}) => {
-        const sortedActivities = sheets
-            .filter(s => s.data || s.createdAt)
-            .sort((a, b) => {
-                const dateA = new Date(a.data || a.createdAt);
-                const dateB = new Date(b.data || b.createdAt);
-                return dateB - dateA;
-            });
-        const recentActivities = sortedActivities.slice(0, Math.max(5, activityVisibleCount));
+        // Filter: only drafts and completed (NO archived)
+        const filteredSheets = sheets.filter(s => {
+            if (s.archived) return false; // Escludi archiviati
+            if (s.data || s.createdAt) return true;
+            return false;
+        });
+
+        // Separate drafts and completed
+        const drafts = filteredSheets.filter(s => s.status !== 'completed');
+        const completed = filteredSheets.filter(s => s.status === 'completed');
+
+        // Sort both by date (most recent first)
+        const sortByDate = (a, b) => {
+            const dateA = new Date(a.data || a.createdAt);
+            const dateB = new Date(b.data || b.createdAt);
+            return dateB - dateA;
+        };
+
+        drafts.sort(sortByDate);
+        completed.sort(sortByDate);
+
+        // Combine: all drafts + last 5 completed
+        const recentActivities = [
+            ...drafts,
+            ...completed.slice(0, 5)
+        ].sort(sortByDate); // Re-sort combined list
 
         const getStatusBadge = (sheet) => {
             if (sheet.archived) return { text: t.archived, color: 'bg-gray-500' };
@@ -695,25 +828,6 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                             })}
                         </tbody>
                     </table>
-                </div>
-                <div className="mt-3 flex justify-end">
-                    <button
-                        className={`px-3 py-1 text-sm rounded ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'} hover:opacity-90`}
-                        onClick={() => {
-                            const total = sortedActivities.length;
-                            if (activityVisibleCount < total) {
-                                setActivityVisibleCount(c => c + 5);
-                            } else {
-                                setActivityVisibleCount(5);
-                            }
-                        }}
-                    >
-                        {(() => {
-                            const total = sortedActivities.length;
-                            if (activityVisibleCount < total) return t.showMore || 'Mostra altro';
-                            return t.hide || 'Nascondi';
-                        })()}
-                    </button>
                 </div>
             </div>
         );
@@ -946,13 +1060,6 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
     // ========================================
     // 📊 MAIN RENDER
     // ========================================
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="loader"></div>
-            </div>
-        );
-    }
 
     // Fix: racchiudi tutto in un unico div
     return (
@@ -1084,7 +1191,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                     {renderAdvancedBarChart({ hideTitle: true })}
                 </div>
 
-                <div className={`${cardClass} p-0`} style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className={`${cardClass} p-0 overflow-hidden`} style={{ display: 'flex', flexDirection: 'column' }}>
                     {/* Card title (theme-aware) */}
                     <div className="p-4 sm:p-6">
                         <div className="flex items-center justify-between gap-3">

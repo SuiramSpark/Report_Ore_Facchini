@@ -138,110 +138,117 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
             </p>
             {/* Sheets List */}
             {filteredSheets.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                    {filteredSheets.map(sheet => (
-                        <div
-                            key={sheet.id}
-                            className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 hover:shadow-xl transition-shadow`}
-                        >
-                            <div className="flex flex-col sm:flex-row justify-between gap-4">
-                                {/* Sheet Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                                        <h3 className="text-lg sm:text-xl font-bold truncate">
-                                            {sheet.titoloAzienda || t.company || 'Company'}
-                                        </h3>
-                                        {typeof getStatusBadge === 'function' ? getStatusBadge(sheet) : null}
+                <div className="grid grid-cols-1 gap-3">
+                    {filteredSheets.map(sheet => {
+                        // Determina colore bordo sinistro basato su stato
+                        let borderColor = 'border-l-yellow-500'; // Default: draft
+                        if (sheet.status === 'completed') borderColor = 'border-l-green-500';
+                        else if (sheet.archived) borderColor = 'border-l-gray-400';
+                        
+                        return (
+                            <div
+                                key={sheet.id}
+                                className={`${cardClass} rounded-xl shadow-lg border-l-4 ${borderColor} p-3 sm:p-4 hover:shadow-xl transition-all`}
+                            >
+                                <div className="flex flex-col sm:flex-row justify-between gap-3">
+                                    {/* Sheet Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                            <h3 className="text-base sm:text-lg font-bold truncate">
+                                                {sheet.titoloAzienda || t.company || 'Company'}
+                                            </h3>
+                                            {typeof getStatusBadge === 'function' ? getStatusBadge(sheet) : null}
+                                        </div>
+                                        <div className={`space-y-0.5 text-xs sm:text-sm ${textClass}`}>
+                                            <p>📅 {typeof formatDate === 'function' ? formatDate(sheet.data) : (sheet.data || '')}</p>
+                                            <p>👤 {sheet.responsabile}</p>
+                                            {sheet.location && <p>📍 {sheet.location}</p>}
+                                            <p>👷 {sheet.lavoratori?.length || 0} {(t.workers || 'workers').toLowerCase()}</p>
+                                            {sheet.firmaResponsabile && (
+                                                <p className="text-green-600 dark:text-green-400 font-semibold">
+                                                    ✍️ {t.responsibleSignature || 'Signature'}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className={`space-y-1 text-sm ${textClass}`}>
-                                        <p>📅 {typeof formatDate === 'function' ? formatDate(sheet.data) : (sheet.data || '')}</p>
-                                        <p>👤 {sheet.responsabile}</p>
-                                        {sheet.location && <p>📍 {sheet.location}</p>}
-                                        <p>👷 {sheet.lavoratori?.length || 0} {(t.workers || 'workers').toLowerCase()}</p>
-                                        {sheet.firmaResponsabile && (
-                                            <p className="text-green-600 dark:text-green-400 font-semibold">
-                                                ✍️ {t.responsibleSignature || 'Signature'}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                {/* Actions */}
-                                <div className="flex flex-row sm:flex-col gap-2 sm:justify-start">
-                                    <button
-                                        onClick={() => onSelectSheet(sheet)}
-                                        className={`flex-1 sm:flex-none px-4 py-2 ${
-                                            sheet.status === 'completed'
-                                                ? 'bg-blue-600 hover:bg-blue-700'
-                                                : 'bg-indigo-600 hover:bg-indigo-700'
-                                        } text-white rounded-lg font-semibold transition-colors text-sm sm:text-base`}
-                                    >
-                                        {sheet.status === 'completed' ? '👁️ ' + (t.view || 'View') : '✏️ ' + (t.edit || 'Edit')}
-                                    </button>
-                                    {sheet.status === 'completed' && typeof generatePDF === 'function' && (
+                                    {/* Actions */}
+                                    <div className="flex flex-row sm:flex-col gap-2 sm:justify-start">
                                         <button
-                                            onClick={() => generatePDF(sheet, companyLogo)}
-                                            className="flex-1 sm:flex-none px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                                            onClick={() => onSelectSheet(sheet)}
+                                            className={`flex-1 sm:flex-none px-3 py-1.5 ${
+                                                sheet.status === 'completed'
+                                                    ? 'bg-blue-600 hover:bg-blue-700'
+                                                    : 'bg-indigo-600 hover:bg-indigo-700'
+                                            } text-white rounded-lg font-semibold transition-colors text-xs sm:text-sm`}
                                         >
-                                            📄 PDF
+                                            {sheet.status === 'completed' ? '👁️ ' + (t.view || 'View') : '✏️ ' + (t.edit || 'Edit')}
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => onArchiveSheet(sheet.id, !sheet.archived)}
-                                        className="flex-1 sm:flex-none px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
-                                    >
-                                        {sheet.archived ? '↩️' : '📦'}
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (confirm(`${t.confirm || 'Confirm'}?`)) {
-                                                onDeleteSheet(sheet.id);
-                                            }
-                                        }}
-                                        className="flex-1 sm:flex-none px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
-                                    >
-                                        🗑️
-                                    </button>
+                                        {sheet.status === 'completed' && typeof generatePDF === 'function' && (
+                                            <button
+                                                onClick={() => generatePDF(sheet, companyLogo)}
+                                                className="flex-1 sm:flex-none px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors text-xs sm:text-sm"
+                                            >
+                                                📄 PDF
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => onArchiveSheet(sheet.id, !sheet.archived)}
+                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors text-xs sm:text-sm"
+                                        >
+                                            {sheet.archived ? '↩️' : '📦'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`${t.confirm || 'Confirm'}?`)) {
+                                                    onDeleteSheet(sheet.id);
+                                                }
+                                            }}
+                                            className="flex-1 sm:flex-none px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-xs sm:text-sm"
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
                                 </div>
+                                {/* Static Weather Summary (if available) */}
+                                {sheet.weatherStatic ? (
+                                    <div className="my-2 flex items-center gap-3 text-sm" title={t.weatherDetails}>
+                                        <span style={{fontSize:'1.7em'}} aria-label={t.weatherIcon}>
+                                            {(() => {
+                                                const code = sheet.weatherStatic.weathercode;
+                                                if (code === 0) return '☀️';
+                                                if (code >= 1 && code <= 3) return '🌤️';
+                                                if ((code >= 45 && code <= 48)) return '🌫️';
+                                                if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return '🌧️';
+                                                if (code >= 71 && code <= 77) return '❄️';
+                                                if (code === 95 || (code >= 96 && code <= 99)) return '⛈️';
+                                                return '🌡️';
+                                            })()}
+                                        </span>
+                                        <span>
+                                            <b>{t.weatherHistorical || 'Meteo storico'}:</b> 
+                                            <span title={t.weatherMax}>{typeof sheet.weatherStatic.temp_max === 'number' ? `🌡️ ${Math.round(sheet.weatherStatic.temp_max)}°C` : '--'}</span>
+                                            {typeof sheet.weatherStatic.temp_min === 'number' ? <span title={t.weatherMin}>{` / ${Math.round(sheet.weatherStatic.temp_min)}°C`}</span> : ''}
+                                            {typeof sheet.weatherStatic.precipitation === 'number' ? <span title={t.weatherRain}>{` • 🌧️ ${sheet.weatherStatic.precipitation}mm`}</span> : ''}
+                                            <span className="ml-2 opacity-70" title="Codice meteo">{(() => {
+                                                const code = sheet.weatherStatic.weathercode;
+                                                if (code === 0) return t.weatherClear;
+                                                if (code >= 1 && code <= 3) return t.weatherCloud;
+                                                if ((code >= 45 && code <= 48)) return 'Nebbia';
+                                                if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return t.weatherRain;
+                                                if (code >= 71 && code <= 77) return t.weatherSnow;
+                                                if (code === 95 || (code >= 96 && code <= 99)) return t.weatherThunder;
+                                                return t.weatherUnknown;
+                                            })()}</span>
+                                        </span>
+                                    </div>
+                                ) : (sheet.localita && WeatherWidget && (
+                                    <div className="my-2">
+                                        <WeatherWidget location={sheet.localita} darkMode={darkMode} />
+                                    </div>
+                                ))}
                             </div>
-                            {/* Static Weather Summary (if available) */}
-                            {sheet.weatherStatic ? (
-                                <div className="my-2 flex items-center gap-3 text-sm" title={t.weatherDetails}>
-                                    <span style={{fontSize:'1.7em'}} aria-label={t.weatherIcon}>
-                                        {(() => {
-                                            const code = sheet.weatherStatic.weathercode;
-                                            if (code === 0) return '☀️';
-                                            if (code >= 1 && code <= 3) return '🌤️';
-                                            if ((code >= 45 && code <= 48)) return '🌫️';
-                                            if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return '🌧️';
-                                            if (code >= 71 && code <= 77) return '❄️';
-                                            if (code === 95 || (code >= 96 && code <= 99)) return '⛈️';
-                                            return '🌡️';
-                                        })()}
-                                    </span>
-                                    <span>
-                                        <b>{t.weatherHistorical || 'Meteo storico'}:</b> 
-                                        <span title={t.weatherMax}>{typeof sheet.weatherStatic.temp_max === 'number' ? `🌡️ ${Math.round(sheet.weatherStatic.temp_max)}°C` : '--'}</span>
-                                        {typeof sheet.weatherStatic.temp_min === 'number' ? <span title={t.weatherMin}>{` / ${Math.round(sheet.weatherStatic.temp_min)}°C`}</span> : ''}
-                                        {typeof sheet.weatherStatic.precipitation === 'number' ? <span title={t.weatherRain}>{` • 🌧️ ${sheet.weatherStatic.precipitation}mm`}</span> : ''}
-                                        <span className="ml-2 opacity-70" title="Codice meteo">{(() => {
-                                            const code = sheet.weatherStatic.weathercode;
-                                            if (code === 0) return t.weatherClear;
-                                            if (code >= 1 && code <= 3) return t.weatherCloud;
-                                            if ((code >= 45 && code <= 48)) return 'Nebbia';
-                                            if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return t.weatherRain;
-                                            if (code >= 71 && code <= 77) return t.weatherSnow;
-                                            if (code === 95 || (code >= 96 && code <= 99)) return t.weatherThunder;
-                                            return t.weatherUnknown;
-                                        })()}</span>
-                                    </span>
-                                </div>
-                            ) : (sheet.localita && WeatherWidget && (
-                                <div className="my-2">
-                                    <WeatherWidget location={sheet.localita} darkMode={darkMode} />
-                                </div>
-                            ))}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             ) : (
                 <div className={`${cardClass} rounded-xl shadow-lg p-8 sm:p-12 text-center`}>

@@ -249,17 +249,32 @@ window.invertSignatureForPDF = (signatureDataURL) => {
 // Deterministic color for a given key (e.g., worker name or id)
 window.getColorForKey = (key) => {
     try {
+        // Expanded palette with 24 distinct, visually diverse colors
         const palette = [
-            '#4f46e5', // indigo-600
-            '#7c3aed', // purple-600
-            '#06b6d4', // cyan-500
-            '#f97316', // orange-500
-            '#ef4444', // red-500
-            '#10b981', // emerald-500
-            '#eab308', // amber-500
-            '#3b82f6', // blue-500
-            '#8b5cf6', // violet-500
-            '#f472b6'  // pink-400
+            '#EF4444', // red-500
+            '#F59E0B', // amber-500
+            '#10B981', // emerald-500
+            '#06B6D4', // cyan-500
+            '#3B82F6', // blue-500
+            '#8B5CF6', // violet-500
+            '#EC4899', // pink-500
+            '#F97316', // orange-500
+            '#84CC16', // lime-500
+            '#14B8A6', // teal-500
+            '#6366F1', // indigo-500
+            '#A855F7', // purple-500
+            '#F43F5E', // rose-500
+            '#FBBF24', // amber-400
+            '#34D399', // emerald-400
+            '#22D3EE', // cyan-400
+            '#60A5FA', // blue-400
+            '#A78BFA', // violet-400
+            '#F472B6', // pink-400
+            '#FB923C', // orange-400
+            '#A3E635', // lime-400
+            '#2DD4BF', // teal-400
+            '#818CF8', // indigo-400
+            '#C084FC'  // purple-400
         ];
 
         let h = 0;

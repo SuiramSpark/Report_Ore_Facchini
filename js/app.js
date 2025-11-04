@@ -9,6 +9,7 @@ const App = () => {
     const [currentSheet, setCurrentSheet] = useState(null);
     const [companyLogo, setCompanyLogo] = useState(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [moreMenuOpen, setMoreMenuOpen] = useState(false); // Menu "Altro" mobile
     // Stati principali mancanti
     const [darkMode, setDarkMode] = useState(false);
     const [language, setLanguage] = useState('it');
@@ -32,6 +33,7 @@ const App = () => {
     const [blacklist, setBlacklist] = useState([]);
     const [auditLog, setAuditLog] = useState([]);
     const [currentView, setCurrentView] = useState('dashboard');
+    const [autoArchiveDay, setAutoArchiveDay] = useState(5); // Day of month to auto-archive
 
     // Initialize Firebase
     useEffect(() => {
@@ -43,9 +45,11 @@ const App = () => {
         const savedDarkMode = localStorage.getItem('darkMode') === 'true';
         const savedLanguage = localStorage.getItem('language') || 'it';
         const savedLogo = localStorage.getItem('companyLogo');
+        const savedAutoArchiveDay = parseInt(localStorage.getItem('autoArchiveDay')) || 5;
         
     setDarkMode(savedDarkMode);
     setAppLanguage(savedLanguage);
+        setAutoArchiveDay(savedAutoArchiveDay);
         if (savedLogo) setCompanyLogo(savedLogo);
         
         // Check URL params for worker mode
@@ -131,6 +135,84 @@ const App = () => {
             unsubscribeAudit();
         };
     }, [db, mode]);
+
+    // Auto-archive completed sheets on configured day of month
+    useEffect(() => {
+        if (!db || mode !== 'admin' || sheets.length === 0) return;
+
+        const checkAutoArchive = async () => {
+            const today = new Date();
+            const dayOfMonth = today.getDate();
+
+            // Check if today is the configured auto-archive day
+            if (dayOfMonth !== autoArchiveDay) return;
+
+            // Check if we already ran today (using localStorage to track)
+            const lastAutoArchive = localStorage.getItem('lastAutoArchive');
+            const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD
+            if (lastAutoArchive === todayString) return; // Already ran today
+
+            // Find completed sheets from previous months that are not archived
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+
+            const sheetsToArchive = sheets.filter(sheet => {
+                if (sheet.archived || sheet.status !== 'completed') return false;
+
+                // Get sheet's month/year from createdAt
+                const sheetDate = sheet.createdAt?.toDate ? sheet.createdAt.toDate() : new Date(sheet.createdAt);
+                const sheetMonth = sheetDate.getMonth();
+                const sheetYear = sheetDate.getFullYear();
+
+                // Archive if from previous months
+                return (sheetYear < currentYear) || (sheetYear === currentYear && sheetMonth < currentMonth);
+            });
+
+            if (sheetsToArchive.length === 0) {
+                localStorage.setItem('lastAutoArchive', todayString);
+                return;
+            }
+
+            // Archive all eligible sheets
+            let archivedCount = 0;
+            for (const sheet of sheetsToArchive) {
+                try {
+                    await db.collection('timesheets').doc(sheet.id).update({
+                        archived: true,
+                        archivedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    await addAuditLog('AUTO_ARCHIVE', `Sheet: ${sheet.month || 'N/A'} - Auto-archived (completed in previous month)`);
+                    archivedCount++;
+                } catch (error) {
+                    console.error('Error auto-archiving sheet:', error);
+                }
+            }
+
+            if (archivedCount > 0) {
+                showToast(`📦 ${archivedCount} ${archivedCount === 1 ? 'foglio completato archiviato' : 'fogli completati archiviati'} automaticamente`, 'success');
+            }
+
+            // Mark as done for today
+            localStorage.setItem('lastAutoArchive', todayString);
+        };
+
+        // Run check immediately
+        checkAutoArchive();
+
+        // Set up daily check at midnight
+        const now = new Date();
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+        const msUntilMidnight = tomorrow - now;
+
+        const timeoutId = setTimeout(() => {
+            checkAutoArchive();
+            // Set up daily interval
+            const intervalId = setInterval(checkAutoArchive, 24 * 60 * 60 * 1000);
+            return () => clearInterval(intervalId);
+        }, msUntilMidnight);
+
+        return () => clearTimeout(timeoutId);
+    }, [db, mode, sheets, autoArchiveDay]);
 
     // Load app settings (linkExpiration doc) and keep in state
     useEffect(() => {
@@ -487,10 +569,7 @@ const App = () => {
                                 { view: 'calendar', icon: '📆', label: t.calendar || 'Calendario' },
                                 { view: 'workerstats', icon: '👤', label: t.workerStatistics || 'Statistiche' },
                                 { view: 'blacklist', icon: '🚫', label: t.blacklist },
-                                { view: 'audit', icon: '📝', label: t.auditLog },
                                 { view: 'reports', icon: '📈', label: t.reports },
-                                { view: 'backup', icon: '💾', label: t.backupData || 'Backup' },
-                                { view: 'scheduledNotifications', icon: '⏰', label: t.notifications || 'Notifiche' }, // ⭐ NEW
                                 { view: 'settings', icon: '⚙️', label: t.settings }
                             ].map(item => (
                                 <button
@@ -574,24 +653,11 @@ const App = () => {
                             </button>
 
                             {/* RadioPlayer ora solo nel Dashboard widget */}
-
-                            {/* Mobile Menu Toggle */}
-                            <button
-                                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className={`lg:hidden px-2 py-1 sm:px-3 sm:py-2 rounded-lg font-bold transition-all duration-300 ${
-                                    darkMode
-                                        ? 'bg-indigo-500/20 hover:bg-indigo-500/30 text-white shadow-lg shadow-indigo-500/20'
-                                        : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-700 shadow-lg shadow-indigo-500/20'
-                                }`}
-                                aria-label="Menu"
-                            >
-                                {mobileMenuOpen ? '✕' : '☰'}
-                            </button>
                         </div>
                     </div>
 
-                    {/* Mobile Navigation - MODERNIZZATO */}
-                    {mobileMenuOpen && (
+                    {/* OLD Mobile Menu Hamburger - DISABLED: Sostituito da bottom nav, mantiene state per compatibilità */}
+                    {false && mobileMenuOpen && (
                         <nav className={`lg:hidden mt-3 flex flex-col gap-2 animate-fade-in p-3 rounded-xl ${
                             darkMode ? 'bg-gray-800/50 backdrop-blur-md' : 'bg-white/50 backdrop-blur-md'
                         }`}>
@@ -601,10 +667,7 @@ const App = () => {
                                 { view: 'calendar', icon: '📆', label: t.calendar || 'Calendario' },
                                 { view: 'workerstats', icon: '👤', label: t.workerStatistics || 'Statistiche' },
                                 { view: 'blacklist', icon: '🚫', label: t.blacklist },
-                                { view: 'audit', icon: '📝', label: t.auditLog },
-                                { view: 'reports', icon: '📈', label: t.reports },
-                                { view: 'backup', icon: '💾', label: t.backupData || 'Backup' },
-                                { view: 'scheduledNotifications', icon: '⏰', label: t.notifications || 'Notifiche' }, // ⭐ NEW
+                                { view: 'reports', icon: '�', label: t.reports },
                                 { view: 'settings', icon: '⚙️', label: t.settings }
                             ].map(item => (
                                 <button
@@ -629,8 +692,124 @@ const App = () => {
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
+            {/* 📱 BOTTOM NAVIGATION MOBILE - MODERNA */}
+            <nav className={`lg:hidden fixed bottom-0 left-0 right-0 z-40 ${
+                darkMode ? 'bg-gray-900/95 border-t border-gray-800' : 'bg-white/95 border-t border-gray-200'
+            } backdrop-blur-lg shadow-2xl`}
+                style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+            >
+                <div className="flex items-center justify-around px-2 py-2">
+                    {/* Dashboard */}
+                    <button
+                        onClick={() => { setCurrentView('dashboard'); setMoreMenuOpen(false); }}
+                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
+                            currentView === 'dashboard'
+                                ? darkMode
+                                    ? 'bg-indigo-600 text-white scale-110'
+                                    : 'bg-indigo-500 text-white scale-110'
+                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
+                        }`}
+                    >
+                        <span className="text-xl">📊</span>
+                        <span className="text-xs mt-1 font-medium">{t.dashboard || 'Dashboard'}</span>
+                    </button>
+
+                    {/* Fogli */}
+                    <button
+                        onClick={() => { setCurrentView('list'); setMoreMenuOpen(false); }}
+                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
+                            currentView === 'list'
+                                ? darkMode
+                                    ? 'bg-indigo-600 text-white scale-110'
+                                    : 'bg-indigo-500 text-white scale-110'
+                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
+                        }`}
+                    >
+                        <span className="text-xl">📋</span>
+                        <span className="text-xs mt-1 font-medium">{t.sheets || 'Fogli'}</span>
+                    </button>
+
+                    {/* Statistiche */}
+                    <button
+                        onClick={() => { setCurrentView('workerstats'); setMoreMenuOpen(false); }}
+                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
+                            currentView === 'workerstats'
+                                ? darkMode
+                                    ? 'bg-indigo-600 text-white scale-110'
+                                    : 'bg-indigo-500 text-white scale-110'
+                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
+                        }`}
+                    >
+                        <span className="text-xl">👤</span>
+                        <span className="text-xs mt-1 font-medium">{t.stats || 'Stats'}</span>
+                    </button>
+
+                    {/* Blacklist */}
+                    <button
+                        onClick={() => { setCurrentView('blacklist'); setMoreMenuOpen(false); }}
+                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
+                            currentView === 'blacklist'
+                                ? darkMode
+                                    ? 'bg-indigo-600 text-white scale-110'
+                                    : 'bg-indigo-500 text-white scale-110'
+                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
+                        }`}
+                    >
+                        <span className="text-xl">🚫</span>
+                        <span className="text-xs mt-1 font-medium">{t.blacklist || 'Blacklist'}</span>
+                    </button>
+
+                    {/* Altro (Popup Menu) */}
+                    <button
+                        onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
+                            moreMenuOpen
+                                ? darkMode
+                                    ? 'bg-indigo-600 text-white scale-110'
+                                    : 'bg-indigo-500 text-white scale-110'
+                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
+                        }`}
+                    >
+                        <span className="text-xl">⋮</span>
+                        <span className="text-xs mt-1 font-medium">{t.more || 'Altro'}</span>
+                    </button>
+                </div>
+
+                {/* Popup Menu "Altro" */}
+                {moreMenuOpen && (
+                    <div className={`absolute bottom-full left-0 right-0 mb-2 mx-2 rounded-xl shadow-2xl animate-fade-in ${
+                        darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+                    }`}>
+                        <div className="p-2 grid grid-cols-3 gap-2">
+                            {[
+                                { view: 'calendar', icon: '📆', label: t.calendar || 'Calendario' },
+                                { view: 'reports', icon: '📈', label: t.reports || 'Report' },
+                                { view: 'settings', icon: '⚙️', label: t.settings || 'Impostazioni' }
+                            ].map(item => (
+                                <button
+                                    key={item.view}
+                                    onClick={() => { setCurrentView(item.view); setMoreMenuOpen(false); }}
+                                    className={`flex flex-col items-center justify-center p-3 rounded-lg transition-all ${
+                                        currentView === item.view
+                                            ? darkMode
+                                                ? 'bg-indigo-600 text-white'
+                                                : 'bg-indigo-500 text-white'
+                                            : darkMode
+                                                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    <span className="text-2xl mb-1">{item.icon}</span>
+                                    <span className="text-xs font-medium text-center">{item.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </nav>
+
+            {/* Main Content - Aggiunto padding-bottom per bottom nav mobile */}
+            <main className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto pb-20 lg:pb-6">
                 {currentView === 'dashboard' && (
                     <DashboardComp sheets={sheets} darkMode={darkMode} language={language} weekStart={appSettings.weekStart} />
                 )}
@@ -735,15 +914,6 @@ const App = () => {
                     />
                 )}
 
-                {/* ⭐ NEW: Scheduled Notifications View */}
-                {currentView === 'scheduledNotifications' && (
-                    <ScheduledNotificationsComp
-                        db={db}
-                        darkMode={darkMode}
-                        language={language}
-                    />
-                )}
-
                 {currentView === 'settings' && (
                     <SettingsComp
                         db={db}
@@ -752,6 +922,9 @@ const App = () => {
                         language={language}
                         companyLogo={companyLogo}
                         setCompanyLogo={setCompanyLogo}
+                        autoArchiveDay={autoArchiveDay}
+                        setAutoArchiveDay={setAutoArchiveDay}
+                        auditLog={auditLog}
                     />
                 )}
             </main>
