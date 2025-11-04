@@ -109,6 +109,19 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
     // Overall counts (not limited to period)
     const overallTotalSheets = Array.isArray(sheets) ? sheets.length : 0;
     const overallCompletedSheets = Array.isArray(sheets) ? sheets.filter(s => s.status === 'completed').length : 0;
+    // Calcolo ore totali effettive su tutti i fogli completati
+    let overallTotalHours = 0;
+    if (Array.isArray(sheets)) {
+        for (const sheet of sheets) {
+            if (sheet.status === 'completed' && Array.isArray(sheet.lavoratori)) {
+                for (const w of sheet.lavoratori) {
+                    const hours = parseFloat(w.oreTotali || 0);
+                    overallTotalHours += isNaN(hours) ? 0 : hours;
+                }
+            }
+        }
+        overallTotalHours = Math.round(overallTotalHours * 10) / 10;
+    }
 
     // Process each sheet
     for (const sheet of filtered) {
@@ -230,6 +243,7 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
         overallCompletedSheets,
         todayHours,
         weeklyHours: Math.round(totalHours * 10) / 10,
+        overallTotalHours,
         avgDailyHours,
         activeWorkers: totalWorkers,
         efficiency,
@@ -1099,7 +1113,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                         </div>
                     </div>
                     {/* Full-width widget: widget fills the card */}
-                    <div className="weather-area w-full flex items-stretch" style={{ flex: 1, height: '100%', minHeight: 220, ['--weather-bg-duration']: `${weatherBgDuration}s` }}>
+                    <div className="weather-area w-full flex items-stretch" style={{ flex: 1, height: '100%', minHeight: 140, ['--weather-bg-duration']: `${weatherBgDuration}s` }}>
                         <div className={`weather-area__bg weather-bg--${weatherIconKey || 'unknown'}`} aria-hidden="true" style={{ position: 'absolute', inset: 0, borderRadius: 12 }}></div>
                         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                             <WeatherWidget fullHeight={true} location={weatherLocation} darkMode={darkMode} days={forecastDays} refreshToken={refreshToken} language={language} showControls={false} onWeatherChange={(key) => { if (key) setWeatherIconKey(key); }} />
@@ -1148,32 +1162,37 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
             {/* ========================================
                 STATISTICHE AGGIUNTIVE
                 ======================================== */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-                {[
-                    { value: stats.totalSheets, labelKey: 'totalSheets', fallback: { it: 'Totale fogli', en: 'Total sheets', es: 'Fichas totales', fr: 'Total feuilles', ro: 'Foi totale' }, color: 'indigo', icon: '📋' },
-                    { value: stats.draftSheets, labelKey: 'inDraft', fallback: { it: 'In bozza', en: 'In draft', es: 'En borrador', fr: 'En brouillon', ro: 'În ciornă' }, color: 'yellow', icon: '✏️' },
-                    { value: stats.archivedSheets, labelKey: 'archivedSheets', fallback: { it: 'Archiviati', en: 'Archived', es: 'Archivadas', fr: 'Archivé', ro: 'Arhivate' }, color: 'gray', icon: '📦' },
-                    { value: stats.totalWorkers, labelKey: 'totalWorkers', fallback: { it: 'Totale lavoratori', en: 'Total workers', es: 'Trabajadores totales', fr: 'Travailleurs totaux', ro: 'Lucrători totali' }, color: 'purple', icon: '👷' }
-                ].map((stat, i) => {
-                    const label = t[stat.labelKey];
-                    const value = (typeof stat.value === 'number' ? stat.value : (stat.value ?? 0));
-
-                    return (
-                        <div
-                            key={i}
-                            className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`}
-                            style={{ animationDelay: `${800 + i * 100}ms` }}
-                        >
-                            <div className="text-2xl mb-2">{stat.icon}</div>
-                            <div className={`text-xl sm:text-2xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400`}>
-                                {value}
-                            </div>
-                            <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                                {label}
-                            </div>
-                        </div>
-                    );
-                })}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6">
+                {/* Stat: Total Sheets */}
+                <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `800ms` }}>
+                    <div className="text-2xl mb-2">📋</div>
+                    <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totalSheets}</div>
+                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.totalSheets}</div>
+                </div>
+                {/* Stat: Draft Sheets */}
+                <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `900ms` }}>
+                    <div className="text-2xl mb-2">✏️</div>
+                    <div className="text-xl sm:text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.draftSheets}</div>
+                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.inDraft}</div>
+                </div>
+                {/* Stat: Archived Sheets */}
+                <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `1000ms` }}>
+                    <div className="text-2xl mb-2">📦</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.archivedSheets}</div>
+                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.archivedSheets}</div>
+                </div>
+                {/* Stat: Total Workers */}
+                <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `1100ms` }}>
+                    <div className="text-2xl mb-2">👷</div>
+                    <div className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.totalWorkers}</div>
+                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.totalWorkers}</div>
+                </div>
+                {/* Stat: All-Time Hours (NEW) */}
+                <div className={`${cardClass} p-4 text-center border-2 border-green-500 bg-green-50 dark:bg-green-900/30 ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `1200ms` }}>
+                    <div className="text-2xl mb-2">⏳</div>
+                    <div className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-300">{stats.overallTotalHours}h</div>
+                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{t.totalHoursAllTime || 'Ore totali (tutti i fogli)'}</div>
+                </div>
             </div>
         </div>
     );

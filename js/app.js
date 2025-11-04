@@ -575,21 +575,6 @@ const App = () => {
 
                             {/* RadioPlayer ora solo nel Dashboard widget */}
 
-                            {/* Logo Upload - GRADIENT BORDER */}
-                            <label className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all duration-300 hover:scale-110 ${
-                                darkMode
-                                    ? 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 shadow-lg shadow-purple-500/20'
-                                    : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-700 shadow-lg shadow-purple-500/20'
-                            }`} title={t.uploadLogo}>
-                                🖼️
-                                <input 
-                                    type="file" 
-                                    accept="image/*" 
-                                    onChange={handleLogoUpload} 
-                                    className="hidden" 
-                                />
-                            </label>
-
                             {/* Mobile Menu Toggle */}
                             <button
                                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

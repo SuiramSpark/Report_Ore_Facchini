@@ -281,10 +281,10 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     <span className="text-3xl">⏰</span>
                     <div>
                         <h2 className="text-2xl font-bold">
-                            {t.scheduledNotifications || (language === 'it' ? 'Notifiche Programmate' : 'Scheduled Notifications')}
+                            {t.scheduledNotifications}
                         </h2>
                         <p className={textClass}>
-                            {t.scheduledNotificationsDescription || (language === 'it' ? 'Ricevi notifiche automatiche agli orari che preferisci' : 'Receive automatic notifications at your preferred times')}
+                            {t.scheduledNotificationsDescription}
                         </p>
                     </div>
                 </div>
@@ -298,14 +298,14 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                             <span className="text-2xl">⚠️</span>
                             <div className="flex-1">
                                 <p className={`font-semibold ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>
-                                    {t.authorizeNotifications || (language === 'it' ? 'Autorizza le notifiche per usare questa funzione' : 'Authorize notifications to use this feature')}
+                                    {t.authorizeNotifications}
                                 </p>
                             </div>
                             <button
                                 onClick={requestPermission}
                                 className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold transition-colors"
                             >
-                                🔔 {t.requestPermission || (language === 'it' ? 'Autorizza' : 'Request permission')}
+                                🔔 {t.requestPermission}
                             </button>
                         </div>
                     </div>
@@ -316,14 +316,14 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <span>➕</span>
-                    {t.newNotificationTitle || (language === 'it' ? 'Nuova Notifica' : 'New Notification')}
+                    {t.newNotificationTitle}
                 </h3>
 
                 <div className="space-y-4">
                     {/* Time Input */}
                     <div>
                         <label className={`block text-sm font-semibold mb-2 ${textClass}`}>
-                            ⏰ {t.timeLabel || (language === 'it' ? 'Orario' : 'Time')}
+                            ⏰ {t.timeLabel}
                         </label>
                         <input
                             type="time"
@@ -337,7 +337,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     {/* Message Input */}
                     <div>
                         <label className={`block text-sm font-semibold mb-2 ${textClass}`}>
-                            💬 {t.customMessageLabel || (language === 'it' ? 'Messaggio Personalizzato' : 'Custom Message')}
+                            💬 {t.customMessageLabel}
                         </label>
                         <textarea
                             value={newNotification.message}
@@ -351,7 +351,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     {/* Example Messages */}
                     <div>
                         <p className={`text-sm font-semibold mb-2 ${textClass}`}>
-                            💡 {t.exampleMessagesLabel || (language === 'it' ? 'Messaggi di esempio (clicca per usare):' : 'Example messages (click to use):')}
+                            💡 {t.exampleMessagesLabel}
                         </p>
                         <div className="flex flex-wrap gap-2">
                             {exampleMessages.map((msg, i) => (
@@ -373,7 +373,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                     {/* Days Selection */}
                     <div>
                         <label className={`block text-sm font-semibold mb-2 ${textClass}`}>
-                            📅 {t.daysOfWeekLabel || (language === 'it' ? 'Giorni della Settimana' : 'Days of the Week')}
+                            📅 {t.daysOfWeekLabel}
                         </label>
                         <div className="flex flex-wrap gap-2">
                             {daysOfWeek.map(day => (
@@ -400,7 +400,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                         disabled={!newNotification.message.trim()}
                         className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400"
                     >
-                        ➕ {t.addNotification || (language === 'it' ? 'Aggiungi Notifica' : 'Add Notification')}
+                        ➕ {t.addNotification}
                     </button>
                 </div>
             </div>
@@ -409,14 +409,14 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <span>📋</span>
-                    {`${t.activeNotifications || (language === 'it' ? 'Notifiche Attive' : 'Active Notifications')} (${notifications.length})`}
+                    {`${t.activeNotifications} (${notifications.length})`}
                 </h3>
 
                 {notifications.length === 0 ? (
                     <div className="text-center py-8">
                         <p className="text-4xl mb-3">⏰</p>
                         <p className={textClass}>
-                                {t.noScheduledNotifications || (language === 'it' ? 'Nessuna notifica programmata' : 'No scheduled notifications')}
+                                {t.noScheduledNotifications}
                         </p>
                     </div>
                 ) : (
@@ -435,7 +435,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                                     }
                                 }}
                                 role={notification.sheetId ? 'button' : undefined}
-                                title={notification.sheetId ? ( (t.openSheetTitle || (language === 'it' ? 'Apri foglio {id}' : 'Open sheet {id}')).replace('{id}', notification.sheetId) ) : undefined}
+                                title={notification.sheetId ? t.openSheetTitle?.replace('{id}', notification.sheetId) : undefined}
                                 className={`p-4 rounded-lg border-l-4 cursor-pointer ${
                                     notification.enabled
                                         ? 'border-green-500'
@@ -450,7 +450,7 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
                                                 {notification.time}
                                             </span>
                                             {notification.sheetId && (
-                                                <span className="ml-2 text-sm" title={language === 'it' ? `Apri foglio ${notification.sheetId}` : language === 'en' ? `Open sheet ${notification.sheetId}` : `Open sheet ${notification.sheetId}`} aria-hidden>
+                                                <span className="ml-2 text-sm" title={t.openSheetTitle?.replace('{id}', notification.sheetId)} aria-hidden>
                                                     🔗
                                                 </span>
                                             )}
@@ -526,20 +526,20 @@ const ScheduledNotifications = ({ db, darkMode, language = 'it' }) => {
             <div className={`${cardClass} rounded-xl shadow-lg p-6`}>
                 <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
                     <span>💡</span>
-                    {t.infoTitle || (language === 'it' ? 'Informazioni' : 'Information')}
+                    {t.infoTitle}
                 </h3>
                 <ul className={`space-y-2 text-sm ${textClass}`}>
                     <li className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{t.info_tab_open || (language === 'it' ? 'Le notifiche verranno inviate solo se la tab è aperta nel browser' : 'Notifications will only be sent if the tab is open in the browser')}</span>
+                        <span>{t.info_tab_open}</span>
                     </li>
                     <li className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{t.info_use_emoji || (language === 'it' ? 'Puoi usare emoji nei messaggi personalizzati ❤️ 🎉 👷' : 'You can use emoji in custom messages ❤️ 🎉 👷')}</span>
+                        <span>{t.info_use_emoji}</span>
                     </li>
                     <li className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{t.info_disabled_saved || (language === 'it' ? 'Le notifiche disattivate non verranno inviate ma rimarranno salvate' : 'Disabled notifications won\'t be sent but will remain saved')}</span>
+                        <span>{t.info_disabled_saved}</span>
                     </li>
                 </ul>
             </div>

@@ -42,10 +42,13 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
         let arr = sheets.slice();
 
         if (filter === 'active') {
+            // Attivi: solo fogli non completati E non archiviati
             arr = arr.filter(s => s.status !== 'completed' && !s.archived);
         } else if (filter === 'completed') {
-            arr = arr.filter(s => s.status === 'completed');
+            // Completati: solo fogli completati E non archiviati
+            arr = arr.filter(s => s.status === 'completed' && !s.archived);
         } else if (filter === 'archived') {
+            // Archiviati: solo fogli archiviati (indipendentemente dallo stato)
             arr = arr.filter(s => !!s.archived);
         }
 
