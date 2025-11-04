@@ -572,7 +572,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                         {isActive && (
                                                             <div 
                                                                 className={`fixed px-4 py-3 rounded-xl shadow-2xl whitespace-nowrap animate-fade-in pointer-events-none ${
-                                                                    darkMode ? 'bg-gray-800/95 text-white border-2 border-indigo-500/50' : 'bg-white/95 text-gray-900 border-2 border-indigo-400/50'
+                                                                    darkMode ? 'bg-gray-900/98 text-white border-2 border-indigo-400' : 'bg-white/98 text-gray-900 border-2 border-indigo-500'
                                                                 }`}
                                                                 style={{ 
                                                                     minWidth: '150px',
@@ -580,12 +580,12 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                                     left: '50%',
                                                                     top: '50%',
                                                                     transform: 'translate(-50%, -150%)',
-                                                                    backdropFilter: 'blur(12px)'
+                                                                    backdropFilter: 'blur(16px)'
                                                                 }}
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
-                                                                <div className="text-base font-bold mb-1">{seg.name}</div>
-                                                                <div className={`text-sm font-semibold ${darkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
+                                                                <div className="text-lg font-bold mb-1">{seg.name}</div>
+                                                                <div className={`text-base font-bold ${darkMode ? 'text-indigo-300' : 'text-indigo-700'}`}>
                                                                     {seg.hours.toFixed(1)} ore
                                                                 </div>
                                                                 {/* Arrow */}
@@ -597,7 +597,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                                                                         height: 0,
                                                                         borderLeft: '8px solid transparent',
                                                                         borderRight: '8px solid transparent',
-                                                                        borderTop: `10px solid ${darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)'}`
+                                                                        borderTop: `10px solid ${darkMode ? 'rgba(17, 24, 39, 0.98)' : 'rgba(255, 255, 255, 0.98)'}`
                                                                     }}
                                                                 ></div>
                                                             </div>
