@@ -13,6 +13,8 @@ const App = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [recoveryError, setRecoveryError] = useState('');
     const [adminPasswordHash, setAdminPasswordHash] = useState(null); // Caricato da Firebase invece di hardcoded
+    const [recoveryData, setRecoveryData] = useState(null); // Domande di sicurezza caricate da Firebase
+    const [loadingRecovery, setLoadingRecovery] = useState(true); // Loading per recupero password
     
     // ⚠️ DEPRECATO: Questo hash non viene più usato, viene caricato da Firebase
     // const ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // "admin123"
@@ -130,7 +132,22 @@ const App = () => {
         setLoading(false);
     }, []);
 
-    // 🔒 Funzione verifica password admin
+    // � Carica domande di sicurezza per recupero password
+    useEffect(() => {
+        if (!db || !showPasswordRecovery) return;
+        
+        setLoadingRecovery(true);
+        db.collection('settings').doc('securityQuestions').get()
+            .then(doc => {
+                if (doc.exists) {
+                    setRecoveryData(doc.data());
+                }
+                setLoadingRecovery(false);
+            })
+            .catch(() => setLoadingRecovery(false));
+    }, [db, showPasswordRecovery]);
+
+    // �🔒 Funzione verifica password admin
     const handleAdminLogin = async () => {
         if (!adminPasswordHash) {
             setShowPasswordError(true);
@@ -696,22 +713,6 @@ const App = () => {
     if (!isAuthenticated) {
         // Se è attiva la schermata di recupero password
         if (showPasswordRecovery) {
-            // Hook per caricare domande di sicurezza da Firebase
-            const [recoveryData, setRecoveryData] = React.useState(null);
-            const [loadingRecovery, setLoadingRecovery] = React.useState(true);
-
-            React.useEffect(() => {
-                if (!db) return;
-                db.collection('settings').doc('securityQuestions').get()
-                    .then(doc => {
-                        if (doc.exists) {
-                            setRecoveryData(doc.data());
-                        }
-                        setLoadingRecovery(false);
-                    })
-                    .catch(() => setLoadingRecovery(false));
-            }, [db]);
-
             if (loadingRecovery) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-gray-900">
