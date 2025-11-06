@@ -363,9 +363,10 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
         // COMPACT INFO BOX
         // ========================================
         
-        // Light gray background box (smaller)
+        // Light gray background box (expanded height for new fields)
+        const infoBoxHeight = (sheet.indirizzoEvento || (sheet.orarioStimatoDa && sheet.orarioStimatoA)) ? 30 : 18;
         doc.setFillColor(240, 242, 247);
-        doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 18, 2, 2, 'F');
+        doc.roundedRect(margin, yPos, pageWidth - 2 * margin, infoBoxHeight, 2, 2, 'F');
 
         // Info text (smaller fonts)
         doc.setFontSize(7);
@@ -400,7 +401,25 @@ window.exportToPDF = async (sheet, companyLogo = null, filename = null) => {
             doc.text(locationText.length > 30 ? locationText.substring(0, 30) + '...' : locationText, pageWidth / 2 + 28, infoY + 6);
         }
 
-        yPos += 22;
+        // New fields - Third row
+        let thirdRowY = infoY + 12;
+        
+        if (sheet.indirizzoEvento) {
+            doc.setFont('helvetica', 'bold');
+            doc.text((typeof window !== 'undefined' && window.t) ? window.t('pdfLabelAddress') : 'INDIRIZZO:', margin + 3, thirdRowY);
+            doc.setFont('helvetica', 'normal');
+            const addressText = sheet.indirizzoEvento;
+            doc.text(addressText.length > 45 ? addressText.substring(0, 45) + '...' : addressText, margin + 20, thirdRowY);
+        }
+
+        if (sheet.orarioStimatoDa && sheet.orarioStimatoA) {
+            doc.setFont('helvetica', 'bold');
+            doc.text((typeof window !== 'undefined' && window.t) ? window.t('pdfLabelEstimatedSchedule') : 'ORARIO STIMATO PRE-LAVORO:', pageWidth / 2 + 5, thirdRowY);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${sheet.orarioStimatoDa} - ${sheet.orarioStimatoA}`, pageWidth / 2 + 55, thirdRowY);
+        }
+
+        yPos += infoBoxHeight + 4;
 
         // ========================================
         // COMPACT LAVORATORI SECTION - 4X SMALLER

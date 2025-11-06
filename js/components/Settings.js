@@ -18,15 +18,20 @@ function formatDateTime(timestamp) {
     }
 }
 
-const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, setCompanyLogo, autoArchiveDay = 5, setAutoArchiveDay, auditLog = [] }) => {
+const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, setCompanyLogo, autoArchiveDay = 5, setAutoArchiveDay, auditLog = [], appSettings, setAppSettings }) => {
     // ==================== STATI ====================
     // Submenu collapse states
-    const [expandedSection, setExpandedSection] = React.useState('general'); // 'general', 'notifications', 'calendar', 'privacy', 'backup', 'audit', 'advanced'
+    const [expandedSection, setExpandedSection] = React.useState('general'); // 'general', 'notifications', 'calendar', 'privacy', 'termsOfService', 'backup', 'audit', 'advanced'
     
     // GDPR Privacy Notice
     const [gdprText, setGdprText] = React.useState('');
     const [editingGdpr, setEditingGdpr] = React.useState(false);
     const [loadingGdpr, setLoadingGdpr] = React.useState(true);
+
+    // Terms of Service
+    const [tosText, setTosText] = React.useState('');
+    const [editingTos, setEditingTos] = React.useState(false);
+    const [loadingTos, setLoadingTos] = React.useState(true);
 
     // Settings state
     const [loading, setLoading] = React.useState(true);
@@ -78,6 +83,15 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         currentPassword: '',
         newPassword: '',
         confirmPassword: ''
+    });
+
+    // Activity Types Management states
+    const [showActivityModal, setShowActivityModal] = React.useState(false);
+    const [editingActivity, setEditingActivity] = React.useState(null);
+    const [activityForm, setActivityForm] = React.useState({
+        nome: '',
+        emoji: '📋',
+        colore: '#3B82F6'
     });
 
     // ==================== TRANSLATION HELPER ====================
@@ -148,6 +162,19 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         loadGdpr();
     }, [db]);
 
+    // Load Terms of Service
+    React.useEffect(() => {
+        if (!db) return;
+        const loadTos = async () => {
+            try {
+                const doc = await db.collection('settings').doc('termsOfService').get();
+                if (doc.exists) setTosText(doc.data().text || '');
+            } catch (e) { console.error('Error loading Terms of Service:', e); }
+            setLoadingTos(false);
+        };
+        loadTos();
+    }, [db]);
+
     // Load Scheduled Notifications
     React.useEffect(() => {
         if (!db) return;
@@ -196,6 +223,22 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             showToast('❌ Errore salvataggio privacy', 'error');
         }
         setLoadingGdpr(false);
+    };
+
+    const saveTosText = async () => {
+        if (!db) return;
+        setLoadingTos(true);
+        try {
+            await db.collection('settings').doc('termsOfService').set({ 
+                text: tosText, 
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp() 
+            }, { merge: true });
+            showToast('✅ Termini di Servizio aggiornati', 'success');
+            setEditingTos(false);
+        } catch (e) {
+            showToast('❌ Errore salvataggio Termini di Servizio', 'error');
+        }
+        setLoadingTos(false);
     };
 
     // 🔐 Save Security Questions
@@ -465,6 +508,94 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         }
 
         setDeletingLogs(false);
+    };
+
+    // ==================== ACTIVITY TYPES MANAGEMENT ====================
+    const handleAddActivity = async () => {
+        if (!activityForm.nome.trim()) {
+            showToast(t.activityNameRequired || '⚠️ Nome attività obbligatorio', 'warning');
+            return;
+        }
+
+        const newActivity = {
+            id: Date.now().toString(),
+            nome: activityForm.nome.trim(),
+            emoji: activityForm.emoji,
+            colore: activityForm.colore
+        };
+
+        const updatedActivities = [...(appSettings?.tipiAttivita || []), newActivity];
+
+        try {
+            await db.collection('settings').doc('activityTypes').set({
+                tipiAttivita: updatedActivities
+            });
+            setAppSettings({ ...appSettings, tipiAttivita: updatedActivities });
+            showToast(t.activityAdded || '✅ Attività aggiunta', 'success');
+            setShowActivityModal(false);
+            setActivityForm({ nome: '', emoji: '📋', colore: '#3B82F6' });
+        } catch (error) {
+            console.error('Error adding activity:', error);
+            showToast('❌ Errore durante l\'aggiunta', 'error');
+        }
+    };
+
+    const handleEditActivity = async () => {
+        if (!activityForm.nome.trim()) {
+            showToast(t.activityNameRequired || '⚠️ Nome attività obbligatorio', 'warning');
+            return;
+        }
+
+        const updatedActivities = (appSettings?.tipiAttivita || []).map(act =>
+            act.id === editingActivity.id
+                ? { ...act, nome: activityForm.nome.trim(), emoji: activityForm.emoji, colore: activityForm.colore }
+                : act
+        );
+
+        try {
+            await db.collection('settings').doc('activityTypes').set({
+                tipiAttivita: updatedActivities
+            });
+            setAppSettings({ ...appSettings, tipiAttivita: updatedActivities });
+            showToast(t.activityUpdated || '✅ Attività aggiornata', 'success');
+            setShowActivityModal(false);
+            setEditingActivity(null);
+            setActivityForm({ nome: '', emoji: '📋', colore: '#3B82F6' });
+        } catch (error) {
+            console.error('Error updating activity:', error);
+            showToast('❌ Errore durante l\'aggiornamento', 'error');
+        }
+    };
+
+    const handleDeleteActivity = async (activityId) => {
+        if (!confirm(t.confirmDeleteActivity || '⚠️ Eliminare questa attività?')) {
+            return;
+        }
+
+        const updatedActivities = (appSettings?.tipiAttivita || []).filter(act => act.id !== activityId);
+
+        try {
+            await db.collection('settings').doc('activityTypes').set({
+                tipiAttivita: updatedActivities
+            });
+            setAppSettings({ ...appSettings, tipiAttivita: updatedActivities });
+            showToast(t.activityDeleted || '✅ Attività eliminata', 'success');
+        } catch (error) {
+            console.error('Error deleting activity:', error);
+            showToast('❌ Errore durante l\'eliminazione', 'error');
+        }
+    };
+
+    const openAddActivityModal = () => {
+        setActivityForm({ nome: '', emoji: '📋', colore: '#3B82F6' });
+        setEditingActivity(null);
+        setShowActivityModal(true);
+    };
+
+    const openEditActivityModal = (activity) => {
+        setActivityForm({ nome: activity.nome, emoji: activity.emoji, colore: activity.colore });
+        setEditingActivity(activity);
+        setShowActivityModal(true);
     };
 
     // ==================== HELPER COMPONENTS ====================
@@ -917,6 +1048,124 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )
         ),
 
+        // ========== SEZIONE: TERMINI DI SERVIZIO ==========
+        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '📜', 
+                title: t.termsOfService || 'Termini di Servizio', 
+                sectionKey: 'termsOfService' 
+            }),
+            
+            expandedSection === 'termsOfService' && React.createElement('div', { className: 'p-4 space-y-4 animate-fade-in' },
+                React.createElement('h3', { className: subSectionHeaderClass },
+                    '📋 ' + (t.tosNotice || 'Termini e Condizioni')
+                ),
+                React.createElement('p', { className: textClass + ' text-sm mb-3' },
+                    t.tosDescription || 'Testo mostrato ai lavoratori prima della firma (accettazione obbligatoria)'
+                ),
+                
+                editingTos
+                    ? React.createElement('div', {},
+                        React.createElement('textarea', {
+                            value: tosText,
+                            onChange: (e) => setTosText(e.target.value),
+                            rows: 10,
+                            className: inputClass + ' p-3 rounded border w-full',
+                            placeholder: 'Inserisci i Termini di Servizio...'
+                        }),
+                        React.createElement('div', { className: 'flex gap-2 mt-3' },
+                            React.createElement('button', {
+                                onClick: saveTosText,
+                                disabled: loadingTos,
+                                className: 'flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors'
+                            }, loadingTos ? '⏳ Salvataggio...' : '💾 Salva'),
+                            React.createElement('button', {
+                                onClick: () => setEditingTos(false),
+                                className: 'px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
+                            }, '✖️ Annulla')
+                        )
+                    )
+                    : React.createElement('div', {},
+                        React.createElement('div', { 
+                            className: `p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`,
+                            style: { maxHeight: '200px', overflowY: 'auto' }
+                        },
+                            React.createElement('p', { className: textClass, style: { whiteSpace: 'pre-wrap' } },
+                                tosText || (t.noTosText || 'Nessun testo configurato')
+                            )
+                        ),
+                        React.createElement('button', {
+                            onClick: () => setEditingTos(true),
+                            className: 'mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors'
+                        }, '✏️ ' + (t.edit || 'Modifica'))
+                    )
+            )
+        ),
+
+        // ========== SEZIONE: TIPI ATTIVITÀ ==========
+        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '🏷️', 
+                title: t.manageActivityTypes || 'Gestione Tipi Attività', 
+                sectionKey: 'activityTypes',
+                count: appSettings?.tipiAttivita?.length || 0
+            }),
+            
+            expandedSection === 'activityTypes' && React.createElement('div', { className: 'p-4 space-y-6 animate-fade-in' },
+                // Header con pulsante aggiungi
+                React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+                    React.createElement('h3', { className: subSectionHeaderClass },
+                        '🎯 ' + (t.activityTypes || 'Tipi di Attività')
+                    ),
+                    React.createElement('button', {
+                        onClick: openAddActivityModal,
+                        className: 'px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2'
+                    }, '➕ ' + (t.addActivityType || 'Aggiungi Attività'))
+                ),
+
+                // Lista attività
+                (appSettings?.tipiAttivita || []).length === 0
+                    ? React.createElement('div', { className: `p-8 rounded-lg border-2 border-dashed text-center ${darkMode ? 'border-gray-600 bg-gray-700/30' : 'border-gray-300 bg-gray-50'}` },
+                        React.createElement('p', { className: textClass + ' text-lg mb-2' }, '📋'),
+                        React.createElement('p', { className: textClass }, t.noActivitiesConfigured || 'Nessuna attività configurata')
+                    )
+                    : React.createElement('div', { className: 'space-y-3' },
+                        ...(appSettings?.tipiAttivita || []).map(activity =>
+                            React.createElement('div', { 
+                                key: activity.id,
+                                className: `flex items-center justify-between p-4 rounded-lg border-2 transition-all ${darkMode ? 'bg-gray-700/50 border-gray-600 hover:border-gray-500' : 'bg-white border-gray-200 hover:border-gray-300'}`,
+                                style: { borderLeftWidth: '6px', borderLeftColor: activity.colore }
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-3' },
+                                    React.createElement('span', { 
+                                        className: 'text-3xl',
+                                        style: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }
+                                    }, activity.emoji),
+                                    React.createElement('div', {},
+                                        React.createElement('p', { className: 'font-semibold ' + (darkMode ? 'text-gray-100' : 'text-gray-900') }, 
+                                            activity.nome
+                                        ),
+                                        React.createElement('p', { className: 'text-xs ' + textClass },
+                                            activity.colore.toUpperCase()
+                                        )
+                                    )
+                                ),
+                                React.createElement('div', { className: 'flex gap-2' },
+                                    React.createElement('button', {
+                                        onClick: () => openEditActivityModal(activity),
+                                        className: 'px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm'
+                                    }, '✏️ ' + (t.edit || 'Modifica')),
+                                    React.createElement('button', {
+                                        onClick: () => handleDeleteActivity(activity.id),
+                                        className: 'px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm'
+                                    }, '🗑️ ' + (t.delete || 'Elimina'))
+                                )
+                            )
+                        )
+                    )
+            )
+        ),
+
         // ========== SEZIONE: SICUREZZA (NUOVA) ==========
         React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
@@ -1236,6 +1485,118 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     )
                 )
             )
+        ),
+
+        // ========== MODAL: AGGIUNGI/MODIFICA ATTIVITÀ ==========
+        showActivityModal && React.createElement('div', { 
+            className: 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50',
+            onClick: () => {
+                setShowActivityModal(false);
+                setEditingActivity(null);
+                setActivityForm({ nome: '', emoji: '📋', colore: '#3B82F6' });
+            }
+        },
+            React.createElement('div', { 
+                className: `${cardClass} rounded-2xl shadow-2xl p-6 w-full max-w-md animate-fade-in`,
+                onClick: (e) => e.stopPropagation()
+            },
+                // Modal Header
+                React.createElement('div', { className: 'flex items-center justify-between mb-6' },
+                    React.createElement('h2', { className: 'text-2xl font-bold ' + (darkMode ? 'text-gray-100' : 'text-gray-900') },
+                        editingActivity 
+                            ? '✏️ ' + (t.editActivityType || 'Modifica Attività')
+                            : '➕ ' + (t.addActivityType || 'Aggiungi Attività')
+                    ),
+                    React.createElement('button', {
+                        onClick: () => {
+                            setShowActivityModal(false);
+                            setEditingActivity(null);
+                            setActivityForm({ nome: '', emoji: '📋', colore: '#3B82F6' });
+                        },
+                        className: 'text-2xl hover:opacity-70 transition-opacity'
+                    }, '✖️')
+                ),
+
+                // Form
+                React.createElement('div', { className: 'space-y-4' },
+                    // Nome
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            t.activityName || 'Nome Attività'
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: activityForm.nome,
+                            onChange: (e) => setActivityForm({ ...activityForm, nome: e.target.value }),
+                            placeholder: t.activityNamePlaceholder || 'es. Magazzino, Evento, Trasloco...',
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2 focus:ring-2 focus:ring-indigo-500'
+                        })
+                    ),
+
+                    // Emoji
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            t.activityEmoji || 'Emoji'
+                        ),
+                        React.createElement('div', { className: 'flex items-center gap-3' },
+                            React.createElement('span', { className: 'text-5xl' }, activityForm.emoji),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: activityForm.emoji,
+                                onChange: (e) => setActivityForm({ ...activityForm, emoji: e.target.value.slice(0, 2) }),
+                                maxLength: 2,
+                                placeholder: '🏢',
+                                className: inputClass + ' flex-1 px-4 py-3 rounded-lg border-2 text-center text-2xl'
+                            })
+                        )
+                    ),
+
+                    // Colore
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            t.activityColor || 'Colore'
+                        ),
+                        React.createElement('div', { className: 'flex items-center gap-3' },
+                            React.createElement('div', { 
+                                className: 'w-16 h-16 rounded-lg border-2 shadow-inner',
+                                style: { backgroundColor: activityForm.colore, borderColor: darkMode ? '#374151' : '#D1D5DB' }
+                            }),
+                            React.createElement('input', {
+                                type: 'color',
+                                value: activityForm.colore,
+                                onChange: (e) => setActivityForm({ ...activityForm, colore: e.target.value }),
+                                className: 'flex-1 h-12 rounded-lg border-2 cursor-pointer'
+                            }),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: activityForm.colore,
+                                onChange: (e) => setActivityForm({ ...activityForm, colore: e.target.value }),
+                                placeholder: '#3B82F6',
+                                className: inputClass + ' w-28 px-3 py-2 rounded-lg border-2 text-sm font-mono'
+                            })
+                        )
+                    ),
+
+                    // Pulsanti
+                    React.createElement('div', { className: 'flex gap-3 pt-4' },
+                        React.createElement('button', {
+                            onClick: () => {
+                                setShowActivityModal(false);
+                                setEditingActivity(null);
+                                setActivityForm({ nome: '', emoji: '📋', colore: '#3B82F6' });
+                            },
+                            className: 'flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
+                        }, '✖️ ' + (t.cancel || 'Annulla')),
+                        React.createElement('button', {
+                            onClick: editingActivity ? handleEditActivity : handleAddActivity,
+                            className: 'flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors'
+                        }, editingActivity 
+                            ? '💾 ' + (t.save || 'Salva')
+                            : '➕ ' + (t.add || 'Aggiungi')
+                        )
+                    )
+                )
+            )
         )
     );
 };
@@ -1244,3 +1605,4 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
 if (typeof window !== 'undefined') {
     window.Settings = Settings;
 }
+

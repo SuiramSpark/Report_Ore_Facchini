@@ -44,7 +44,16 @@ const App = () => {
     const [sheetId, setSheetId] = useState(null);
     const [db, setDb] = useState(null);
     const [storage, setStorage] = useState(null);
-    const [appSettings, setAppSettings] = useState({ weekStart: 1 });
+    const [appSettings, setAppSettings] = useState({ 
+        weekStart: 1, 
+        expirationDays: 1,
+        tipiAttivita: [
+            { id: '1', nome: 'Magazzino', emoji: '🏢', colore: '#3B82F6' },
+            { id: '2', nome: 'Evento', emoji: '🎉', colore: '#10B981' },
+            { id: '3', nome: 'Trasloco', emoji: '🚚', colore: '#F59E0B' },
+            { id: '4', nome: 'Inventario', emoji: '📦', colore: '#8B5CF6' }
+        ]
+    });
     const [sheets, setSheets] = useState([]);
     const [blacklist, setBlacklist] = useState([]);
     const [auditLog, setAuditLog] = useState([]);
@@ -397,7 +406,12 @@ const App = () => {
             .onSnapshot(doc => {
                 if (!doc.exists) return;
                 const data = doc.data() || {};
-                setAppSettings(prev => ({ ...prev, weekStart: typeof data.weekStart !== 'undefined' ? Number(data.weekStart) : (prev.weekStart || 1) }));
+                setAppSettings(prev => ({ 
+                    ...prev, 
+                    weekStart: typeof data.weekStart !== 'undefined' ? Number(data.weekStart) : (prev.weekStart || 1),
+                    expirationDays: typeof data.expirationDays !== 'undefined' ? Number(data.expirationDays) : (prev.expirationDays || 1),
+                    tipiAttivita: data.tipiAttivita || prev.tipiAttivita
+                }));
             }, (err) => {
                 console.error('Error loading app settings:', err);
             });
@@ -483,6 +497,9 @@ const App = () => {
             data: new Date().toISOString().split('T')[0],
             titoloAzienda: '',
             location: '',
+            indirizzoEvento: '',
+            orarioStimatoDa: '',
+            orarioStimatoA: '',
             responsabile: '',
             note: '',
             lavoratori: [],
@@ -1245,6 +1262,7 @@ const App = () => {
                         darkMode={darkMode}
                         language={language}
                         companyLogo={companyLogo}
+                        appSettings={appSettings}
                     />
                 )}
 
@@ -1320,6 +1338,8 @@ const App = () => {
                         autoArchiveDay={autoArchiveDay}
                         setAutoArchiveDay={setAutoArchiveDay}
                         auditLog={auditLog}
+                        appSettings={appSettings}
+                        setAppSettings={setAppSettings}
                     />
                 )}
             </main>

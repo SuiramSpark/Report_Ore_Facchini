@@ -12,7 +12,8 @@ const SheetEditor = ({
     addAuditLog,
     darkMode, 
     language = 'it',
-    companyLogo 
+    companyLogo,
+    appSettings = { expirationDays: 1 }
 }) => {
     // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
     // Keep a safe fallback to the legacy `translations` object so migration is incremental.
@@ -45,7 +46,8 @@ const SheetEditor = ({
     const [loading, setLoading] = React.useState(false);
     const [selectedWorkers, setSelectedWorkers] = React.useState([]);
     const [bulkEditMode, setBulkEditMode] = React.useState(false);
-    const [bulkEditData, setBulkEditData] = React.useState({ pausaMinuti: '' });
+    const [partialPDFMode, setPartialPDFMode] = React.useState(false);
+    const [bulkEditData, setBulkEditData] = React.useState({ pausaMinuti: '', oraIn: '', oraOut: '' });
     const [editingWorker, setEditingWorker] = React.useState(null);
     const [showAddWorkerForm, setShowAddWorkerForm] = React.useState(false);
     const [newWorker, setNewWorker] = React.useState({
@@ -56,8 +58,16 @@ const SheetEditor = ({
         pausa: 0,
         codiceFiscale: '',
         numeroIdentita: '',
-        telefono: ''
+        telefono: '',
+        email: '',
+        indirizzo: '',
+        dataNascita: '',
+        firma: ''
     });
+    const [showOptionalFieldsAdd, setShowOptionalFieldsAdd] = React.useState(false);
+    const addWorkerCanvasRef = React.useRef(null);
+    const [addWorkerSignaturePad, setAddWorkerSignaturePad] = React.useState(null);
+    const [showActivityDropdown, setShowActivityDropdown] = React.useState(false);
     const cardClass = darkMode ? 'bg-gray-800' : 'bg-white';
     const inputClass = darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-700';
@@ -104,6 +114,38 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
         return '0.00';
     }
 };
+
+    // Calcola differenza tra orario effettivo e orario stimato (ritardo o anticipo)
+    const calculateTimeDifference = (actualTime, estimatedTime) => {
+        if (!actualTime || !estimatedTime) return null;
+        
+        try {
+            const [actualHours, actualMinutes] = actualTime.split(':').map(Number);
+            const [estimatedHours, estimatedMinutes] = estimatedTime.split(':').map(Number);
+            
+            if (isNaN(actualHours) || isNaN(actualMinutes) || isNaN(estimatedHours) || isNaN(estimatedMinutes)) {
+                return null;
+            }
+            
+            const actualTotalMinutes = actualHours * 60 + actualMinutes;
+            const estimatedTotalMinutes = estimatedHours * 60 + estimatedMinutes;
+            const diffMinutes = actualTotalMinutes - estimatedTotalMinutes;
+            
+            const hours = Math.floor(Math.abs(diffMinutes) / 60);
+            const minutes = Math.abs(diffMinutes) % 60;
+            
+            return {
+                diffMinutes,
+                hours,
+                minutes,
+                isLate: diffMinutes > 0,  // true = ritardo (arrivato dopo), false = anticipo
+                formatted: hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+            };
+        } catch (error) {
+            console.error('Errore calcolo differenza orari:', error);
+            return null;
+        }
+    };
 
     const checkWorkerBlacklist = (worker) => {
         return blacklist.find(bl => 
@@ -205,6 +247,31 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 respCanvasRef.current.isCanvasBlank = () => isCanvasBlank(respCanvasRef.current);
             }
         }, [canvasKey]); // 🐛 FIX: Re-inizializza quando canvasKey cambia
+
+        // Initialize SignaturePad for Add Worker form
+        React.useEffect(() => {
+            if (showOptionalFieldsAdd && addWorkerCanvasRef.current && !addWorkerSignaturePad) {
+                const canvas = addWorkerCanvasRef.current;
+                initCanvas(canvas);
+                canvas.clearCanvas = () => clearCanvas(canvas);
+                canvas.isCanvasBlank = () => isCanvasBlank(canvas);
+                setAddWorkerSignaturePad(canvas); // Store canvas reference
+            }
+        }, [showOptionalFieldsAdd, addWorkerSignaturePad]);
+
+    // Close activity dropdown when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showActivityDropdown && !event.target.closest('.activity-dropdown-container')) {
+                setShowActivityDropdown(false);
+            }
+        };
+
+        if (showActivityDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [showActivityDropdown]);
 
     // --- Static Weather Fetch Logic ---
     // Copied/adapted from WeatherWidget.js for static weather snapshot
@@ -428,6 +495,54 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
         setLoading(false);
     };
 
+    // Funzione per condividere l'indirizzo
+    const shareAddress = async () => {
+        const address = currentSheet.indirizzoEvento;
+        if (!address) return;
+
+        // Web Share API (mobile + alcuni browser desktop moderni)
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: currentSheet.titoloAzienda || t.locationAddress,
+                    text: `📍 ${address}`,
+                    url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+                });
+            } catch (error) {
+                // User cancelled or error - fallback to clipboard
+                if (error.name !== 'AbortError') {
+                    copyAddressToClipboard(address);
+                }
+            }
+        } else {
+            // Fallback: copia negli appunti
+            copyAddressToClipboard(address);
+        }
+    };
+
+    // Helper per copiare l'indirizzo negli appunti
+    const copyAddressToClipboard = async (address) => {
+        try {
+            await navigator.clipboard.writeText(address);
+            showToastLocal(`✅ ${t.addressCopied}`, 'success');
+        } catch (error) {
+            // Fallback per browser vecchi
+            const textArea = document.createElement('textarea');
+            textArea.value = address;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToastLocal(`✅ ${t.addressCopied}`, 'success');
+            } catch (err) {
+                showToastLocal(`❌ ${t.errorCopying || 'Errore copia'}`, 'error');
+            }
+            document.body.removeChild(textArea);
+        }
+    };
+
     const updateWorker = async (workerId, updatedData) => {
         setLoading(true);
         const updatedLavoratori = currentSheet.lavoratori.map(w => 
@@ -467,6 +582,12 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
 
         setLoading(true);
         
+        // Get signature if available
+        let firmaData = '';
+        if (addWorkerSignaturePad && typeof addWorkerSignaturePad.isCanvasBlank === 'function' && !addWorkerSignaturePad.isCanvasBlank()) {
+            firmaData = addWorkerSignaturePad.toDataURL();
+        }
+        
         const workerToAdd = {
             id: Date.now().toString(),
             nome: newWorker.nome,
@@ -477,7 +598,15 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             oreTotali: calculateHours(newWorker.oraEntrata, newWorker.oraUscita, newWorker.pausa),
             codiceFiscale: newWorker.codiceFiscale || '',
             numeroIdentita: newWorker.numeroIdentita || '',
-            telefono: newWorker.telefono || ''
+            telefono: newWorker.telefono || '',
+            email: newWorker.email || '',
+            indirizzo: newWorker.indirizzo || '',
+            dataNascita: newWorker.dataNascita || '',
+            firma: firmaData,
+            ritardoIngressoAutorizzato: false,
+            noteRitardoIngresso: '',
+            uscitaAnticipoAutorizzata: false,
+            noteUscitaAnticipo: ''
         };
 
         const updatedLavoratori = [...(currentSheet.lavoratori || []), workerToAdd];
@@ -497,8 +626,19 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 pausa: 0,
                 codiceFiscale: '',
                 numeroIdentita: '',
-                telefono: ''
+                telefono: '',
+                email: '',
+                indirizzo: '',
+                dataNascita: '',
+                firma: ''
             });
+            
+            // Clear signature pad
+            if (addWorkerSignaturePad && typeof addWorkerSignaturePad.clearCanvas === 'function') {
+                addWorkerSignaturePad.clearCanvas();
+            }
+            setAddWorkerSignaturePad(null);
+            setShowOptionalFieldsAdd(false);
 
             if (addAuditLog) {
                 await addAuditLog('WORKER_ADD', `Aggiunto: ${workerToAdd.nome} ${workerToAdd.cognome}`);
@@ -522,8 +662,19 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
         setLoading(true);
         const updatedLavoratori = currentSheet.lavoratori.map(w => {
             if (selectedWorkers.includes(w.id)) {
-                const newOre = calculateHours(w.oraIn, w.oraOut, bulkEditData.pausaMinuti);
-                return { ...w, pausaMinuti: bulkEditData.pausaMinuti, oreTotali: newOre };
+                // Use new values if provided, otherwise keep existing
+                const newOraIn = bulkEditData.oraIn || w.oraIn;
+                const newOraOut = bulkEditData.oraOut || w.oraOut;
+                const newPausa = bulkEditData.pausaMinuti !== '' ? bulkEditData.pausaMinuti : w.pausaMinuti;
+                
+                const newOre = calculateHours(newOraIn, newOraOut, newPausa);
+                return { 
+                    ...w, 
+                    oraIn: newOraIn,
+                    oraOut: newOraOut,
+                    pausaMinuti: newPausa, 
+                    oreTotali: newOre 
+                };
             }
             return w;
         });
@@ -536,6 +687,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             setCurrentSheet(prev => ({ ...prev, lavoratori: updatedLavoratori }));
             setSelectedWorkers([]);
             setBulkEditMode(false);
+            setBulkEditData({ pausaMinuti: '', oraIn: '', oraOut: '' }); // Reset form
             
             if (addAuditLog) {
                 await addAuditLog('BULK_UPDATE', `${selectedWorkers.length} ${t.workers.toLowerCase()}`);
@@ -571,6 +723,45 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             }
             
             setTimeout(() => onBack(), 1500);
+        } catch (error) {
+            console.error(error);
+            showToastLocal(`❌ ${t.error}`, 'error');
+        }
+        setLoading(false);
+    };
+
+    const generatePartialPDF = async () => {
+        if (selectedWorkers.length === 0) {
+            showToastLocal(`❌ ${t.selectWorkersForPDF || 'Seleziona almeno un lavoratore per il PDF'}`, 'error');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Create a temporary sheet with only selected workers
+            const selectedWorkersData = currentSheet.lavoratori.filter(w => selectedWorkers.includes(w.id));
+            const partialSheet = {
+                ...currentSheet,
+                lavoratori: selectedWorkersData
+            };
+
+            // Generate PDF with custom filename
+            const filenamePrefix = t.pdfFilenamePrefix || 'foglio_presenze';
+            const customFilename = `${filenamePrefix}_PARZIALE_${partialSheet.titoloAzienda || 'N_D'}_${partialSheet.data}.pdf`.replace(/\s+/g, '_');
+            
+            if (typeof window.exportToPDF === 'function') {
+                await window.exportToPDF(partialSheet, companyLogo, customFilename);
+            } else {
+                throw new Error('exportToPDF function not available');
+            }
+            
+            if (addAuditLog) {
+                await addAuditLog('PDF_PARTIAL', `PDF parziale con ${selectedWorkers.length} lavoratori`);
+            }
+            
+            // Exit partial PDF mode
+            setPartialPDFMode(false);
+            setSelectedWorkers([]);
         } catch (error) {
             console.error(error);
             showToastLocal(`❌ ${t.error}`, 'error');
@@ -637,6 +828,153 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                         onChange={(e) => setCurrentSheet({...currentSheet, responsabile: e.target.value})}
                         className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                     />
+                    
+                    {/* 📍 NUOVO CAMPO: Indirizzo Evento/Magazzino */}
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder={t.locationAddress || 'Indirizzo Evento/Magazzino'}
+                            value={currentSheet.indirizzoEvento || ''}
+                            onChange={(e) => setCurrentSheet({...currentSheet, indirizzoEvento: e.target.value})}
+                            className={`flex-1 px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                        />
+                        {currentSheet.indirizzoEvento && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={shareAddress}
+                                    title={t.shareAddress || 'Condividi Indirizzo'}
+                                    className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                >
+                                    <span className="text-xl">📤</span>
+                                    <span className="hidden sm:inline">{t.share || 'Condividi'}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const encodedAddress = encodeURIComponent(currentSheet.indirizzoEvento);
+                                        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+                                        window.open(mapsUrl, '_blank');
+                                    }}
+                                    title={t.openInMaps || 'Apri in Google Maps'}
+                                    className="px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                >
+                                    <span className="text-xl">📍</span>
+                                    <span className="hidden sm:inline">{t.openInMaps || 'Maps'}</span>
+                                </button>
+                            </>
+                        )}
+                    </div>
+                    
+                    {/* 🏷️ NUOVO CAMPO: Tipo Attività (opzionale, multi-select) */}
+                    <div className="col-span-1 sm:col-span-2">
+                        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {t.activityType || 'Tipo Attività'} <span className="text-gray-400 text-xs">(opzionale)</span>
+                        </label>
+                        
+                        {/* Selected activities badges */}
+                        {currentSheet.tipoAttivita && currentSheet.tipoAttivita.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {currentSheet.tipoAttivita.map(activityId => {
+                                    const activity = appSettings.tipiAttivita?.find(a => a.id === activityId);
+                                    if (!activity) return null;
+                                    return (
+                                        <span
+                                            key={activityId}
+                                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-white text-sm font-medium"
+                                            style={{ backgroundColor: activity.colore }}
+                                        >
+                                            <span>{activity.emoji}</span>
+                                            <span>{activity.nome}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const updated = (currentSheet.tipoAttivita || []).filter(id => id !== activityId);
+                                                    setCurrentSheet({...currentSheet, tipoAttivita: updated});
+                                                }}
+                                                className="ml-1 hover:bg-black/20 rounded-full w-4 h-4 flex items-center justify-center"
+                                            >
+                                                ✕
+                                            </button>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        
+                        {/* Dropdown selector */}
+                        <div className="relative activity-dropdown-container">
+                            <button
+                                type="button"
+                                onClick={() => setShowActivityDropdown(!showActivityDropdown)}
+                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-left flex items-center justify-between`}
+                            >
+                                <span className="text-gray-400">{t.selectActivities || 'Seleziona attività...'}</span>
+                                <span className="text-gray-400">▼</span>
+                            </button>
+                            {showActivityDropdown && (
+                                <div className={`absolute z-50 w-full mt-1 ${cardClass} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} rounded-lg shadow-lg max-h-60 overflow-y-auto`}>
+                                    {appSettings.tipiAttivita && appSettings.tipiAttivita.length > 0 ? (
+                                        appSettings.tipiAttivita.map(activity => {
+                                            const isSelected = (currentSheet.tipoAttivita || []).includes(activity.id);
+                                            return (
+                                                <label
+                                                    key={activity.id}
+                                                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={(e) => {
+                                                            const current = currentSheet.tipoAttivita || [];
+                                                            const updated = e.target.checked
+                                                                ? [...current, activity.id]
+                                                                : current.filter(id => id !== activity.id);
+                                                            setCurrentSheet({...currentSheet, tipoAttivita: updated});
+                                                        }}
+                                                        className="w-4 h-4"
+                                                    />
+                                                    <span style={{ color: activity.colore }}>{activity.emoji}</span>
+                                                    <span className="flex-1">{activity.nome}</span>
+                                                </label>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="px-4 py-3 text-gray-500 text-sm">
+                                            {t.noActivitiesConfigured || 'Nessuna attività configurata'}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* ⏰ NUOVO CAMPO: Orari Stimati (opzionali) */}
+                    <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-3">
+                        <div>
+                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                {t.estimatedFrom || 'Dalle (stimate)'} <span className="text-gray-400 text-xs">(opzionale)</span>
+                            </label>
+                            <input
+                                type="time"
+                                value={currentSheet.orarioStimatoDa || ''}
+                                onChange={(e) => setCurrentSheet({...currentSheet, orarioStimatoDa: e.target.value})}
+                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                            />
+                        </div>
+                        <div>
+                            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                {t.estimatedTo || 'Alle (stimate)'} <span className="text-gray-400 text-xs">(opzionale)</span>
+                            </label>
+                            <input
+                                type="time"
+                                value={currentSheet.orarioStimatoA || ''}
+                                onChange={(e) => setCurrentSheet({...currentSheet, orarioStimatoA: e.target.value})}
+                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                            />
+                        </div>
+                    </div>
+                    
                     <div className="flex items-center">
                     <input
                         type="text"
@@ -703,12 +1041,17 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
 
                 {/* Link visibile con indicatore scadenza */}
                 <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <p className={`text-xs ${textClass} mb-2 font-semibold flex items-center gap-2`}>
+                    <p className={`text-xs ${textClass} mb-2 font-semibold flex items-center gap-2 flex-wrap`}>
                         🔗 {t.shareLink || 'Link condivisione'}:
                         {currentSheet.linkGeneratedAt && (
-                            <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs">
-                                ✅ Attivo da {new Date(currentSheet.linkGeneratedAt).toLocaleString('it-IT')}
-                            </span>
+                            <>
+                                <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs">
+                                    ✅ {t.linkActiveFrom || 'Attivo da'} {new Date(currentSheet.linkGeneratedAt).toLocaleString('it-IT')}
+                                </span>
+                                <span className="bg-red-500 text-white px-2 py-0.5 rounded text-xs">
+                                    ⏰ {t.linkValidUntil || 'Valido fino a'} {new Date(new Date(currentSheet.linkGeneratedAt).getTime() + (appSettings.expirationDays || 1) * 24 * 60 * 60 * 1000).toLocaleString('it-IT')}
+                                </span>
+                            </>
                         )}
                     </p>
                     <div className="flex gap-2">
@@ -776,7 +1119,9 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 {showAddWorkerForm && (
                     <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-green-900/20 border-2 border-green-600' : 'bg-green-50 border-2 border-green-300'}`}>
                         <h4 className="font-bold mb-3 text-base sm:text-lg">➕ {t.addWorker}</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        
+                        {/* Campi obbligatori */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                             <input
                                 type="text"
                                 placeholder={`${t.firstName} *`}
@@ -807,19 +1152,97 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                             />
                             <input
                                 type="number"
-                                placeholder={t.breakMinutes}
+                                placeholder={`${t.breakMinutes} *`}
                                 value={newWorker.pausa}
                                 onChange={(e) => setNewWorker({...newWorker, pausa: e.target.value})}
                                 className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
                             />
-                            <input
-                                type="text"
-                                placeholder={t.fiscalCode}
-                                value={newWorker.codiceFiscale}
-                                onChange={(e) => setNewWorker({...newWorker, codiceFiscale: e.target.value})}
-                                className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
-                            />
                         </div>
+                        
+                        {/* Bottone campi opzionali */}
+                        <button
+                            type="button"
+                            onClick={() => setShowOptionalFieldsAdd(!showOptionalFieldsAdd)}
+                            className={`w-full mb-3 px-4 py-2 rounded-lg font-medium text-sm ${
+                                darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                            }`}
+                        >
+                            {showOptionalFieldsAdd ? '▼' : '▶'} {t.optionalFields || 'Campi opzionali'}
+                        </button>
+                        
+                        {/* Campi opzionali */}
+                        {showOptionalFieldsAdd && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                <input
+                                    type="text"
+                                    placeholder={t.fiscalCode}
+                                    value={newWorker.codiceFiscale}
+                                    onChange={(e) => setNewWorker({...newWorker, codiceFiscale: e.target.value})}
+                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder={t.idNumber}
+                                    value={newWorker.numeroIdentita}
+                                    onChange={(e) => setNewWorker({...newWorker, numeroIdentita: e.target.value})}
+                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                />
+                                <input
+                                    type="tel"
+                                    placeholder={t.phone || 'Telefono'}
+                                    value={newWorker.telefono}
+                                    onChange={(e) => setNewWorker({...newWorker, telefono: e.target.value})}
+                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                />
+                                <input
+                                    type="email"
+                                    placeholder={t.email || 'Email'}
+                                    value={newWorker.email}
+                                    onChange={(e) => setNewWorker({...newWorker, email: e.target.value})}
+                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder={t.address || 'Indirizzo'}
+                                    value={newWorker.indirizzo}
+                                    onChange={(e) => setNewWorker({...newWorker, indirizzo: e.target.value})}
+                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                />
+                                <input
+                                    type="date"
+                                    placeholder={t.birthDate || 'Data di nascita'}
+                                    value={newWorker.dataNascita}
+                                    onChange={(e) => setNewWorker({...newWorker, dataNascita: e.target.value})}
+                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                />
+                            </div>
+                        )}
+                        
+                        {/* Firma */}
+                        {showOptionalFieldsAdd && (
+                            <div className="mb-3">
+                                <label className={`block mb-2 font-medium text-sm ${textClass}`}>
+                                    ✍️ {t.signature || 'Firma'}
+                                </label>
+                                <canvas
+                                    ref={addWorkerCanvasRef}
+                                    className="w-full border-2 border-gray-400 rounded-lg bg-white"
+                                    style={{ touchAction: 'none', height: '150px' }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (addWorkerSignaturePad && typeof addWorkerSignaturePad.clearCanvas === 'function') {
+                                            addWorkerSignaturePad.clearCanvas();
+                                        }
+                                    }}
+                                    className="mt-2 px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
+                                >
+                                    🗑️ {t.clearSignature || 'Cancella firma'}
+                                </button>
+                            </div>
+                        )}
+                        
                         <div className="flex gap-2 mt-3">
                             <button
                                 onClick={addWorker}
@@ -829,7 +1252,14 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 {loading ? `⏳ ${t.loading}...` : `✓ ${t.addWorker}`}
                             </button>
                             <button
-                                onClick={() => setShowAddWorkerForm(false)}
+                                onClick={() => {
+                                    setShowAddWorkerForm(false);
+                                    setShowOptionalFieldsAdd(false);
+                                    if (addWorkerSignaturePad && typeof addWorkerSignaturePad.clearCanvas === 'function') {
+                                        addWorkerSignaturePad.clearCanvas();
+                                    }
+                                    setAddWorkerSignaturePad(null);
+                                }}
                                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold"
                             >
                                 {t.cancel}
@@ -857,22 +1287,36 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                             </span>
                         </div>
                         
-                        <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                            <input
+                                type="time"
+                                placeholder={t.timeIn}
+                                value={bulkEditData.oraIn}
+                                onChange={(e) => setBulkEditData({...bulkEditData, oraIn: e.target.value})}
+                                className={`px-4 py-2 rounded-lg border ${inputClass}`}
+                            />
+                            <input
+                                type="time"
+                                placeholder={t.timeOut}
+                                value={bulkEditData.oraOut}
+                                onChange={(e) => setBulkEditData({...bulkEditData, oraOut: e.target.value})}
+                                className={`px-4 py-2 rounded-lg border ${inputClass}`}
+                            />
                             <input
                                 type="number"
-                                placeholder={t.break}
+                                placeholder={t.breakMinutes}
                                 value={bulkEditData.pausaMinuti}
                                 onChange={(e) => setBulkEditData({...bulkEditData, pausaMinuti: e.target.value})}
-                                className={`flex-1 px-4 py-2 rounded-lg border ${inputClass}`}
+                                className={`px-4 py-2 rounded-lg border ${inputClass}`}
                             />
-                            <button
-                                onClick={bulkUpdateWorkers}
-                                disabled={selectedWorkers.length === 0}
-                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-400 text-sm sm:text-base"
-                            >
-                                {t.updateAll}
-                            </button>
                         </div>
+                        <button
+                            onClick={bulkUpdateWorkers}
+                            disabled={selectedWorkers.length === 0}
+                            className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold disabled:bg-gray-400 text-sm sm:text-base"
+                        >
+                            {t.updateAll}
+                        </button>
                     </div>
                 )}
 
@@ -931,7 +1375,103 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                     className={`px-3 py-2 rounded border ${inputClass} text-sm`}
                                                     placeholder={t.break}
                                                 />
+                                                <input
+                                                    type="text"
+                                                    value={editingWorker.codiceFiscale || ''}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, codiceFiscale: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.fiscalCode}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={editingWorker.numeroIdentita || ''}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, numeroIdentita: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.idNumber}
+                                                />
+                                                <input
+                                                    type="tel"
+                                                    value={editingWorker.telefono || ''}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, telefono: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.phone}
+                                                />
+                                                <input
+                                                    type="email"
+                                                    value={editingWorker.email || ''}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, email: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.email}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={editingWorker.indirizzo || ''}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, indirizzo: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.address}
+                                                />
+                                                <input
+                                                    type="date"
+                                                    value={editingWorker.dataNascita || ''}
+                                                    onChange={(e) => setEditingWorker({...editingWorker, dataNascita: e.target.value})}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.birthDate}
+                                                />
                                             </div>
+                                            
+                                            {/* Sezione Autorizzazioni Orari */}
+                                            {(currentSheet.orarioStimatoDa || currentSheet.orarioStimatoA) && (
+                                                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                                    <h4 className="text-sm font-semibold mb-3 text-blue-900 dark:text-blue-100">
+                                                        🕐 {t.scheduleAuthorizations}
+                                                    </h4>
+                                                    
+                                                    {/* Autorizzazione Ritardo Ingresso */}
+                                                    <div className="mb-3">
+                                                        <label className="flex items-center gap-2 mb-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={editingWorker.ritardoIngressoAutorizzato || false}
+                                                                onChange={(e) => setEditingWorker({...editingWorker, ritardoIngressoAutorizzato: e.target.checked})}
+                                                                className="w-4 h-4"
+                                                            />
+                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                                {t.authorizeDelay}
+                                                            </span>
+                                                        </label>
+                                                        <textarea
+                                                            value={editingWorker.noteRitardoIngresso || ''}
+                                                            onChange={(e) => setEditingWorker({...editingWorker, noteRitardoIngresso: e.target.value})}
+                                                            placeholder={t.delayNotes}
+                                                            className={`w-full px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                            rows="2"
+                                                        />
+                                                    </div>
+                                                    
+                                                    {/* Autorizzazione Uscita Anticipata */}
+                                                    <div>
+                                                        <label className="flex items-center gap-2 mb-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={editingWorker.uscitaAnticipoAutorizzata || false}
+                                                                onChange={(e) => setEditingWorker({...editingWorker, uscitaAnticipoAutorizzata: e.target.checked})}
+                                                                className="w-4 h-4"
+                                                            />
+                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                                {t.authorizeEarlyExit}
+                                                            </span>
+                                                        </label>
+                                                        <textarea
+                                                            value={editingWorker.noteUscitaAnticipo || ''}
+                                                            onChange={(e) => setEditingWorker({...editingWorker, noteUscitaAnticipo: e.target.value})}
+                                                            placeholder={t.earlyExitNotes}
+                                                            className={`w-full px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                            rows="2"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
                                             <div className="flex flex-col sm:flex-row gap-2">
                                                 <button
                                                     onClick={() => updateWorker(worker.id, editingWorker)}
@@ -949,7 +1489,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                         </div>
                                     ) : (
                                         <div className="flex items-start gap-3">
-                                            {bulkEditMode && (
+                                            {(bulkEditMode || partialPDFMode) && (
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
@@ -966,6 +1506,56 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                     </div>
                                                 )}
                                                 
+                                                {currentSheet.orarioStimatoDa && currentSheet.orarioStimatoA && (
+                                                    (worker.oraIn !== currentSheet.orarioStimatoDa || worker.oraOut !== currentSheet.orarioStimatoA) && (
+                                                        <div className="bg-yellow-600 text-white px-3 py-2 rounded-lg mb-2 text-xs sm:text-sm font-semibold">
+                                                            ⚠️ {t.hoursMismatch}
+                                                        </div>
+                                                    )
+                                                )}
+                                                
+                                                {/* Badge Ritardo Ingresso */}
+                                                {(() => {
+                                                    const delayDiff = calculateTimeDifference(worker.oraIn, currentSheet.orarioStimatoDa);
+                                                    if (delayDiff && delayDiff.isLate && delayDiff.diffMinutes > 0) {
+                                                        const isAuthorized = worker.ritardoIngressoAutorizzato;
+                                                        return (
+                                                            <div className={`px-3 py-2 rounded-lg mb-2 text-xs sm:text-sm font-semibold ${
+                                                                isAuthorized 
+                                                                    ? 'bg-green-600 text-white' 
+                                                                    : 'bg-orange-600 text-white'
+                                                            }`}>
+                                                                {isAuthorized ? '✓' : '⚠️'} {isAuthorized ? t.authorizedLate : t.lateArrival}: {delayDiff.formatted}
+                                                                {worker.noteRitardoIngresso && (
+                                                                    <p className="text-xs mt-1 opacity-90">📝 {worker.noteRitardoIngresso}</p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                                
+                                                {/* Badge Uscita Anticipata */}
+                                                {(() => {
+                                                    const earlyDiff = calculateTimeDifference(worker.oraOut, currentSheet.orarioStimatoA);
+                                                    if (earlyDiff && !earlyDiff.isLate && earlyDiff.diffMinutes < 0) {
+                                                        const isAuthorized = worker.uscitaAnticipoAutorizzata;
+                                                        return (
+                                                            <div className={`px-3 py-2 rounded-lg mb-2 text-xs sm:text-sm font-semibold ${
+                                                                isAuthorized 
+                                                                    ? 'bg-green-600 text-white' 
+                                                                    : 'bg-orange-600 text-white'
+                                                            }`}>
+                                                                {isAuthorized ? '✓' : '⚠️'} {isAuthorized ? t.authorizedExit : t.earlyExit}: {earlyDiff.formatted}
+                                                                {worker.noteUscitaAnticipo && (
+                                                                    <p className="text-xs mt-1 opacity-90">📝 {worker.noteUscitaAnticipo}</p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                                
                                                 <p className="font-semibold text-sm sm:text-base mb-1">
                                                     {t.workerNumber} #{i + 1}: {worker.nome} {worker.cognome}
                                                 </p>
@@ -980,6 +1570,56 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                         alt={t.signature} 
                                                         className="mt-2 h-12 sm:h-16 border rounded bg-white" 
                                                     />
+                                                )}
+                                                
+                                                {/* Toggle autorizzazioni inline */}
+                                                {(currentSheet.orarioStimatoDa || currentSheet.orarioStimatoA) && (
+                                                    (() => {
+                                                        const delayDiff = calculateTimeDifference(worker.oraIn, currentSheet.orarioStimatoDa);
+                                                        const earlyDiff = calculateTimeDifference(worker.oraOut, currentSheet.orarioStimatoA);
+                                                        const hasDelay = delayDiff && delayDiff.isLate && delayDiff.diffMinutes > 0;
+                                                        const hasEarlyExit = earlyDiff && !earlyDiff.isLate && earlyDiff.diffMinutes < 0;
+                                                        
+                                                        if (hasDelay || hasEarlyExit) {
+                                                            return (
+                                                                <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs">
+                                                                    {hasDelay && (
+                                                                        <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={worker.ritardoIngressoAutorizzato || false}
+                                                                                onChange={async (e) => {
+                                                                                    await updateWorker(worker.id, {
+                                                                                        ...worker,
+                                                                                        ritardoIngressoAutorizzato: e.target.checked
+                                                                                    });
+                                                                                }}
+                                                                                className="w-4 h-4"
+                                                                            />
+                                                                            <span className="flex-1">{t.authorizeDelay}</span>
+                                                                        </label>
+                                                                    )}
+                                                                    {hasEarlyExit && (
+                                                                        <label className="flex items-center gap-2 cursor-pointer">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={worker.uscitaAnticipoAutorizzata || false}
+                                                                                onChange={async (e) => {
+                                                                                    await updateWorker(worker.id, {
+                                                                                        ...worker,
+                                                                                        uscitaAnticipoAutorizzata: e.target.checked
+                                                                                    });
+                                                                                }}
+                                                                                className="w-4 h-4"
+                                                                            />
+                                                                            <span className="flex-1">{t.authorizeEarlyExit}</span>
+                                                                        </label>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()
                                                 )}
                                             </div>
                                             
@@ -1081,13 +1721,56 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             </div>
 
             {/* Complete Button */}
-            <button
-                onClick={completeSheet}
-                disabled={!currentSheet.firmaResponsabile || loading}
-                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-base sm:text-lg transition-colors disabled:bg-gray-400 shadow-lg"
-            >
-                {loading ? `⏳ ${t.loading}...` : `✅ ${t.completePDF}`}
-            </button>
+            <div className="flex flex-col gap-3">
+                {partialPDFMode ? (
+                    <>
+                        <div className={`p-3 rounded-lg ${darkMode ? 'bg-blue-900/30' : 'bg-blue-50'} text-center`}>
+                            <p className={`text-sm font-semibold ${textClass}`}>
+                                📄 {t.selectWorkersForPDF || 'Seleziona i lavoratori da includere nel PDF parziale'}
+                            </p>
+                            <p className={`text-xs ${textClass} mt-1`}>
+                                {selectedWorkers.length} {t.selected || 'selezionati'}
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={generatePartialPDF}
+                                disabled={loading || selectedWorkers.length === 0}
+                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm sm:text-base transition-colors disabled:bg-gray-400 shadow-lg"
+                            >
+                                {loading ? `⏳ ${t.loading}...` : `📄 ${t.generatePDF || 'Genera PDF'}`}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setPartialPDFMode(false);
+                                    setSelectedWorkers([]);
+                                }}
+                                className="px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl font-semibold text-sm sm:text-base"
+                            >
+                                {t.cancel}
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            onClick={completeSheet}
+                            disabled={!currentSheet.firmaResponsabile || loading}
+                            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-base sm:text-lg transition-colors disabled:bg-gray-400 shadow-lg"
+                        >
+                            {loading ? `⏳ ${t.loading}...` : `✅ ${t.completePDF}`}
+                        </button>
+                        {currentSheet.lavoratori && currentSheet.lavoratori.length > 0 && (
+                            <button
+                                onClick={() => setPartialPDFMode(true)}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm sm:text-base transition-colors shadow-lg"
+                            >
+                                📄 {t.partialPDF || 'Genera PDF Parziale'}
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>
         {/* Widget Meteo per la località del foglio */}
         {currentSheet?.localita && (
                                 <div className="my-2">

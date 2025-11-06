@@ -64,6 +64,12 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     const [showGdpr, setShowGdpr] = React.useState(false);
     const [loadingGdpr, setLoadingGdpr] = React.useState(true);
 
+    // Terms of Service State
+    const [tosText, setTosText] = React.useState('');
+    const [showTos, setShowTos] = React.useState(false);
+    const [loadingTos, setLoadingTos] = React.useState(true);
+    const [tosAccepted, setTosAccepted] = React.useState(false);
+
     // Load GDPR text from Firestore
     React.useEffect(() => {
         if (!db) return;
@@ -75,6 +81,19 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
             setLoadingGdpr(false);
         };
         loadGdpr();
+    }, [db]);
+
+    // Load Terms of Service from Firestore
+    React.useEffect(() => {
+        if (!db) return;
+        const loadTos = async () => {
+            try {
+                const doc = await db.collection('settings').doc('termsOfService').get();
+                if (doc.exists) setTosText(doc.data().text || '');
+            } catch (e) { console.error('Error loading Terms of Service:', e); }
+            setLoadingTos(false);
+        };
+        loadTos();
     }, [db]);
     
     // 📄 PDF Generation State
@@ -469,6 +488,12 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
             return;
         }
 
+        // Check Terms of Service acceptance
+        if (!tosAccepted) {
+            showToast(`❌ ${t.mustAcceptTos || 'Devi accettare i Termini di Servizio'}`, 'error');
+            return;
+        }
+
         // Check signature
         if (isCanvasBlank(canvasRef.current)) {
             showToast(`❌ ${t.signBeforeSend}`, 'error');
@@ -486,6 +511,8 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
             ...workerData,
             firma,
             oreTotali,
+            tosAccepted: true,
+            tosAcceptedAt: new Date().toISOString(),
             id: Date.now(),
             submittedAt: new Date().toISOString()
         };
@@ -1060,6 +1087,37 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                     {loadingGdpr ? (t.loading || 'Loading...') : (gdprText || t.noGdprText || 'No privacy notice set.')}
                                 </div>
                             )}
+                        </div>
+
+                        {/* Terms of Service (collapsible) */}
+                        <div className="my-4">
+                            <button
+                                type="button"
+                                className={`px-4 py-2 rounded-lg font-medium shadow-md transition-colors text-sm sm:text-base ${showTos ? 'bg-gray-400 text-white hover:bg-gray-500' : 'bg-indigo-500 text-white hover:bg-indigo-600'}`}
+                                onClick={() => setShowTos(v => !v)}
+                            >
+                                {showTos ? (t.hideTos || 'Nascondi Termini') : (t.showTos || 'Visualizza Termini di Servizio')}
+                            </button>
+                            {showTos && (
+                                <div className={`mt-2 p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-gray-100 border-gray-300 text-gray-800'}`} style={{ whiteSpace: 'pre-line', maxHeight: '300px', overflowY: 'auto' }}>
+                                    {loadingTos ? (t.loading || 'Loading...') : (tosText || t.noTosText || 'Nessun Termine di Servizio configurato.')}
+                                </div>
+                            )}
+                            
+                            {/* Terms of Service Acceptance Checkbox */}
+                            <div className={`mt-3 flex items-start gap-3 p-3 rounded-lg border-2 ${tosAccepted ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-red-500 bg-red-50 dark:bg-red-900/20'}`}>
+                                <input
+                                    type="checkbox"
+                                    id="tosAcceptance"
+                                    checked={tosAccepted}
+                                    onChange={(e) => setTosAccepted(e.target.checked)}
+                                    className="mt-1 w-5 h-5 cursor-pointer"
+                                />
+                                <label htmlFor="tosAcceptance" className={`text-sm sm:text-base font-semibold cursor-pointer ${tosAccepted ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                                    {tosAccepted ? '✅ ' : '⚠️ '}
+                                    {t.acceptTos || 'Accetto i Termini e le Condizioni di Servizio'} *
+                                </label>
+                            </div>
                         </div>
 
                         {/* 🔧 FIX: Firma - CANVAS OTTIMIZZATO MOBILE con key per re-render */}

@@ -60,7 +60,8 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
                 return (
                     (s.titoloAzienda || '').toLowerCase().includes(q) ||
                     normResp.includes(q) ||
-                    ((s.location || s.localita || '') + '').toLowerCase().includes(q)
+                    ((s.location || s.localita || '') + '').toLowerCase().includes(q) ||
+                    ((s.indirizzoEvento || '') + '').toLowerCase().includes(q)
                 );
             });
         }
@@ -127,7 +128,7 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
                 </button>
                 <input
                     type="text"
-                    placeholder={`🔍 ${t.company || 'Company'}, ${t.responsible || 'Responsible'}, ${t.location || 'Location'}...`}
+                    placeholder={`🔍 ${t.searchSheets || 'Cerca per azienda, responsabile, località, indirizzo'}...`}
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-base`}
@@ -142,8 +143,11 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
                     {filteredSheets.map(sheet => {
                         // Determina colore bordo sinistro basato su stato
                         let borderColor = 'border-l-yellow-500'; // Default: draft
-                        if (sheet.status === 'completed') borderColor = 'border-l-green-500';
-                        else if (sheet.archived) borderColor = 'border-l-gray-400';
+                        if (sheet.archived || sheet.status === 'archived') {
+                            borderColor = 'border-l-gray-500'; // Archiviati: grigio
+                        } else if (sheet.status === 'completed') {
+                            borderColor = 'border-l-green-500'; // Completati: verde
+                        }
                         
                         return (
                             <div

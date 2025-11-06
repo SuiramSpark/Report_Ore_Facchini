@@ -1163,6 +1163,16 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                         suffix: 'h'
                     },
                     {
+                        icon: '⏱️',
+                        value: stats.overallTotalHours || 0,
+                        labelKey: 'totalHoursAllTime',
+                        fallback: {
+                            it: 'Ore totali (fogli completati)', en: 'Total hours (completed sheets)', es: 'Horas totales (hojas completadas)', fr: 'Heures totales (feuilles terminées)', ro: 'Ore totale (foi finalizate)'
+                        },
+                        color: 'indigo',
+                        suffix: 'h'
+                    },
+                    {
                         icon: '👥',
                         value: stats.activeWorkers,
                         labelKey: 'activeWorkersLabel',
@@ -1170,15 +1180,6 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                             it: 'Lavoratori attivi', en: 'Active workers', es: 'Trabajadores activos', fr: 'Travailleurs actifs', ro: 'Lucrători activi'
                         },
                         color: 'purple'
-                    },
-                    {
-                        icon: '✅',
-                        value: stats.completedSheets,
-                        labelKey: 'completedSheetsLabel',
-                        fallback: {
-                            it: 'Fogli completati', en: 'Completed sheets', es: 'Hojas completadas', fr: 'Feuilles terminées', ro: 'Foi finalizate'
-                        },
-                        color: 'orange'
                     }
                 ].map((metric, i) => {
                     // Resolve label with translation fallback
