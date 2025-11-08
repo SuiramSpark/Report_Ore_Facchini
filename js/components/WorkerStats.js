@@ -582,63 +582,6 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                             });
                         })(),
 
-                        // === TIPI DI ATTIVITÀ - PIE CHART ===
-                        (() => {
-                            const { DistributionPieChart } = window.AdvancedCharts || {};
-                            const activityTypes = window.activityTypes || [];
-                            if (!DistributionPieChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
-
-                            const activityPieData = Object.entries(aggregateStats.activityHours)
-                                .map(([activityId, hours]) => {
-                                    const activity = activityTypes.find(a => a.id === activityId);
-                                    // USA .nome e .emoji dalle impostazioni
-                                    const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
-                                    
-                                    return {
-                                        name: activityName,
-                                        value: parseFloat(hours.toFixed(1))
-                                    };
-                                })
-                                .sort((a, b) => b.value - a.value)
-                                .slice(0, 8);
-
-                            return React.createElement(DistributionPieChart, {
-                                data: activityPieData,
-                                darkMode,
-                                title: '📊 Distribuzione Percentuale Tipi di Attività'
-                            });
-                        })(),
-
-                        // === TIPI DI ATTIVITÀ - GRAFICO CIRCOLARE ===
-                        (() => {
-                            const { ActivityPolarChart } = window.AdvancedCharts || {};
-                            const activityTypes = window.activityTypes || [];
-                            if (!ActivityPolarChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
-
-                            const totalActivityHours = Object.values(aggregateStats.activityHours).reduce((sum, h) => sum + h, 0) || 1;
-
-                            const activityData = Object.entries(aggregateStats.activityHours)
-                                .map(([activityId, hours]) => {
-                                    const activity = activityTypes.find(a => a.id === activityId);
-                                    // USA .nome e .emoji dalle impostazioni
-                                    const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
-                                    const percentage = Math.round((hours / totalActivityHours) * 100);
-                                    
-                                    return {
-                                        metric: activityName,
-                                        value: percentage
-                                    };
-                                })
-                                .sort((a, b) => b.value - a.value)
-                                .slice(0, 8);
-
-                            return React.createElement(ActivityPolarChart, {
-                                data: activityData,
-                                darkMode,
-                                title: '🌐 Performance Tipi di Attività (Radar Circolare)'
-                            });
-                        })(),
-
                         // === TABELLA DETTAGLIATA TIPI DI ATTIVITÀ ===
                         (() => {
                             const activityTypes = window.activityTypes || [];
@@ -964,39 +907,253 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                 });
             })()}
 
-            {/* 🎯 Performance - Metriche Lavoratore */}
+            {/* 🎯 Performance - Metriche Lavoratore con 5 KPI + TOOLTIP */}
             {(() => {
-                const { ActivityPolarChart } = window.AdvancedCharts || {};
-                if (!ActivityPolarChart) return null;
+                // 🎯 PRODUTTIVITÀ: Ore medie giornaliere su 8h standard
+                const avgHoursPerDay = stats.totalHours / Math.max(stats.uniqueWorkDays || stats.totalDays, 1);
+                const productivity = Math.min((avgHoursPerDay / 8) * 100, 100);
                 
-                // Calcola metriche performance (0-100)
-                const avgHoursPerDay = stats.totalHours / Math.max(stats.totalDays, 1);
-                const productivity = Math.min((avgHoursPerDay / 8) * 100, 100); // Basato su 8h standard
+                // 📊 COSTANZA: Rapporto fogli/giorni lavorativi
                 const consistency = stats.totalDays > 0 ? Math.min((stats.totalSheets / stats.totalDays) * 100, 100) : 0;
-                const experience = Math.min((stats.totalDays / 30) * 100, 100); // Max 30 giorni
-                const reliability = stats.totalSheets > 0 ? 85 : 0; // Placeholder (può essere calcolato da presenze)
                 
-                const performanceData = [
-                    { metric: 'Produttività', value: Math.round(productivity) },
-                    { metric: 'Costanza', value: Math.round(consistency) },
-                    { metric: 'Esperienza', value: Math.round(experience) },
-                    { metric: 'Affidabilità', value: Math.round(reliability) },
-                    { metric: 'Ore Totali', value: Math.min((stats.totalHours / 100) * 100, 100) }
-                ];
+                // 🎓 ESPERIENZA: Giorni lavorati su giorni lavorativi totali nel periodo
+                const experience = stats.workingDaysInPeriod > 0 
+                    ? Math.min((stats.uniqueWorkDays / stats.workingDaysInPeriod) * 100, 100) 
+                    : 0;
                 
-                return React.createElement(ActivityPolarChart, {
-                    data: performanceData,
-                    darkMode,
-                    title: `🎯 ${t.performance || 'Performance'} ${selectedWorker} (Circolare)`
-                });
+                // 📅 DISPONIBILITÀ: Giorni weekend/festivi lavorati
+                const totalWeekendDays = stats.entries.filter(e => 
+                    window.isWeekend(e.date) || window.isItalianHoliday(e.date)
+                ).length;
+                const availability = totalWeekendDays > 0 
+                    ? Math.min((stats.weekendDaysWorked / totalWeekendDays) * 100, 100) 
+                    : (stats.weekendDaysWorked > 0 ? 100 : 0);
+                
+                // 🎯 AFFIDABILITÀ: Formula complessa a 5 fattori
+                // 30% Completezza dati
+                const completeness = stats.totalSheets > 0 ? (stats.completedSheets / stats.totalSheets) * 30 : 0;
+                
+                // 20% Presenza costante
+                const presenceRatio = stats.totalDays > 0 ? Math.min((stats.totalSheets / stats.totalDays), 1) * 20 : 0;
+                
+                // 20% Puntualità (arrivi anticipati + uscite posticipate)
+                const punctualityScore = stats.totalSheets > 0 
+                    ? ((stats.earlyArrivals + stats.lateExits) / (stats.totalSheets * 2)) * 20 
+                    : 0;
+                
+                // 20% Reputazione Blacklist
+                const blacklistPenalty = isWorkerBlacklisted ? 
+                    (blacklist.find(bl => {
+                        const [nome, ...cognomeParts] = selectedWorker.split(' ');
+                        const cognome = cognomeParts.join(' ');
+                        return normalizeWorkerName(bl.nome, bl.cognome) === normalizeWorkerName(nome, cognome);
+                    })?.severity === 'high' ? 0 : 
+                     blacklist.find(bl => {
+                        const [nome, ...cognomeParts] = selectedWorker.split(' ');
+                        const cognome = cognomeParts.join(' ');
+                        return normalizeWorkerName(bl.nome, bl.cognome) === normalizeWorkerName(nome, cognome);
+                    })?.severity === 'medium' ? 10 : 15) 
+                    : 20;
+                
+                // 10% Disponibilità weekend
+                const availabilityBonus = (availability / 100) * 10;
+                
+                const reliability = Math.min(completeness + presenceRatio + punctualityScore + blacklistPenalty + availabilityBonus, 100);
+                
+                return React.createElement('div', {
+                    className: `${cardClass} rounded-xl shadow-lg p-4 sm:p-6 border-l-4 border-orange-500 animate-fade-in`,
+                    style: { animationDelay: '300ms' }
+                },
+                    React.createElement('h3', {
+                        className: `text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                    }, `🎯 Performance ${selectedWorker}`),
+                    
+                    // 5 KPI Cards con TOOLTIP
+                    React.createElement('div', { className: 'grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4' },
+                        [
+                            { 
+                                label: 'Produttività', 
+                                value: Math.round(productivity), 
+                                icon: '⚡', 
+                                color: 'purple',
+                                tooltip: `Media ${avgHoursPerDay.toFixed(1)}h/giorno su 8h standard`
+                            },
+                            { 
+                                label: 'Costanza', 
+                                value: Math.round(consistency), 
+                                icon: '📊', 
+                                color: 'blue',
+                                tooltip: `${stats.totalSheets} fogli in ${stats.totalDays} giorni`
+                            },
+                            { 
+                                label: 'Esperienza', 
+                                value: Math.round(experience), 
+                                icon: '🎓', 
+                                color: 'green',
+                                tooltip: `${stats.uniqueWorkDays} giorni su ${stats.workingDaysInPeriod} lavorativi`
+                            },
+                            { 
+                                label: 'Disponibilità', 
+                                value: Math.round(availability), 
+                                icon: '📅', 
+                                color: 'indigo',
+                                tooltip: `${stats.weekendDaysWorked} weekend/festivi lavorati`
+                            },
+                            { 
+                                label: 'Affidabilità', 
+                                value: Math.round(reliability), 
+                                icon: '🎯', 
+                                color: 'orange',
+                                tooltip: `Dati completi + Puntualità + Reputazione`
+                            }
+                        ].map((metric, idx) =>
+                            React.createElement('div', {
+                                key: idx,
+                                className: `p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} text-center cursor-help group relative`,
+                                title: metric.tooltip
+                            },
+                                React.createElement('div', { className: 'text-2xl mb-1' }, metric.icon),
+                                React.createElement('div', {
+                                    className: `text-2xl font-bold text-${metric.color}-600 dark:text-${metric.color}-400`
+                                }, `${metric.value}%`),
+                                React.createElement('div', {
+                                    className: `text-xs ${textClass} mt-1`
+                                }, metric.label),
+                                // Tooltip hover
+                                React.createElement('div', {
+                                    className: `absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-lg`
+                                }, metric.tooltip)
+                            )
+                        )
+                    ),
+                    
+                    // Divisore
+                    React.createElement('div', {
+                        className: `border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} my-4`
+                    }),
+                    
+                    // Dettaglio Breakdown Affidabilità
+                    React.createElement('div', {},
+                        React.createElement('h4', {
+                            className: `text-sm font-bold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                        }, '🔍 Dettaglio Calcolo Affidabilità'),
+                        
+                        React.createElement('div', { className: 'space-y-2 text-xs sm:text-sm' },
+                            // Completezza Dati
+                            React.createElement('div', {
+                                className: `flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-2' },
+                                    React.createElement('span', { className: 'text-lg' }, '📝'),
+                                    React.createElement('span', { className: textClass }, 'Completezza Dati (30%)')
+                                ),
+                                React.createElement('div', { className: 'text-right' },
+                                    React.createElement('div', {
+                                        className: `font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`
+                                    }, `${stats.completedSheets}/${stats.totalSheets} fogli`),
+                                    React.createElement('div', {
+                                        className: `text-xs ${textClass}`
+                                    }, `${Math.round(completeness)}% di 30`)
+                                )
+                            ),
+                            
+                            // Presenza Costante
+                            React.createElement('div', {
+                                className: `flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-2' },
+                                    React.createElement('span', { className: 'text-lg' }, '📅'),
+                                    React.createElement('span', { className: textClass }, 'Presenza Costante (20%)')
+                                ),
+                                React.createElement('div', { className: 'text-right' },
+                                    React.createElement('div', {
+                                        className: `font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`
+                                    }, `${stats.totalSheets}/${stats.totalDays} giorni`),
+                                    React.createElement('div', {
+                                        className: `text-xs ${textClass}`
+                                    }, `${Math.round(presenceRatio)}% di 20`)
+                                )
+                            ),
+                            
+                            // Puntualità Arrivo/Uscita
+                            React.createElement('div', {
+                                className: `flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-2' },
+                                    React.createElement('span', { className: 'text-lg' }, '⏰'),
+                                    React.createElement('span', { className: textClass }, 'Puntualità Orari (20%)')
+                                ),
+                                React.createElement('div', { className: 'text-right' },
+                                    React.createElement('div', {
+                                        className: `font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`
+                                    }, `${stats.earlyArrivals} arrivi + ${stats.lateExits} uscite`),
+                                    React.createElement('div', {
+                                        className: `text-xs ${textClass}`
+                                    }, `${Math.round(punctualityScore)}% di 20`)
+                                )
+                            ),
+                            
+                            // Reputazione Blacklist
+                            React.createElement('div', {
+                                className: `flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-2' },
+                                    React.createElement('span', { className: 'text-lg' }, isWorkerBlacklisted ? '🚫' : '✅'),
+                                    React.createElement('span', { className: textClass }, 'Reputazione (20%)')
+                                ),
+                                React.createElement('div', { className: 'text-right' },
+                                    React.createElement('div', {
+                                        className: `font-bold ${isWorkerBlacklisted ? (darkMode ? 'text-red-400' : 'text-red-600') : (darkMode ? 'text-green-400' : 'text-green-600')}`
+                                    }, isWorkerBlacklisted ? 'In Blacklist' : 'Pulito'),
+                                    React.createElement('div', {
+                                        className: `text-xs ${textClass}`
+                                    }, `${Math.round(blacklistPenalty)}% di 20`)
+                                )
+                            ),
+                            
+                            // Disponibilità Weekend
+                            React.createElement('div', {
+                                className: `flex items-center justify-between p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-2' },
+                                    React.createElement('span', { className: 'text-lg' }, '🌙'),
+                                    React.createElement('span', { className: textClass }, 'Disponibilità (10%)')
+                                ),
+                                React.createElement('div', { className: 'text-right' },
+                                    React.createElement('div', {
+                                        className: `font-bold ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`
+                                    }, `${stats.weekendDaysWorked} weekend`),
+                                    React.createElement('div', {
+                                        className: `text-xs ${textClass}`
+                                    }, `${Math.round(availabilityBonus)}% di 10`)
+                                )
+                            ),
+                            
+                            // Totale
+                            React.createElement('div', {
+                                className: `flex items-center justify-between p-3 rounded mt-2 border-t-2 ${darkMode ? 'bg-gray-600 border-orange-500' : 'bg-orange-50 border-orange-400'}`
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-2' },
+                                    React.createElement('span', { className: 'text-lg' }, '🎯'),
+                                    React.createElement('span', {
+                                        className: `font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`
+                                    }, 'Affidabilità Totale')
+                                ),
+                                React.createElement('div', {
+                                    className: `text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`
+                                }, `${Math.round(reliability)}%`)
+                            )
+                        )
+                    )
+                );
             })()}
 
-            {/* 🎨 Distribuzione Tipi di Attività */}
+            {/* 📊 BAR CHART - Ore per Tipo di Attività (Lavoratore Singolo) */}
             {(() => {
-                const { ActivityPolarChart } = window.AdvancedCharts || {};
+                const { TopItemsBarChart } = window.AdvancedCharts || {};
                 const activityTypes = window.activityTypes || [];
                 
-                if (!ActivityPolarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
+                if (!TopItemsBarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
                     // Mostra messaggio se non ci sono attività
                     return React.createElement('div', {
                         className: `${cardClass} rounded-xl shadow-lg p-6 text-center animate-fade-in`,
@@ -1010,42 +1167,6 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                             className: `text-sm ${textClass}`
                         }, `${selectedWorker} non ha fogli con tipi di attività assegnati.`)
                     );
-                }
-                
-                // Calcola totale ore per percentuali corrette
-                const totalHours = Object.values(stats.activityHours).reduce((sum, h) => sum + h, 0) || 1;
-                
-                // Mappa ID attività → nome attività
-                const activityData = Object.entries(stats.activityHours)
-                    .map(([activityId, hours]) => {
-                        const activity = activityTypes.find(a => a.id === activityId);
-                        // USA .nome e .emoji dalle impostazioni
-                        const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
-                        const percentage = Math.round((hours / totalHours) * 100);
-                        
-                        return {
-                            metric: activityName,
-                            value: percentage
-                        };
-                    })
-                    .slice(0, 8); // Max 8 attività per leggibilità
-                
-                if (activityData.length === 0) return null;
-                
-                return React.createElement(ActivityPolarChart, {
-                    data: activityData,
-                    darkMode,
-                    title: `🌐 ${t.activityTypes || 'Tipi di Attività'} - ${selectedWorker} (Circolare)`
-                });
-            })()}
-
-            {/* 📊 BAR CHART - Ore per Tipo di Attività (Lavoratore Singolo) */}
-            {(() => {
-                const { TopItemsBarChart } = window.AdvancedCharts || {};
-                const activityTypes = window.activityTypes || [];
-                
-                if (!TopItemsBarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
-                    return null;
                 }
                 
                 const activityBarData = Object.entries(stats.activityHours)
@@ -1065,35 +1186,6 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     data: activityBarData,
                     darkMode,
                     title: `🎨 Ore per Tipo di Attività - ${selectedWorker}`
-                });
-            })()}
-
-            {/* 🥧 PIE CHART - Distribuzione Attività (Lavoratore Singolo) */}
-            {(() => {
-                const { DistributionPieChart } = window.AdvancedCharts || {};
-                const activityTypes = window.activityTypes || [];
-                
-                if (!DistributionPieChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
-                    return null;
-                }
-                
-                const activityPieData = Object.entries(stats.activityHours)
-                    .map(([activityId, hours]) => {
-                        const activity = activityTypes.find(a => a.id === activityId);
-                        // USA .nome e .emoji dalle impostazioni
-                        const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
-                        
-                        return {
-                            name: activityName,
-                            value: parseFloat(hours.toFixed(1))
-                        };
-                    })
-                    .sort((a, b) => b.value - a.value);
-                
-                return React.createElement(DistributionPieChart, {
-                    data: activityPieData,
-                    darkMode,
-                    title: `📊 Distribuzione Percentuale Attività - ${selectedWorker}`
                 });
             })()}
 

@@ -2,6 +2,86 @@
 // UTILITY FUNCTIONS - v4.3 EXACT PDF MATCH
 // ========================================
 
+// 🇮🇹 FESTIVI NAZIONALI ITALIANI (2024-2026)
+window.ITALIAN_HOLIDAYS = {
+    2024: [
+        '2024-01-01', // Capodanno
+        '2024-01-06', // Epifania
+        '2024-03-31', // Pasqua
+        '2024-04-01', // Lunedì dell'Angelo
+        '2024-04-25', // Festa della Liberazione
+        '2024-05-01', // Festa dei Lavoratori
+        '2024-06-02', // Festa della Repubblica
+        '2024-08-15', // Ferragosto
+        '2024-11-01', // Tutti i Santi
+        '2024-12-08', // Immacolata Concezione
+        '2024-12-25', // Natale
+        '2024-12-26'  // Santo Stefano
+    ],
+    2025: [
+        '2025-01-01', // Capodanno
+        '2025-01-06', // Epifania
+        '2025-04-20', // Pasqua
+        '2025-04-21', // Lunedì dell'Angelo
+        '2025-04-25', // Festa della Liberazione
+        '2025-05-01', // Festa dei Lavoratori
+        '2025-06-02', // Festa della Repubblica
+        '2025-08-15', // Ferragosto
+        '2025-11-01', // Tutti i Santi
+        '2025-12-08', // Immacolata Concezione
+        '2025-12-25', // Natale
+        '2025-12-26'  // Santo Stefano
+    ],
+    2026: [
+        '2026-01-01', // Capodanno
+        '2026-01-06', // Epifania
+        '2026-04-05', // Pasqua
+        '2026-04-06', // Lunedì dell'Angelo
+        '2026-04-25', // Festa della Liberazione
+        '2026-05-01', // Festa dei Lavoratori
+        '2026-06-02', // Festa della Repubblica
+        '2026-08-15', // Ferragosto
+        '2026-11-01', // Tutti i Santi
+        '2026-12-08', // Immacolata Concezione
+        '2026-12-25', // Natale
+        '2026-12-26'  // Santo Stefano
+    ]
+};
+
+// 📅 Funzione: Controlla se una data è un festivo
+window.isItalianHoliday = (dateString) => {
+    const year = dateString.substring(0, 4);
+    const holidays = window.ITALIAN_HOLIDAYS[year] || [];
+    return holidays.includes(dateString);
+};
+
+// 📅 Funzione: Controlla se una data è weekend (sabato o domenica)
+window.isWeekend = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDay();
+    return day === 0 || day === 6; // 0 = domenica, 6 = sabato
+};
+
+// 📅 Funzione: Controlla se una data è lavorativa (non weekend e non festivo)
+window.isWorkingDay = (dateString) => {
+    return !window.isWeekend(dateString) && !window.isItalianHoliday(dateString);
+};
+
+// 📅 Funzione: Conta giorni lavorativi in un range di date
+window.countWorkingDays = (startDate, endDate) => {
+    let count = 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        if (window.isWorkingDay(dateStr)) {
+            count++;
+        }
+    }
+    return count;
+};
+
 // Toast Notification System
 window.showToast = (message, type = 'info', duration = 3000) => {
     const container = document.getElementById('toast-container') || (() => {
@@ -1028,6 +1108,12 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
     const monthlyTrend = {};
     const activityHours = {}; // 🎯 Ore per tipo attività
     let totalHours = 0;
+    let completedSheets = 0; // 🎯 Fogli con dati completi
+    let onTimeSheets = 0; // 🎯 Fogli con orari presenti
+    let weekendDaysWorked = 0; // 🎯 Giorni weekend/festivi lavorati
+    let earlyArrivals = 0; // 🎯 Arrivi anticipati
+    let lateExits = 0; // 🎯 Uscite posticipate
+    const workDates = new Set(); // 🎯 Date uniche lavorate
     
     sheets.forEach(sheet => {
         sheet.lavoratori?.forEach(worker => {
@@ -1039,6 +1125,57 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
                 
                 if (sheet.titoloAzienda) {
                     companies.add(sheet.titoloAzienda);
+                }
+                
+                // 🎯 Aggiungi data al set delle date lavorate
+                if (sheet.data) {
+                    workDates.add(sheet.data);
+                    
+                    // 🎯 Controlla se è weekend o festivo
+                    if (window.isWeekend(sheet.data) || window.isItalianHoliday(sheet.data)) {
+                        weekendDaysWorked++;
+                    }
+                }
+                
+                // 🎯 Calcola affidabilità: conta fogli completi e puntuali
+                const hasOraIn = worker.oraIn && worker.oraIn.trim() !== '';
+                const hasOraOut = worker.oraOut && worker.oraOut.trim() !== '';
+                const hasOreTotali = hours > 0;
+                
+                // Foglio completo: ha tutti i dati necessari
+                if (hasOraIn && hasOraOut && hasOreTotali) {
+                    completedSheets++;
+                }
+                
+                // Foglio puntuale: ha almeno gli orari
+                if (hasOraIn && hasOraOut) {
+                    onTimeSheets++;
+                    
+                    // 🎯 Calcola puntualità (confronto con orari stimati dal FOGLIO)
+                    const orarioStimatoOd = sheet.orarioStimatoOd || '09:00';
+                    const orarioStimatoA = sheet.orarioStimatoA || '18:00';
+                    
+                    // Converte orari in minuti per confronto
+                    const timeToMinutes = (time) => {
+                        if (!time) return 0;
+                        const [h, m] = time.split(':').map(Number);
+                        return h * 60 + m;
+                    };
+                    
+                    const arrivoEffettivo = timeToMinutes(worker.oraIn);
+                    const uscitaEffettiva = timeToMinutes(worker.oraOut);
+                    const arrivoStimato = timeToMinutes(orarioStimatoOd);
+                    const uscitaStimata = timeToMinutes(orarioStimatoA);
+                    
+                    // Arrivo anticipato (almeno 5 minuti prima)
+                    if (arrivoEffettivo > 0 && arrivoStimato > 0 && arrivoEffettivo <= (arrivoStimato - 5)) {
+                        earlyArrivals++;
+                    }
+                    
+                    // Uscita posticipata (almeno 5 minuti dopo)
+                    if (uscitaEffettiva > 0 && uscitaStimata > 0 && uscitaEffettiva >= (uscitaStimata + 5)) {
+                        lateExits++;
+                    }
                 }
                 
                 // Prendi tipoAttivita dal FOGLIO (sheet), non dal lavoratore
@@ -1073,6 +1210,17 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
     
     entries.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     
+    // 🎯 Calcola giorni lavorativi totali nel periodo
+    let workingDaysInPeriod = 0;
+    if (entries.length > 0) {
+        const dates = entries.map(e => e.date).filter(Boolean);
+        if (dates.length > 0) {
+            const startDate = dates[dates.length - 1]; // Prima data
+            const endDate = dates[0]; // Ultima data
+            workingDaysInPeriod = window.countWorkingDays(startDate, endDate);
+        }
+    }
+    
     const displayName = entries.length > 0 
         ? `${entries[0].company}` 
         : 'N/A';
@@ -1087,7 +1235,14 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
         activityHours, // 🎯 Nuovo campo
         entries,
         totalDays: entries.length, // Per calcoli performance
-        totalSheets: entries.length
+        totalSheets: entries.length,
+        completedSheets, // 🎯 Fogli con dati completi (oraIn + oraOut + oreTotali)
+        onTimeSheets, // 🎯 Fogli con orari presenti (oraIn + oraOut)
+        weekendDaysWorked, // 🎯 NUOVO: Giorni weekend/festivi lavorati
+        earlyArrivals, // 🎯 NUOVO: Arrivi anticipati (>5min prima)
+        lateExits, // 🎯 NUOVO: Uscite posticipate (>5min dopo)
+        workingDaysInPeriod, // 🎯 NUOVO: Giorni lavorativi totali nel periodo
+        uniqueWorkDays: workDates.size // 🎯 NUOVO: Giorni unici lavorati
     };
 };
 
