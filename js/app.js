@@ -851,7 +851,6 @@ const App = () => {
     const SheetEditorComp = window.SheetEditor || (() => React.createElement('div', null, t.editorNotLoaded || 'Editor non caricato'));
     const CalendarComp = window.Calendar || (() => React.createElement('div', null, t.calendarNotLoaded || 'Calendar non caricato'));
     const WorkerStatsComp = window.WorkerStats || (() => React.createElement('div', null, t.workerStatsNotLoaded || 'WorkerStats non caricata'));
-    const Advanced3DStatsComp = window.Advanced3DStats || (() => React.createElement('div', null, t.stats3dNotLoaded || 'Statistiche 3D non caricate'));
     const BlacklistComp = window.Blacklist || (() => React.createElement('div', null, t.blacklistNotLoaded || 'Blacklist non caricata'));
     const AuditLogComp = window.AuditLog || (() => React.createElement('div', null, t.auditLogNotLoaded || 'AuditLog non caricato'));
     const ReportManagerComp = window.ReportManager || (() => React.createElement('div', null, t.reportManagerNotLoaded || 'ReportManager non caricato'));
@@ -1294,21 +1293,6 @@ const App = () => {
                         <span className="text-xs mt-1 font-medium">{t.stats || 'Stats'}</span>
                     </button>
 
-                    {/* Statistiche 3D */}
-                    <button
-                        onClick={() => { setCurrentView('stats3d'); setMoreMenuOpen(false); }}
-                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
-                            currentView === 'stats3d'
-                                ? darkMode
-                                    ? 'bg-indigo-600 text-white scale-110'
-                                    : 'bg-indigo-500 text-white scale-110'
-                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
-                        }`}
-                    >
-                        <span className="text-xl">📊</span>
-                        <span className="text-xs mt-1 font-medium">{t.stats3d || '3D Stats'}</span>
-                    </button>
-
                     {/* Blacklist */}
                     <button
                         onClick={() => { setCurrentView('blacklist'); setMoreMenuOpen(false); }}
@@ -1449,17 +1433,6 @@ const App = () => {
                         onAddToBlacklist={addToBlacklist}
                         blacklist={blacklist}
                         activityTypes={appSettings.tipiAttivita || []}
-                    />
-                )}
-
-                {/* Advanced 3D Stats View */}
-                {currentView === 'stats3d' && (
-                    <Advanced3DStatsComp
-                        sheets={sheets}
-                        darkMode={darkMode}
-                        language={language}
-                        activityTypes={appSettings.tipiAttivita || []}
-                        onNavigate={(view) => setCurrentView(view)}
                     />
                 )}
 

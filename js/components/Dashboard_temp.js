@@ -1256,26 +1256,26 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                 <div className={`${cardClass} p-0 overflow-hidden`} style={{ display: 'flex', flexDirection: 'column' }}>
                     {/* Card title (theme-aware) */}
                     <div className="p-4 sm:p-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                             <h3 className={`font-semibold text-lg ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                 🌤️ {t.weatherTitle || 'Meteo'}
                             </h3>
 
                             {/* Small control: input + apply + refresh */}
-                            <form onSubmit={(e) => { e.preventDefault(); applyWeatherLocation(); }} className="flex items-center gap-2 flex-shrink-0">
+                            <form onSubmit={(e) => { e.preventDefault(); applyWeatherLocation(); }} className="flex items-center gap-2">
                                 <input
                                     type="text"
                                     value={weatherInput}
                                     onChange={(e) => setWeatherInput(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyWeatherLocation(); } }}
                                     placeholder={t.weatherPlaceholderCity || 'Città, es. Roma'}
-                                    className={`px-2 py-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'} text-sm w-28 sm:w-36 flex-shrink min-w-0`}
+                                    className={`px-2 py-1 rounded border ${darkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'} text-sm w-36`}
                                     aria-label={t.weatherLabelLocation || 'Location'}
                                 />
-                                <button type="button" onClick={applyWeatherLocation} className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm font-semibold whitespace-nowrap ${darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'}`}>
+                                <button type="button" onClick={applyWeatherLocation} className={`px-3 py-1 rounded text-sm font-semibold ${darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'}`}>
                                     {t.update || 'Applica'}
                                 </button>
-                                <button type="button" onClick={() => setRefreshToken(r => r + 1)} title={t.updated || 'Aggiorna'} className={`px-2 py-1 rounded text-sm flex-shrink-0 ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                                <button type="button" onClick={() => setRefreshToken(r => r + 1)} title={t.updated || 'Aggiorna'} className={`px-2 py-1 rounded text-sm ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'}`}>
                                     ⟳
                                 </button>
                             </form>
@@ -1295,7 +1295,7 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                 GRAFICI AVANZATI RECHARTS
                 ======================================== */}
             {(() => {
-                const { DailyHoursLineChart, TopItemsBarChart, DistributionPieChart, CumulativeAreaChart, PerformanceRadarChart, ActivityPolarChart, TimeDistributionChart } = window.AdvancedCharts || {};
+                const { DailyHoursLineChart, TopItemsBarChart, DistributionPieChart, CumulativeAreaChart, PerformanceRadarChart, Activity3DChart } = window.AdvancedCharts || {};
                 if (!DailyHoursLineChart) return null;
                 
                 // Prepara dati per grafici
@@ -1350,13 +1350,13 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                     }
                 });
                 
-                // Crea dati radar per attività - PERCENTUALE SUL TOTALE
-                const totalActivityHours = Object.values(activityHoursMap).reduce((sum, h) => sum + h, 0) || 1;
+                // Crea dati radar per attività
+                const maxActivityHours = Math.max(...Object.values(activityHoursMap), 1);
                 const activityRadarData = Object.entries(activityHoursMap)
                     .map(([activityId, hours]) => {
                         const activity = appSettings.tipiAttivita?.find(a => a.id === activityId);
                         const activityName = activity ? `${activity.emoji || ''} ${activity.nome || activityId}` : `Attività #${activityId}`;
-                        const percentage = Math.round((hours / totalActivityHours) * 100);
+                        const percentage = Math.round((hours / maxActivityHours) * 100);
                         
                         return {
                             metric: activityName,
@@ -1387,17 +1387,11 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                         darkMode,
                         title: `🥧 ${t.sheetsDistribution || 'Distribuzione Fogli'}`
                     }),
-                    // � Grafico Circolare Tipi di Attività (se ci sono dati)
-                    activityRadarData.length > 0 ? React.createElement(ActivityPolarChart, {
+                    // 🌐 Grafico 3D Tipi di Attività (se ci sono dati)
+                    activityRadarData.length > 0 ? React.createElement(Activity3DChart, {
                         data: activityRadarData,
                         darkMode,
-                        title: `🎨 ${t.activityTypes || 'Tipi di Attività'} - Distribuzione %`
-                    }) : null,
-                    // ⏰ Grafico Distribuzione Oraria (dati REALI da oraIn/oraOut)
-                    TimeDistributionChart ? React.createElement(TimeDistributionChart, {
-                        sheets: sheets.filter(s => !s.archived),
-                        darkMode,
-                        title: `⏰ ${t.timeDistribution || 'Distribuzione Ore: Fascia Oraria'}`
+                        title: `� ${t.activityTypes || 'Tipi di Attività'} - Distribuzione 3D`
                     }) : null
                 );
             })()}
@@ -1476,3 +1470,4 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
 // Expose globally and close guard
 window.Dashboard = Dashboard;
 }
+

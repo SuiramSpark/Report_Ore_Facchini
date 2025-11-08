@@ -203,16 +203,19 @@ function WeatherWidget(props) {
         // left: input (optional)
             showControls ? React.createElement('div', { style: leftStyle },
                 React.createElement('label', { className: 'text-xs block mb-1' }, (typeof window !== 'undefined' && window.t) ? window.t('weatherLabelLocation') : 'Località'),
-                React.createElement('div', { style: { display: 'flex', gap: 8 } },
+                React.createElement('div', { className: 'flex gap-2' },
                     React.createElement('input', {
                         value: query,
                         onChange: (e) => setQuery(e.target.value),
                         onKeyDown: (e) => { if (e.key === 'Enter') doSearch(query); },
                         placeholder: (typeof window !== 'undefined' && window.t) ? window.t('weatherPlaceholderCity') : 'Inserisci città (es. Roma)',
-                        className: 'rounded px-2 py-1 w-full',
-                        style: { flex: '1 1 auto' }
+                        className: 'rounded px-2 py-1 flex-1 min-w-0 text-sm'
                     }),
-                    React.createElement('button', { className: `px-3 py-1 rounded-md text-sm ${dark ? 'bg-white/10 text-white' : 'bg-indigo-600 text-white'}`, onClick: () => doSearch(query), disabled: loading }, loading ? '…' : ((typeof window !== 'undefined' && window.t) ? window.t('weatherUpdate') : 'Aggiorna'))
+                    React.createElement('button', { 
+                        className: `px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm whitespace-nowrap ${dark ? 'bg-white/10 text-white' : 'bg-indigo-600 text-white'}`, 
+                        onClick: () => doSearch(query), 
+                        disabled: loading 
+                    }, loading ? '…' : ((typeof window !== 'undefined' && window.t) ? window.t('weatherUpdate') : 'Aggiorna'))
                 )
             ) : null,
         // center: icon

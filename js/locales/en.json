@@ -540,6 +540,7 @@
   "stats3dNotLoaded": "3D Statistics not loaded",
   "more": "More",
   "dailyTrend": "Daily Trend",
+  "timeDistribution": "Time Distribution: Hourly Slots",
   "sheetsDistribution": "Sheets Distribution",
   "clickToView": "Click for details"
 }

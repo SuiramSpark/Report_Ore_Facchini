@@ -609,20 +609,20 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                             });
                         })(),
 
-                        // === TIPI DI ATTIVITÀ - RADAR CHART ===
+                        // === TIPI DI ATTIVITÀ - GRAFICO CIRCOLARE ===
                         (() => {
-                            const { PerformanceRadarChart } = window.AdvancedCharts || {};
+                            const { ActivityPolarChart } = window.AdvancedCharts || {};
                             const activityTypes = window.activityTypes || [];
-                            if (!PerformanceRadarChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
+                            if (!ActivityPolarChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
 
-                            const maxActivityHours = Math.max(...Object.values(aggregateStats.activityHours), 1);
+                            const totalActivityHours = Object.values(aggregateStats.activityHours).reduce((sum, h) => sum + h, 0) || 1;
 
                             const activityData = Object.entries(aggregateStats.activityHours)
                                 .map(([activityId, hours]) => {
                                     const activity = activityTypes.find(a => a.id === activityId);
                                     // USA .nome e .emoji dalle impostazioni
                                     const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
-                                    const percentage = Math.round((hours / maxActivityHours) * 100);
+                                    const percentage = Math.round((hours / totalActivityHours) * 100);
                                     
                                     return {
                                         metric: activityName,
@@ -632,10 +632,10 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                                 .sort((a, b) => b.value - a.value)
                                 .slice(0, 8);
 
-                            return React.createElement(PerformanceRadarChart, {
+                            return React.createElement(ActivityPolarChart, {
                                 data: activityData,
                                 darkMode,
-                                title: '🎯 Performance Tipi di Attività (Radar)'
+                                title: '🌐 Performance Tipi di Attività (Radar Circolare)'
                             });
                         })(),
 
@@ -964,10 +964,10 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                 });
             })()}
 
-            {/* 🎯 Performance Radar - Metriche Lavoratore */}
+            {/* 🎯 Performance - Metriche Lavoratore */}
             {(() => {
-                const { PerformanceRadarChart } = window.AdvancedCharts || {};
-                if (!PerformanceRadarChart) return null;
+                const { ActivityPolarChart } = window.AdvancedCharts || {};
+                if (!ActivityPolarChart) return null;
                 
                 // Calcola metriche performance (0-100)
                 const avgHoursPerDay = stats.totalHours / Math.max(stats.totalDays, 1);
@@ -984,19 +984,19 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     { metric: 'Ore Totali', value: Math.min((stats.totalHours / 100) * 100, 100) }
                 ];
                 
-                return React.createElement(PerformanceRadarChart, {
+                return React.createElement(ActivityPolarChart, {
                     data: performanceData,
                     darkMode,
-                    title: `🎯 ${t.performance || 'Performance'} ${selectedWorker}`
+                    title: `🎯 ${t.performance || 'Performance'} ${selectedWorker} (Circolare)`
                 });
             })()}
 
-            {/* 🎨 Radar Tipi di Attività */}
+            {/* 🎨 Distribuzione Tipi di Attività */}
             {(() => {
-                const { PerformanceRadarChart } = window.AdvancedCharts || {};
+                const { ActivityPolarChart } = window.AdvancedCharts || {};
                 const activityTypes = window.activityTypes || [];
                 
-                if (!PerformanceRadarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
+                if (!ActivityPolarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
                     // Mostra messaggio se non ci sono attività
                     return React.createElement('div', {
                         className: `${cardClass} rounded-xl shadow-lg p-6 text-center animate-fade-in`,
@@ -1012,8 +1012,8 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     );
                 }
                 
-                // Calcola max ore per normalizzazione
-                const maxHours = Math.max(...Object.values(stats.activityHours), 1);
+                // Calcola totale ore per percentuali corrette
+                const totalHours = Object.values(stats.activityHours).reduce((sum, h) => sum + h, 0) || 1;
                 
                 // Mappa ID attività → nome attività
                 const activityData = Object.entries(stats.activityHours)
@@ -1021,7 +1021,7 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                         const activity = activityTypes.find(a => a.id === activityId);
                         // USA .nome e .emoji dalle impostazioni
                         const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
-                        const percentage = Math.round((hours / maxHours) * 100);
+                        const percentage = Math.round((hours / totalHours) * 100);
                         
                         return {
                             metric: activityName,
@@ -1032,10 +1032,10 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                 
                 if (activityData.length === 0) return null;
                 
-                return React.createElement(PerformanceRadarChart, {
+                return React.createElement(ActivityPolarChart, {
                     data: activityData,
                     darkMode,
-                    title: `🎨 ${t.activityTypes || 'Tipi di Attività'} - ${selectedWorker}`
+                    title: `🌐 ${t.activityTypes || 'Tipi di Attività'} - ${selectedWorker} (Circolare)`
                 });
             })()}
 
