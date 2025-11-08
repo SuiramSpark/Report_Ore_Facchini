@@ -60,12 +60,12 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
     const [sessionKey, setSessionKey] = React.useState(null);
 
     // GDPR Privacy Notice State
-    const [gdprText, setGdprText] = React.useState('');
+    const [gdprText, setGdprText] = React.useState(`Informativa sulla privacy (versione predefinita)\n\nQuesto servizio è fornito da Apostu Marius Iulian (contatto: mapostu.04@gmail.com).\n\nFinalità: i dati inseriti dai lavoratori (nome, orari, firma e campi facoltativi) sono utilizzati esclusivamente per la registrazione delle ore e la generazione del documento di riepilogo.\n\nArchiviazione: i dati sono memorizzati in un database Firebase gestito dal proprietario dell'app. I dati vengono conservati finché necessario per lo scopo dichiarato o finché non vengono rimossi manualmente dall'amministratore.\n\nNessun valore legale: questo servizio è fornito a scopo informativo; i documenti generati non hanno valore legale certificato.\n\nPer richieste, cancellazione o rettifica dati contattare: mapostu.04@gmail.com`);
     const [showGdpr, setShowGdpr] = React.useState(false);
     const [loadingGdpr, setLoadingGdpr] = React.useState(true);
 
     // Terms of Service State
-    const [tosText, setTosText] = React.useState('');
+    const [tosText, setTosText] = React.useState(`Termini di Servizio (versione predefinita)\n\nProprietario e contatti: Apostu Marius Iulian - mapostu.04@gmail.com\n\nUso dell'app: l'app permette ai lavoratori di registrare orari e firme per creare un riepilogo delle ore lavorate. I dati inseriti sono salvati su Firebase e l'app è ospitata pubblicamente su GitHub.\n\nAccettazione: compilando e inviando il modulo, il lavoratore dichiara di aver preso visione di questi Termini e accetta che i dati siano salvati per le finalità indicate.\n\nLimitazioni: le informazioni fornite tramite l'app sono a scopo informativo e non costituiscono consulenza legale; i documenti prodotti non garantiscono valore legale.\n\nPer domande o richieste contattare: mapostu.04@gmail.com`);
     const [showTos, setShowTos] = React.useState(false);
     const [loadingTos, setLoadingTos] = React.useState(true);
     const [tosAccepted, setTosAccepted] = React.useState(false);
@@ -76,7 +76,14 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         const loadGdpr = async () => {
             try {
                 const doc = await db.collection('settings').doc('privacyGDPR').get();
-                if (doc.exists) setGdprText(doc.data().text || '');
+                if (doc.exists) {
+                    const remote = doc.data().text;
+                    if (remote && String(remote).trim().length > 0) {
+                        setGdprText(remote);
+                    } else {
+                        console.log('privacyGDPR present but empty - keeping default in-code GDPR text');
+                    }
+                }
             } catch (e) { console.error('Error loading GDPR text:', e); }
             setLoadingGdpr(false);
         };
@@ -89,7 +96,14 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         const loadTos = async () => {
             try {
                 const doc = await db.collection('settings').doc('termsOfService').get();
-                if (doc.exists) setTosText(doc.data().text || '');
+                if (doc.exists) {
+                    const remote = doc.data().text;
+                    if (remote && String(remote).trim().length > 0) {
+                        setTosText(remote);
+                    } else {
+                        console.log('termsOfService present but empty - keeping default in-code ToS text');
+                    }
+                }
             } catch (e) { console.error('Error loading Terms of Service:', e); }
             setLoadingTos(false);
         };
@@ -323,7 +337,7 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
             if (workerData.nome || workerData.cognome || workerData.oraIn || workerData.oraOut) {
                 saveSession(workerData);
             }
-        }, 2000); // Save after 2 seconds of inactivity
+        }, 10000); // Save after 10 seconds of inactivity (ottimizzato per ridurre scritture Firestore)
         
         return () => {
             if (autoSaveTimeoutRef.current) {
@@ -624,6 +638,26 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
         } catch (error) {
             console.error('Error logging modification:', error);
         }
+    };
+
+    // 🚀 OTTIMIZZAZIONE: Debounced input handler per ridurre re-render e auto-save frequency
+    const debouncedUpdateWorkerData = React.useMemo(
+        () => window.debounce((field, value) => {
+            setWorkerData((prevData) => ({
+                ...prevData,
+                [field]: value,
+            }));
+        }, 500), // 500ms delay - aspetta che utente finisce di digitare
+        []
+    );
+
+    // Handler per input con debounce (riduce scritture auto-save)
+    const handleInputChange = (field) => (e) => {
+        const value = e.target.value;
+        // Aggiorna immediatamente il campo visivo (nessun lag percepito)
+        e.target.dataset.tempValue = value;
+        // Ma ritarda l'aggiornamento dello state (che triggera auto-save)
+        debouncedUpdateWorkerData(field, value);
     };
 
     // Example usage of logModification
@@ -957,25 +991,25 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                     </div>
 
                     <div className="space-y-3 sm:space-y-4">
-                        {/* Nome e Cognome - STACK COMPLETO SU MOBILE */}
+                        {/* Nome e Cognome - STACK COMPLETO SU MOBILE con DEBOUNCE */}
                         <div className="grid grid-cols-1 gap-2 sm:gap-3">
                             <input
                                 type="text"
                                 placeholder={`${t.firstName} *`}
-                                value={workerData.nome}
-                                onChange={(e) => setWorkerData({...workerData, nome: e.target.value})}
+                                defaultValue={workerData.nome}
+                                onChange={handleInputChange('nome')}
                                 className={`w-full px-3 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-base`}
                             />
                             <input
                                 type="text"
                                 placeholder={`${t.lastName} *`}
-                                value={workerData.cognome}
-                                onChange={(e) => setWorkerData({...workerData, cognome: e.target.value})}
+                                defaultValue={workerData.cognome}
+                                onChange={handleInputChange('cognome')}
                                 className={`w-full px-3 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-base`}
                             />
                         </div>
 
-                        {/* Orari - STACK COMPLETO SU MOBILE */}
+                        {/* Orari - STACK COMPLETO SU MOBILE con DEBOUNCE */}
                         <div className="grid grid-cols-1 gap-2 sm:gap-3">
                             <div>
                                 <label className={`block text-xs sm:text-sm font-semibold mb-1 ${textClass}`}>
@@ -983,8 +1017,8 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                 </label>
                                 <input
                                     type="time"
-                                    value={workerData.oraIn}
-                                    onChange={(e) => setWorkerData({...workerData, oraIn: e.target.value})}
+                                    defaultValue={workerData.oraIn}
+                                    onChange={handleInputChange('oraIn')}
                                     className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                     style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                                 />
@@ -995,8 +1029,8 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                 </label>
                                 <input
                                     type="time"
-                                    value={workerData.oraOut}
-                                    onChange={(e) => setWorkerData({...workerData, oraOut: e.target.value})}
+                                    defaultValue={workerData.oraOut}
+                                    onChange={handleInputChange('oraOut')}
                                     className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                     style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                                 />
@@ -1007,8 +1041,8 @@ const WorkerMode = ({ sheetId, db, darkMode: initialDarkMode, language = 'it' })
                                 </label>
                                 <input
                                     type="number"
-                                    value={workerData.pausaMinuti}
-                                    onChange={(e) => setWorkerData({...workerData, pausaMinuti: e.target.value})}
+                                    defaultValue={workerData.pausaMinuti}
+                                    onChange={handleInputChange('pausaMinuti')}
                                     className={`w-full px-3 py-2 rounded-lg border ${inputClass} text-base`}
                                     placeholder="0"
                                     min="0"

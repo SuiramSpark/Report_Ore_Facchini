@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-4.1-blue.svg?cacheSeconds=2592000)
+![Version](https://img.shields.io/badge/version-4.3-blue.svg?cacheSeconds=2592000)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![PWA](https://img.shields.io/badge/PWA-enabled-purple.svg)
 ![Firebase](https://img.shields.io/badge/firebase-integrated-orange.svg)
@@ -41,12 +41,15 @@
 <td width="50%">
 
 ### 📊 **Dashboard Analytics**
-- ✅ Grafici animati in tempo reale
+- ✅ Grafici animati in tempo reale (Chart.js)
 - ✅ Statistiche giornaliere/settimanali/mensili
 - ✅ Top 10 lavoratori e aziende
 - ✅ Comparazione periodi
 - ✅ Vista calendario interattiva
 - ✅ Export Excel (XLSX) avanzato
+- ✅ **Widget Performance ottimizzato**
+- ✅ **Filtri avanzati per statistiche lavoratori**
+- ✅ **Grafici 3D interattivi con Chart.js**
 
 ### 🔒 **Sistema Blacklist**
 - ✅ Livelli di gravità (Alta/Media/Bassa)
@@ -54,6 +57,14 @@
 - ✅ Storico note e modifiche
 - ✅ Filtri avanzati e ricerca
 - ✅ Azioni bulk (selezione multipla)
+
+### ⚡ **Nuovo in v4.3**
+- ✅ **Sistema autorizzazioni orari sincronizzato**
+- ✅ **Badge autorizzazioni in SheetList**
+- ✅ **Conteggio lavoratori unici normalizzato**
+- ✅ **Statistiche globali accurate**
+- ✅ **Filtri multipli per azienda, attività, ore, date**
+- ✅ **Grafici attività tipo dinamici**
 
 </td>
 </tr>

@@ -1,4 +1,4 @@
-// Blacklist Component - 5 LINGUE COMPLETE + Advanced Features
+// Blacklist Component - 🚀 OTTIMIZZATO con paginazione lazy load
 const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }) => {
     // Usa la funzione globale per normalizzare nome e cognome
     const normalizeWorkerName = window.normalizeWorkerName;
@@ -9,6 +9,10 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
     const [selectedItems, setSelectedItems] = React.useState([]);
     const [showStats, setShowStats] = React.useState(true);
     const [showNotesModal, setShowNotesModal] = React.useState(null);
+    
+    // 🚀 OTTIMIZZAZIONE: Paginazione lazy load
+    const [displayLimit, setDisplayLimit] = React.useState(20);
+    const ITEMS_PER_PAGE = 20;
     // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
     // Keep a safe fallback to the legacy `translations` object so migration is incremental.
     const t = new Proxy({}, {
@@ -130,13 +134,23 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
 
         return result;
     }, [blacklist, searchTerm, severityFilter, expiryFilter, sortBy]);
+    
+    // 🚀 Displayed items (con limite paginazione)
+    const displayedBlacklist = React.useMemo(() => {
+        return filteredBlacklist.slice(0, displayLimit);
+    }, [filteredBlacklist, displayLimit]);
+    
+    // Reset limit quando cambiano filtri
+    React.useEffect(() => {
+        setDisplayLimit(ITEMS_PER_PAGE);
+    }, [searchTerm, severityFilter, expiryFilter, sortBy]);
 
     // Bulk actions
     const toggleSelectAll = () => {
-        if (selectedItems.length === filteredBlacklist.length) {
+        if (selectedItems.length === displayedBlacklist.length) {
             setSelectedItems([]);
         } else {
-            setSelectedItems(filteredBlacklist.map(item => item.id));
+            setSelectedItems(displayedBlacklist.map(item => item.id));
         }
     };
 
@@ -386,8 +400,9 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
 
             {/* Blacklist Items */}
             {filteredBlacklist.length > 0 ? (
+                <>
                 <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                    {filteredBlacklist.map((item) => {
+                    {displayedBlacklist.map((item) => {
                         const expired = isExpired(item);
                         const severity = item.severity || 'medium';
                         
@@ -542,20 +557,28 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
                         );
                     })}
                 </div>
+                
+                {/* 🚀 Load More Button */}
+                {displayedBlacklist.length < filteredBlacklist.length && (
+                    <div className="mt-4 text-center">
+                        <button
+                            onClick={() => setDisplayLimit(prev => prev + ITEMS_PER_PAGE)}
+                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                darkMode 
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                            }`}
+                        >
+                            📥 {t.loadMore || 'Carica altri'} ({filteredBlacklist.length - displayedBlacklist.length} {t.remaining || 'rimanenti'})
+                        </button>
+                    </div>
+                )}
+                </>
             ) : (
                 <div className={`${cardClass} rounded-xl shadow-lg p-8 sm:p-12 text-center`}>
-                    <p className="text-4xl sm:text-5xl mb-4">✅</p>
-                    <p className={`${textClass} text-base sm:text-lg font-semibold mb-2`}>
-                        {searchTerm ? t.noSheets : t.noBlacklist}
+                    <p className={`${textClass} text-base sm:text-lg font-medium`}>
+                        {t.noBlacklist || 'No blacklist entries'}
                     </p>
-                    {searchTerm && (
-                        <button
-                            onClick={() => setSearchTerm('')}
-                            className="mt-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm"
-                        >
-                            ✗ {t.clear}
-                        </button>
-                    )}
                 </div>
             )}
 

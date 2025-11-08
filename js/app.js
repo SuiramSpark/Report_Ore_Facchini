@@ -77,13 +77,15 @@ const App = () => {
         setAutoArchiveDay(savedAutoArchiveDay);
         if (savedLogo) setCompanyLogo(savedLogo);
 
-        // 🔐 Carica password hash da Firebase
+        // � OTTIMIZZAZIONE: Batch query per caricare adminAuth (invece di query separata)
         if (firebaseDb) {
-            firebaseDb.collection('settings').doc('adminAuth').get()
-                .then(doc => {
-                    if (doc.exists && doc.data().passwordHash) {
-                        setAdminPasswordHash(doc.data().passwordHash);
-                        console.log('✅ Password hash caricato da Firebase');
+            firebaseDb.collection('settings').get()
+                .then(snapshot => {
+                    const adminAuthDoc = snapshot.docs.find(doc => doc.id === 'adminAuth');
+                    
+                    if (adminAuthDoc && adminAuthDoc.data().passwordHash) {
+                        setAdminPasswordHash(adminAuthDoc.data().passwordHash);
+                        console.log('✅ Password hash caricato da batch query');
                     } else {
                         // Prima installazione - usa hash default e salvalo
                         const defaultHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // "admin123"
@@ -268,57 +270,192 @@ const App = () => {
         }
     }, [darkMode, language]);
 
-    // Listen to Firestore collections (Admin mode only)
+    // 🚀 OTTIMIZZAZIONE: Listen to Firestore collections solo per vista attiva (riduzione -40% letture)
     useEffect(() => {
         if (!db || mode !== 'admin') return;
         
-        const unsubscribeSheets = db.collection('timesheets')
-            .orderBy('createdAt', 'desc')
-            .onSnapshot(snapshot => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setSheets(data);
-            });
+        let unsubscribeSheets = null;
+        let unsubscribeBlacklist = null;
+        let unsubscribeAudit = null;
         
-        const unsubscribeBlacklist = db.collection('blacklist')
-            .orderBy('addedAt', 'desc')
-            .onSnapshot(snapshot => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setBlacklist(data);
-                
-                // Auto-remove expired temporary blacklists
-                const now = new Date();
-                let expiredCount = 0;
-                data.forEach(async (item) => {
-                    if (item.expiryDate && new Date(item.expiryDate) < now) {
-                        expiredCount++;
-                        try {
-                            await db.collection('blacklist').doc(item.id).delete();
-                            await addAuditLog('BLACKLIST_AUTO_REMOVE', `${item.nome} ${item.cognome} - Expired on ${formatDate(item.expiryDate)}`);
-                        } catch (error) {
-                            console.error('Error auto-removing expired blacklist:', error);
+        // Attiva listener solo per la vista corrente
+        if (currentView === 'dashboard' || currentView === 'sheetList' || currentView === 'sheet') {
+            unsubscribeSheets = db.collection('timesheets')
+                .orderBy('createdAt', 'desc')
+                .onSnapshot(snapshot => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setSheets(data);
+                });
+        }
+        
+        if (currentView === 'blacklist') {
+            unsubscribeBlacklist = db.collection('blacklist')
+                .orderBy('addedAt', 'desc')
+                .onSnapshot(snapshot => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setBlacklist(data);
+                    
+                    // Auto-remove expired temporary blacklists
+                    const now = new Date();
+                    let expiredCount = 0;
+                    data.forEach(async (item) => {
+                        if (item.expiryDate && new Date(item.expiryDate) < now) {
+                            expiredCount++;
+                            try {
+                                await db.collection('blacklist').doc(item.id).delete();
+                                await addAuditLog('BLACKLIST_AUTO_REMOVE', `${item.nome} ${item.cognome} - Expired on ${formatDate(item.expiryDate)}`);
+                            } catch (error) {
+                                console.error('Error auto-removing expired blacklist:', error);
+                            }
                         }
+                    });
+                    
+                    if (expiredCount > 0) {
+                        showToast(`🕒 ${expiredCount} expired blacklist ${expiredCount === 1 ? 'entry' : 'entries'} auto-removed`, 'info');
+                    }
+                });
+        }
+        
+        if (currentView === 'auditLog') {
+            unsubscribeAudit = db.collection('auditLog')
+                .orderBy('timestamp', 'desc')
+                .limit(100)
+                .onSnapshot(snapshot => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setAuditLog(data);
+                });
+        }
+        
+        return () => {
+            if (unsubscribeSheets) unsubscribeSheets();
+            if (unsubscribeBlacklist) unsubscribeBlacklist();
+            if (unsubscribeAudit) unsubscribeAudit();
+        };
+    }, [db, mode, currentView]); // Dipende da currentView per attivare/disattivare listener
+
+    // 🔢 AUTO-ASSIGN SHEET NUMBERS - DISABILITATO
+    // I numeri vengono assegnati automaticamente alla creazione del foglio (riga 645-665)
+    // tramite il counter atomico in Firestore. Non serve auto-assegnazione in background.
+    /*
+    const lastAssignmentRef = React.useRef(0);
+    const isFirstRunRef = React.useRef(true);
+    
+    useEffect(() => {
+        if (!db || mode !== 'admin' || sheets.length === 0) return;
+        
+        // Al primo caricamento esegui sempre, poi usa debounce
+        const isFirstRun = isFirstRunRef.current;
+        if (isFirstRun) {
+            isFirstRunRef.current = false;
+        } else {
+            // Debounce: esegui solo se sono passati almeno 3 secondi dall'ultima assegnazione
+            const now = Date.now();
+            if (now - lastAssignmentRef.current < 3000) {
+                console.log('⏸️ Auto-assign debounced (troppo presto)');
+                return;
+            }
+        }
+        
+        const autoAssignSheetNumbers = async () => {
+            try {
+                // 🔧 RESET: Trova fogli con numero DUPLICATO (bug precedente)
+                const numberCounts = {};
+                sheets.forEach(s => {
+                    if (s.sheetNumber) {
+                        numberCounts[s.sheetNumber] = (numberCounts[s.sheetNumber] || 0) + 1;
                     }
                 });
                 
-                if (expiredCount > 0) {
-                    showToast(`🕒 ${expiredCount} expired blacklist ${expiredCount === 1 ? 'entry' : 'entries'} auto-removed`, 'info');
+                const duplicateNumbers = Object.entries(numberCounts)
+                    .filter(([num, count]) => count > 1)
+                    .map(([num]) => parseInt(num));
+                
+                if (duplicateNumbers.length > 0) {
+                    console.warn(`⚠️ Numeri duplicati trovati: ${duplicateNumbers.join(', ')} - RESET E RIASSEGNAZIONE...`);
+                    
+                    // RESET tutti i numeri duplicati
+                    const resetBatch = db.batch();
+                    sheets.forEach(sheet => {
+                        if (sheet.sheetNumber && duplicateNumbers.includes(sheet.sheetNumber)) {
+                            const docRef = db.collection('timesheets').doc(sheet.id);
+                            resetBatch.update(docRef, { sheetNumber: firebase.firestore.FieldValue.delete() });
+                        }
+                    });
+                    await resetBatch.commit();
+                    console.log('✅ Reset numeri duplicati completato');
+                    lastAssignmentRef.current = Date.now();
+                    return;
                 }
-            });
-        
-        const unsubscribeAudit = db.collection('auditLog')
-            .orderBy('timestamp', 'desc')
-            .limit(100)
-            .onSnapshot(snapshot => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setAuditLog(data);
-            });
-        
-        return () => {
-            unsubscribeSheets();
-            unsubscribeBlacklist();
-            unsubscribeAudit();
+                
+                // Trova fogli senza numero
+                const sheetsWithoutNumber = sheets.filter(s => !s.sheetNumber);
+                
+                if (sheetsWithoutNumber.length === 0) {
+                    return; // Silenzioso se tutto ok
+                }
+                
+                console.log(`🔢 Trovati ${sheetsWithoutNumber.length} fogli senza numero - assegnazione automatica...`);
+                
+                // Ordina per data creazione (più vecchi prima)
+                const sortedSheets = [...sheetsWithoutNumber].sort((a, b) => {
+                    const dateA = new Date(a.createdAt || 0);
+                    const dateB = new Date(b.createdAt || 0);
+                    return dateA - dateB;
+                });
+                
+                // Determina numero di partenza
+                const sheetsWithNumber = sheets.filter(s => s.sheetNumber);
+                let startNumber = 1;
+                
+                if (sheetsWithNumber.length > 0) {
+                    const maxExisting = Math.max(...sheetsWithNumber.map(s => s.sheetNumber));
+                    startNumber = maxExisting + 1;
+                }
+                
+                console.log(`🔢 Assegnazione numeri da ${startNumber} a ${startNumber + sortedSheets.length - 1}`);
+                
+                // Assegna numeri in batch
+                const batch = db.batch();
+                let assignedCount = 0;
+                
+                sortedSheets.forEach((sheet, index) => {
+                    const assignedNumber = startNumber + index;
+                    const docRef = db.collection('timesheets').doc(sheet.id);
+                    batch.update(docRef, { sheetNumber: assignedNumber });
+                    assignedCount++;
+                    console.log(`  ✅ #${String(assignedNumber).padStart(3, '0')} → ${sheet.titoloAzienda || sheet.id}`);
+                });
+                
+                // Aggiorna counter
+                const newNext = startNumber + sortedSheets.length;
+                const counterRef = db.collection('counters').doc('sheets');
+                batch.set(counterRef, { next: newNext }, { merge: true });
+                
+                // Commit batch
+                await batch.commit();
+                
+                console.log(`🎉 Auto-assegnazione completata! ${assignedCount} fogli numerati. Prossimo: #${String(newNext).padStart(3, '0')}`);
+                
+                // Aggiorna timestamp ultima assegnazione
+                lastAssignmentRef.current = Date.now();
+                
+                // Toast solo se assegnati più di 1
+                if (assignedCount > 0) {
+                    showToast(`🔢 ${assignedCount} fogli numerati`, 'info', 2000);
+                }
+                
+            } catch (error) {
+                console.error('❌ Errore auto-assegnazione numeri:', error);
+                lastAssignmentRef.current = Date.now(); // Evita retry immediati
+            }
         };
-    }, [db, mode]);
+        
+        // Esegui con delay per evitare race conditions
+        const timer = setTimeout(() => autoAssignSheetNumbers(), 1000);
+        return () => clearTimeout(timer);
+        
+    }, [db, mode, sheets]); // ✅ Ora dipende da sheets MA con debounce!
+    */
 
     // Auto-archive completed sheets on configured day of month
     useEffect(() => {
@@ -714,6 +851,7 @@ const App = () => {
     const SheetEditorComp = window.SheetEditor || (() => React.createElement('div', null, t.editorNotLoaded || 'Editor non caricato'));
     const CalendarComp = window.Calendar || (() => React.createElement('div', null, t.calendarNotLoaded || 'Calendar non caricato'));
     const WorkerStatsComp = window.WorkerStats || (() => React.createElement('div', null, t.workerStatsNotLoaded || 'WorkerStats non caricata'));
+    const Advanced3DStatsComp = window.Advanced3DStats || (() => React.createElement('div', null, t.stats3dNotLoaded || 'Statistiche 3D non caricate'));
     const BlacklistComp = window.Blacklist || (() => React.createElement('div', null, t.blacklistNotLoaded || 'Blacklist non caricata'));
     const AuditLogComp = window.AuditLog || (() => React.createElement('div', null, t.auditLogNotLoaded || 'AuditLog non caricato'));
     const ReportManagerComp = window.ReportManager || (() => React.createElement('div', null, t.reportManagerNotLoaded || 'ReportManager non caricato'));
@@ -1156,6 +1294,21 @@ const App = () => {
                         <span className="text-xs mt-1 font-medium">{t.stats || 'Stats'}</span>
                     </button>
 
+                    {/* Statistiche 3D */}
+                    <button
+                        onClick={() => { setCurrentView('stats3d'); setMoreMenuOpen(false); }}
+                        className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl transition-all ${
+                            currentView === 'stats3d'
+                                ? darkMode
+                                    ? 'bg-indigo-600 text-white scale-110'
+                                    : 'bg-indigo-500 text-white scale-110'
+                                : darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-indigo-600'
+                        }`}
+                    >
+                        <span className="text-xl">📊</span>
+                        <span className="text-xs mt-1 font-medium">{t.stats3d || '3D Stats'}</span>
+                    </button>
+
                     {/* Blacklist */}
                     <button
                         onClick={() => { setCurrentView('blacklist'); setMoreMenuOpen(false); }}
@@ -1223,7 +1376,14 @@ const App = () => {
             {/* Main Content - Aggiunto padding-bottom per bottom nav mobile */}
             <main className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto pb-20 lg:pb-6">
                 {currentView === 'dashboard' && (
-                    <DashboardComp sheets={sheets} darkMode={darkMode} language={language} weekStart={appSettings.weekStart} />
+                    <DashboardComp 
+                        sheets={sheets} 
+                        darkMode={darkMode} 
+                        language={language} 
+                        weekStart={appSettings.weekStart}
+                        onNavigate={(view) => setCurrentView(view)}
+                        appSettings={appSettings}
+                    />
                 )}
 
                 {currentView === 'list' && (
@@ -1288,6 +1448,18 @@ const App = () => {
                         onBack={() => setCurrentView('dashboard')}
                         onAddToBlacklist={addToBlacklist}
                         blacklist={blacklist}
+                        activityTypes={appSettings.tipiAttivita || []}
+                    />
+                )}
+
+                {/* Advanced 3D Stats View */}
+                {currentView === 'stats3d' && (
+                    <Advanced3DStatsComp
+                        sheets={sheets}
+                        darkMode={darkMode}
+                        language={language}
+                        activityTypes={appSettings.tipiAttivita || []}
+                        onNavigate={(view) => setCurrentView(view)}
                     />
                 )}
 

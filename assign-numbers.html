@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Assegna Numeri Fogli</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <h1>Assegnazione Numeri Fogli</h1>
+    <button onclick="assignNumbers()" style="padding: 20px; font-size: 18px; background: blue; color: white; cursor: pointer;">
+        🔢 ASSEGNA NUMERI ORA
+    </button>
+    <div id="log" style="margin-top: 20px; font-family: monospace; white-space: pre-wrap;"></div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyA_YfdQkudlebovpbNlN-vXG-oLz3aP8sE",
+            authDomain: "report-ore-facchini.firebaseapp.com",
+            projectId: "report-ore-facchini",
+            storageBucket: "report-ore-facchini.firebasestorage.app",
+            messagingSenderId: "869043539328",
+            appId: "1:869043539328:web:e3c7a5ae9d9c0e25fb87fa"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function log(msg) {
+            const logDiv = document.getElementById('log');
+            logDiv.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        async function assignNumbers() {
+            log('🔍 Caricamento fogli...');
+            
+            try {
+                // Carica tutti i fogli
+                const snapshot = await db.collection('timesheets')
+                    .orderBy('createdAt', 'asc')
+                    .get();
+                
+                const sheets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                log(`📋 Trovati ${sheets.length} fogli totali`);
+                
+                // Trova fogli senza numero
+                const sheetsWithoutNumber = sheets.filter(s => !s.sheetNumber);
+                log(`🔢 Fogli senza numero: ${sheetsWithoutNumber.length}`);
+                
+                if (sheetsWithoutNumber.length === 0) {
+                    log('✅ Tutti i fogli hanno già un numero!');
+                    return;
+                }
+                
+                // Trova numero massimo esistente
+                const sheetsWithNumber = sheets.filter(s => s.sheetNumber);
+                let startNumber = 1;
+                
+                if (sheetsWithNumber.length > 0) {
+                    const maxExisting = Math.max(...sheetsWithNumber.map(s => s.sheetNumber));
+                    startNumber = maxExisting + 1;
+                    log(`🔢 Numero massimo esistente: #${maxExisting}, parto da #${startNumber}`);
+                } else {
+                    log('🔢 Nessun numero esistente, parto da #1');
+                }
+                
+                // Assegna numeri in batch
+                log(`\n🚀 Assegnazione in corso...`);
+                const batch = db.batch();
+                
+                sheetsWithoutNumber.forEach((sheet, index) => {
+                    const assignedNumber = startNumber + index;
+                    const docRef = db.collection('timesheets').doc(sheet.id);
+                    batch.update(docRef, { sheetNumber: assignedNumber });
+                    log(`  ✅ #${String(assignedNumber).padStart(3, '0')} → ${sheet.titoloAzienda || sheet.id}`);
+                });
+                
+                // Aggiorna counter
+                const newNext = startNumber + sheetsWithoutNumber.length;
+                const counterRef = db.collection('counters').doc('sheets');
+                batch.set(counterRef, { next: newNext }, { merge: true });
+                
+                // Commit
+                await batch.commit();
+                
+                log(`\n🎉 COMPLETATO! ${sheetsWithoutNumber.length} fogli numerati`);
+                log(`📊 Prossimo numero: #${String(newNext).padStart(3, '0')}`);
+                log(`\n✅ Ricarica la pagina principale per vedere i numeri!`);
+                
+            } catch (error) {
+                log(`\n❌ ERRORE: ${error.message}`);
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

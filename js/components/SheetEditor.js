@@ -830,24 +830,24 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     />
                     
                     {/* 📍 NUOVO CAMPO: Indirizzo Evento/Magazzino */}
-                    <div className="flex items-center gap-2">
+                    <div className="space-y-2">
                         <input
                             type="text"
                             placeholder={t.locationAddress || 'Indirizzo Evento/Magazzino'}
                             value={currentSheet.indirizzoEvento || ''}
                             onChange={(e) => setCurrentSheet({...currentSheet, indirizzoEvento: e.target.value})}
-                            className={`flex-1 px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                            className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                         />
                         {currentSheet.indirizzoEvento && (
-                            <>
+                            <div className="flex gap-2">
                                 <button
                                     type="button"
                                     onClick={shareAddress}
                                     title={t.shareAddress || 'Condividi Indirizzo'}
-                                    className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
                                 >
                                     <span className="text-xl">📤</span>
-                                    <span className="hidden sm:inline">{t.share || 'Condividi'}</span>
+                                    <span>{t.share || 'Condividi'}</span>
                                 </button>
                                 <button
                                     type="button"
@@ -857,12 +857,12 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                         window.open(mapsUrl, '_blank');
                                     }}
                                     title={t.openInMaps || 'Apri in Google Maps'}
-                                    className="px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
                                 >
                                     <span className="text-xl">📍</span>
-                                    <span className="hidden sm:inline">{t.openInMaps || 'Maps'}</span>
+                                    <span>{t.openInMaps || 'Maps'}</span>
                                 </button>
-                            </>
+                            </div>
                         )}
                     </div>
                     

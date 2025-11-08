@@ -24,6 +24,10 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
     const [selectedLogs, setSelectedLogs] = React.useState([]);
     const [selectMode, setSelectMode] = React.useState(false);
     const [deleting, setDeleting] = React.useState(false);
+    
+    // 🚀 OTTIMIZZAZIONE: Paginazione lazy load
+    const [displayLimit, setDisplayLimit] = React.useState(20);
+    const ITEMS_PER_PAGE = 20;
     // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
     // Keep a safe fallback to the legacy `translations` object so migration is incremental.
     const t = new Proxy({}, {
@@ -52,6 +56,16 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
             return true;
         });
     }, [auditLog, filter]);
+    
+    // 🚀 Displayed logs (con limite paginazione)
+    const displayedLogs = React.useMemo(() => {
+        return filteredLogs.slice(0, displayLimit);
+    }, [filteredLogs, displayLimit]);
+    
+    // Reset limit quando cambiano filtri
+    React.useEffect(() => {
+        setDisplayLimit(ITEMS_PER_PAGE);
+    }, [filter]);
 
     // Clear audit log
     const clearAuditLog = async () => {
@@ -303,8 +317,9 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
 
             {/* Logs List */}
             {filteredLogs.length > 0 ? (
+                <>
                 <div className="space-y-2 sm:space-y-3 max-h-[70vh] overflow-y-auto">
-                    {filteredLogs.map((log, i) => (
+                    {displayedLogs.map((log, i) => (
                         <div
                             key={i}
                             className={`p-3 sm:p-4 rounded-lg border-l-4 ${
@@ -352,6 +367,23 @@ const AuditLog = ({ auditLog, darkMode, language = 'it', db }) => {
                         </div>
                     ))}
                 </div>
+                
+                {/* 🚀 Load More Button */}
+                {displayedLogs.length < filteredLogs.length && (
+                    <div className="mt-4 text-center">
+                        <button
+                            onClick={() => setDisplayLimit(prev => prev + ITEMS_PER_PAGE)}
+                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                darkMode 
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                            }`}
+                        >
+                            📥 {t.loadMore || 'Carica altri'} ({filteredLogs.length - displayedLogs.length} {t.remaining || 'rimanenti'})
+                        </button>
+                    </div>
+                )}
+                </>
             ) : (
                 <div className="text-center py-8 sm:py-12">
                     <p className={`${textClass} text-base sm:text-lg`}>

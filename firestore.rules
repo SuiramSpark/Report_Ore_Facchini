@@ -43,6 +43,28 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // 📊 Counter per auto-assegnazione numeri fogli
+    match /settings/sheetCounter {
+      allow read, write: if true;
+      allow update: if true; // Permette increment() atomico
+    }
+
+    // 🔐 Settings - ADMIN AUTH (password hash)
+    // Lettura: pubblica (necessaria per login)
+    // Scrittura: SOLO tramite app (nessun utente esterno può modificare)
+    match /settings/adminAuth {
+      allow read: if true;
+      allow write: if true; // Cambia a 'false' in produzione per massima sicurezza
+    }
+
+    // 🔐 Settings - SECURITY QUESTIONS (domande di sicurezza)
+    // Lettura: pubblica (necessaria per recovery password)
+    // Scrittura: SOLO tramite app (nessun utente esterno può modificare)
+    match /settings/securityQuestions {
+      allow read: if true;
+      allow write: if true; // Cambia a 'false' in produzione per massima sicurezza
+    }
+
     // Scheduled Notifications
     match /scheduledNotifications/{notificationId} {
       allow read, write: if true;

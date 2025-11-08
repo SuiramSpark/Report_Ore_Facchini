@@ -1,7 +1,13 @@
 // Worker Statistics Component - v4.2 FIX DUPLICATI
-const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlacklist, blacklist = [] }) => {
+const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlacklist, blacklist = [], activityTypes = [] }) => {
     const [selectedWorker, setSelectedWorker] = React.useState(null);
     const [stats, setStats] = React.useState(null);
+    
+    // Rendi activityTypes disponibile globalmente per i grafici
+    React.useEffect(() => {
+        window.activityTypes = activityTypes;
+    }, [activityTypes]);
+    
     // Funzione per verificare se il lavoratore selezionato è già in blacklist
     const isWorkerBlacklisted = React.useMemo(() => {
         if (!selectedWorker || !Array.isArray(blacklist)) return false;
@@ -36,30 +42,86 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
 
     // Search state
     const [search, setSearch] = React.useState("");
+    
+    // 🔍 FILTRI AVANZATI
+    const [filters, setFilters] = React.useState({
+        company: '',
+        activityType: '',
+        minHours: '',
+        maxHours: '',
+        dateFrom: '',
+        dateTo: ''
+    });
+    const [showFilters, setShowFilters] = React.useState(false);
 
-    // Get all unique workers con gestione duplicati, filtered by search
+    // Get all unique workers con gestione duplicati, filtered by search and filters
     const workers = React.useMemo(() => {
-        const workerMap = new Map(); // normalizedKey -> first occurrence worker data
+        const workerMap = new Map(); // normalizedKey -> worker data with stats
+        
         sheets.forEach(sheet => {
+            // Applica filtri a livello di foglio
+            let passesFilters = true;
+            
+            // Filtro azienda
+            if (filters.company && sheet.titoloAzienda !== filters.company) {
+                passesFilters = false;
+            }
+            
+            // Filtro tipo attività
+            if (filters.activityType && (!sheet.tipoAttivita || !sheet.tipoAttivita.includes(filters.activityType))) {
+                passesFilters = false;
+            }
+            
+            // Filtro data
+            if (filters.dateFrom && sheet.data < filters.dateFrom) {
+                passesFilters = false;
+            }
+            if (filters.dateTo && sheet.data > filters.dateTo) {
+                passesFilters = false;
+            }
+            
+            if (!passesFilters) return;
+            
             sheet.lavoratori?.forEach(w => {
                 const normalizedKey = normalizeWorkerName(w.nome, w.cognome);
+                const hours = parseFloat(w.oreTotali) || 0;
+                
                 if (!workerMap.has(normalizedKey)) {
                     workerMap.set(normalizedKey, { 
                         nome: w.nome, 
                         cognome: w.cognome,
                         displayName: `${w.nome} ${w.cognome}`.trim(),
-                        normalized: normalizedKey
+                        normalized: normalizedKey,
+                        totalHours: 0
                     });
                 }
+                
+                // Accumula ore totali
+                const workerData = workerMap.get(normalizedKey);
+                workerData.totalHours += hours;
             });
         });
+        
         let arr = Array.from(workerMap.values());
+        
+        // Filtro ore minime/massime
+        if (filters.minHours) {
+            const min = parseFloat(filters.minHours);
+            arr = arr.filter(worker => worker.totalHours >= min);
+        }
+        if (filters.maxHours) {
+            const max = parseFloat(filters.maxHours);
+            arr = arr.filter(worker => worker.totalHours <= max);
+        }
+        
+        // Filtro ricerca testuale
         if (search.trim()) {
             const normSearch = normalizeWorkerName(search, "");
             arr = arr.filter(worker => worker.normalized.includes(normSearch));
         }
+        
         return arr.map(worker => worker.displayName).sort();
-    }, [sheets, normalizeWorkerName, search]);
+    }, [sheets, normalizeWorkerName, search, filters]);
 
     // Calculate stats when worker selected - CON NORMALIZZAZIONE
     React.useEffect(() => {
@@ -144,6 +206,133 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                             onChange={e => setSearch(e.target.value)}
                         />
                     </div>
+                    
+                    {/* 🔍 FILTRI AVANZATI */}
+                    <div className="mb-4">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`w-full px-4 py-2 rounded-lg font-semibold transition-colors flex items-center justify-between ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
+                        >
+                            <span>🔍 Filtri Avanzati</span>
+                            <span>{showFilters ? '▲' : '▼'}</span>
+                        </button>
+                        
+                        {showFilters && (
+                            <div className={`mt-3 p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} space-y-3`}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {/* Filtro Azienda */}
+                                    <div>
+                                        <label className={`block mb-1 text-sm font-semibold ${textClass}`}>
+                                            🏢 Azienda
+                                        </label>
+                                        <select
+                                            value={filters.company}
+                                            onChange={e => setFilters({...filters, company: e.target.value})}
+                                            className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        >
+                                            <option value="">Tutte le aziende</option>
+                                            {Array.from(new Set(sheets.map(s => s.titoloAzienda).filter(Boolean))).sort().map((company, i) => (
+                                                <option key={i} value={company}>{company}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    {/* Filtro Tipo Attività */}
+                                    <div>
+                                        <label className={`block mb-1 text-sm font-semibold ${textClass}`}>
+                                            🎨 Tipo Attività
+                                        </label>
+                                        <select
+                                            value={filters.activityType}
+                                            onChange={e => setFilters({...filters, activityType: e.target.value})}
+                                            className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        >
+                                            <option value="">Tutte le attività</option>
+                                            {(activityTypes || []).map(activity => (
+                                                <option key={activity.id} value={activity.id}>
+                                                    {activity.emoji} {activity.nome}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    {/* Filtro Ore Minime */}
+                                    <div>
+                                        <label className={`block mb-1 text-sm font-semibold ${textClass}`}>
+                                            ⏰ Ore Minime
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.5"
+                                            value={filters.minHours}
+                                            onChange={e => setFilters({...filters, minHours: e.target.value})}
+                                            placeholder="Es: 10"
+                                            className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        />
+                                    </div>
+                                    
+                                    {/* Filtro Ore Massime */}
+                                    <div>
+                                        <label className={`block mb-1 text-sm font-semibold ${textClass}`}>
+                                            ⏰ Ore Massime
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.5"
+                                            value={filters.maxHours}
+                                            onChange={e => setFilters({...filters, maxHours: e.target.value})}
+                                            placeholder="Es: 100"
+                                            className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        />
+                                    </div>
+                                    
+                                    {/* Filtro Data Inizio */}
+                                    <div>
+                                        <label className={`block mb-1 text-sm font-semibold ${textClass}`}>
+                                            📅 Da Data
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={filters.dateFrom}
+                                            onChange={e => setFilters({...filters, dateFrom: e.target.value})}
+                                            className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        />
+                                    </div>
+                                    
+                                    {/* Filtro Data Fine */}
+                                    <div>
+                                        <label className={`block mb-1 text-sm font-semibold ${textClass}`}>
+                                            📅 A Data
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={filters.dateTo}
+                                            onChange={e => setFilters({...filters, dateTo: e.target.value})}
+                                            className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {/* Pulsanti Azioni */}
+                                <div className="flex gap-2 justify-end mt-3">
+                                    <button
+                                        onClick={() => setFilters({company: '', activityType: '', minHours: '', maxHours: '', dateFrom: '', dateTo: ''})}
+                                        className="px-4 py-2 rounded-lg bg-gray-500 hover:bg-gray-600 text-white font-semibold transition-colors"
+                                    >
+                                        🔄 Resetta Filtri
+                                    </button>
+                                </div>
+                                
+                                {/* Contatore Risultati */}
+                                <div className={`text-sm ${textClass} text-center pt-2 border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                                    📊 Trovati <strong>{workers.length}</strong> lavoratori
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
                     <p className={`${textClass} mb-4 text-sm sm:text-base`}>
                         {t.selectWorker}
                     </p>
@@ -191,6 +380,454 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                         </div>
                     )}
                 </div>
+
+                {/* ========================================
+                    STATISTICHE AGGREGATE GLOBALI
+                    ======================================== */}
+                {workers.length > 0 && (() => {
+                    const normalizeWorkerName = window.normalizeWorkerName;
+                    
+                    // Mappa per mantenere i nomi originali con maiuscole
+                    const workerDisplayNames = new Map(); // normalizedKey -> displayName
+                    
+                    // Calcola statistiche aggregate di tutti i lavoratori
+                    const aggregateStats = {
+                        totalWorkers: workers.length,
+                        totalHours: 0,
+                        totalPresences: 0,
+                        workerHours: {}, // nome normalizzato -> ore totali
+                        companyHours: {}, // azienda -> ore totali
+                        activityHours: {}, // tipo attività -> ore totali
+                        monthlyHours: {}, // YYYY-MM -> ore totali
+                        dailyAverages: [] // per ogni lavoratore
+                    };
+
+                    // Aggrega dati da tutti i fogli
+                    sheets.forEach(sheet => {
+                        sheet.lavoratori?.forEach(w => {
+                            const normalizedKey = normalizeWorkerName(w.nome, w.cognome);
+                            const hours = parseFloat(w.oreTotali) || 0;
+                            
+                            // Salva il nome originale con maiuscole
+                            if (!workerDisplayNames.has(normalizedKey)) {
+                                workerDisplayNames.set(normalizedKey, `${w.nome} ${w.cognome}`.trim());
+                            }
+                            
+                            aggregateStats.totalHours += hours;
+                            aggregateStats.totalPresences += 1;
+                            
+                            // Ore per lavoratore
+                            aggregateStats.workerHours[normalizedKey] = (aggregateStats.workerHours[normalizedKey] || 0) + hours;
+                            
+                            // Ore per azienda (USA CAMPO CORRETTO)
+                            const company = sheet.titoloAzienda || sheet.azienda || 'N/D';
+                            aggregateStats.companyHours[company] = (aggregateStats.companyHours[company] || 0) + hours;
+                            
+                            // 🎯 Ore per tipo attività (PRENDE DAL FOGLIO - sheet.tipoAttivita è un array)
+                            if (sheet.tipoAttivita && Array.isArray(sheet.tipoAttivita) && sheet.tipoAttivita.length > 0) {
+                                // Distribuisci le ore equamente tra tutte le attività del foglio
+                                const hoursPerActivity = hours / sheet.tipoAttivita.length;
+                                sheet.tipoAttivita.forEach(activityId => {
+                                    aggregateStats.activityHours[activityId] = (aggregateStats.activityHours[activityId] || 0) + hoursPerActivity;
+                                });
+                            }
+                            
+                            // Ore mensili
+                            const month = sheet.data.substring(0, 7); // YYYY-MM
+                            aggregateStats.monthlyHours[month] = (aggregateStats.monthlyHours[month] || 0) + hours;
+                        });
+                    });
+
+                    // Calcola medie
+                    const avgHoursPerWorker = aggregateStats.totalHours / workers.length;
+                    const avgPresencesPerWorker = aggregateStats.totalPresences / workers.length;
+
+                    return React.createElement('div', { className: 'space-y-6 mt-6' },
+                        
+                        // === SEZIONE TITOLO ===
+                        React.createElement('div', { className: `${cardClass} rounded-xl shadow-lg p-6` },
+                            React.createElement('h2', {
+                                className: `text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                            }, '📊 Statistiche Globali Lavoratori')
+                        ),
+
+                        // === KPI CARDS ===
+                        React.createElement('div', { className: 'grid grid-cols-2 lg:grid-cols-4 gap-4' },
+                            [
+                                { icon: '👷', label: 'Lavoratori Totali', value: aggregateStats.totalWorkers, color: 'blue' },
+                                { icon: '⏰', label: 'Ore Totali', value: `${aggregateStats.totalHours.toFixed(1)}h`, color: 'green' },
+                                { icon: '📈', label: 'Media Ore/Lavoratore', value: `${avgHoursPerWorker.toFixed(1)}h`, color: 'purple' },
+                                { icon: '📅', label: 'Presenze Totali', value: aggregateStats.totalPresences, color: 'orange' }
+                            ].map((kpi, idx) =>
+                                React.createElement('div', {
+                                    key: idx,
+                                    className: `${cardClass} rounded-xl shadow-lg p-6 border-l-4 border-${kpi.color}-500 animate-fade-in`,
+                                    style: { animationDelay: `${idx * 100}ms` }
+                                },
+                                    React.createElement('div', { className: 'flex items-center justify-between mb-2' },
+                                        React.createElement('span', { className: 'text-3xl' }, kpi.icon)
+                                    ),
+                                    React.createElement('p', { className: `text-sm ${textClass} mb-1` }, kpi.label),
+                                    React.createElement('p', {
+                                        className: `text-3xl font-bold text-${kpi.color}-600 dark:text-${kpi.color}-400`
+                                    }, kpi.value)
+                                )
+                            )
+                        ),
+
+                        // === TOP 10 LAVORATORI - BAR CHART ===
+                        (() => {
+                            const { TopItemsBarChart } = window.AdvancedCharts || {};
+                            if (!TopItemsBarChart) return null;
+
+                            const topWorkers = Object.entries(aggregateStats.workerHours)
+                                .sort(([,a], [,b]) => b - a)
+                                .slice(0, 10)
+                                .map(([normalizedName, hours]) => ({
+                                    name: workerDisplayNames.get(normalizedName) || normalizedName, // USA NOME CON MAIUSCOLE
+                                    value: parseFloat(hours.toFixed(1))
+                                }));
+
+                            return React.createElement(TopItemsBarChart, {
+                                data: topWorkers,
+                                darkMode,
+                                title: '🏆 Top 10 Lavoratori per Ore Totali'
+                            });
+                        })(),
+
+                        // === TOP AZIENDE - BAR CHART ===
+                        (() => {
+                            const { TopItemsBarChart } = window.AdvancedCharts || {};
+                            if (!TopItemsBarChart || Object.keys(aggregateStats.companyHours).length === 0) return null;
+
+                            const topCompanies = Object.entries(aggregateStats.companyHours)
+                                .sort(([,a], [,b]) => b - a)
+                                .slice(0, 8)
+                                .map(([name, hours]) => ({
+                                    name,
+                                    value: parseFloat(hours.toFixed(1))
+                                }));
+
+                            return React.createElement(TopItemsBarChart, {
+                                data: topCompanies,
+                                darkMode,
+                                title: '🏢 Top Aziende per Ore Lavorate'
+                            });
+                        })(),
+
+                        // === DISTRIBUZIONE ORE PER AZIENDA - PIE CHART ===
+                        (() => {
+                            const { DistributionPieChart } = window.AdvancedCharts || {};
+                            if (!DistributionPieChart || Object.keys(aggregateStats.companyHours).length === 0) return null;
+
+                            const companyDistribution = Object.entries(aggregateStats.companyHours)
+                                .sort(([,a], [,b]) => b - a)
+                                .slice(0, 6)
+                                .map(([name, hours]) => ({
+                                    name,
+                                    value: parseFloat(hours.toFixed(1))
+                                }));
+
+                            return React.createElement(DistributionPieChart, {
+                                data: companyDistribution,
+                                darkMode,
+                                title: '🎯 Distribuzione Ore per Azienda (Top 6)'
+                            });
+                        })(),
+
+                        // === MESSAGGIO SE NON CI SONO ATTIVITÀ ===
+                        (() => {
+                            if (Object.keys(aggregateStats.activityHours).length > 0) return null;
+                            
+                            return React.createElement('div', {
+                                className: `${cardClass} rounded-xl shadow-lg p-8 text-center`
+                            },
+                                React.createElement('div', { className: 'text-6xl mb-4' }, '🎨'),
+                                React.createElement('h3', {
+                                    className: `text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                                }, 'Nessun Tipo di Attività Registrato'),
+                                React.createElement('p', {
+                                    className: `${textClass} mb-4`
+                                }, 'I fogli ore non hanno tipi di attività assegnati.'),
+                                React.createElement('p', {
+                                    className: `text-sm ${textClass}`
+                                }, 'Vai in "Modifica Fogli" e aggiungi i tipi di attività ai fogli archiviati per vedere le statistiche.')
+                            );
+                        })(),
+
+                        // === TIPI DI ATTIVITÀ - BAR CHART ===
+                        (() => {
+                            const { TopItemsBarChart } = window.AdvancedCharts || {};
+                            const activityTypes = window.activityTypes || [];
+                            if (!TopItemsBarChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
+
+                            const activityBarData = Object.entries(aggregateStats.activityHours)
+                                .map(([activityId, hours]) => {
+                                    const activity = activityTypes.find(a => a.id === activityId);
+                                    // USA .nome e .emoji dalle impostazioni
+                                    const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                                    
+                                    return {
+                                        name: activityName,
+                                        value: parseFloat(hours.toFixed(1))
+                                    };
+                                })
+                                .sort((a, b) => b.value - a.value)
+                                .slice(0, 10);
+
+                            return React.createElement(TopItemsBarChart, {
+                                data: activityBarData,
+                                darkMode,
+                                title: '🎨 Ore per Tipo di Attività (Top 10)'
+                            });
+                        })(),
+
+                        // === TIPI DI ATTIVITÀ - PIE CHART ===
+                        (() => {
+                            const { DistributionPieChart } = window.AdvancedCharts || {};
+                            const activityTypes = window.activityTypes || [];
+                            if (!DistributionPieChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
+
+                            const activityPieData = Object.entries(aggregateStats.activityHours)
+                                .map(([activityId, hours]) => {
+                                    const activity = activityTypes.find(a => a.id === activityId);
+                                    // USA .nome e .emoji dalle impostazioni
+                                    const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                                    
+                                    return {
+                                        name: activityName,
+                                        value: parseFloat(hours.toFixed(1))
+                                    };
+                                })
+                                .sort((a, b) => b.value - a.value)
+                                .slice(0, 8);
+
+                            return React.createElement(DistributionPieChart, {
+                                data: activityPieData,
+                                darkMode,
+                                title: '📊 Distribuzione Percentuale Tipi di Attività'
+                            });
+                        })(),
+
+                        // === TIPI DI ATTIVITÀ - RADAR CHART ===
+                        (() => {
+                            const { PerformanceRadarChart } = window.AdvancedCharts || {};
+                            const activityTypes = window.activityTypes || [];
+                            if (!PerformanceRadarChart || Object.keys(aggregateStats.activityHours).length === 0) return null;
+
+                            const maxActivityHours = Math.max(...Object.values(aggregateStats.activityHours), 1);
+
+                            const activityData = Object.entries(aggregateStats.activityHours)
+                                .map(([activityId, hours]) => {
+                                    const activity = activityTypes.find(a => a.id === activityId);
+                                    // USA .nome e .emoji dalle impostazioni
+                                    const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                                    const percentage = Math.round((hours / maxActivityHours) * 100);
+                                    
+                                    return {
+                                        metric: activityName,
+                                        value: percentage
+                                    };
+                                })
+                                .sort((a, b) => b.value - a.value)
+                                .slice(0, 8);
+
+                            return React.createElement(PerformanceRadarChart, {
+                                data: activityData,
+                                darkMode,
+                                title: '🎯 Performance Tipi di Attività (Radar)'
+                            });
+                        })(),
+
+                        // === TABELLA DETTAGLIATA TIPI DI ATTIVITÀ ===
+                        (() => {
+                            const activityTypes = window.activityTypes || [];
+                            if (Object.keys(aggregateStats.activityHours).length === 0) return null;
+
+                            const totalActivityHours = Object.values(aggregateStats.activityHours).reduce((sum, h) => sum + h, 0);
+
+                            const activityTableData = Object.entries(aggregateStats.activityHours)
+                                .map(([activityId, hours]) => {
+                                    const activity = activityTypes.find(a => a.id === activityId);
+                                    // USA .nome e .emoji dalle impostazioni
+                                    const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                                    const percentage = ((hours / totalActivityHours) * 100).toFixed(1);
+                                    
+                                    // Conta quanti lavoratori hanno fatto questa attività (dal FOGLIO)
+                                    const workersCount = new Set();
+                                    sheets.forEach(sheet => {
+                                        // Controlla se il foglio ha questa attività
+                                        if (sheet.tipoAttivita && Array.isArray(sheet.tipoAttivita) && sheet.tipoAttivita.includes(activityId)) {
+                                            // Aggiungi tutti i lavoratori di questo foglio
+                                            sheet.lavoratori?.forEach(w => {
+                                                workersCount.add(normalizeWorkerName(w.nome, w.cognome));
+                                            });
+                                        }
+                                    });
+                                    
+                                    return {
+                                        name: activityName,
+                                        hours: hours.toFixed(1),
+                                        percentage: percentage,
+                                        workers: workersCount.size
+                                    };
+                                })
+                                .sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours));
+
+                            return React.createElement('div', { className: `${cardClass} rounded-xl shadow-lg p-6` },
+                                React.createElement('h3', {
+                                    className: `text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                                }, '🎨 Dettaglio Tipi di Attività'),
+                                
+                                React.createElement('div', { className: 'overflow-x-auto' },
+                                    React.createElement('table', { className: 'w-full' },
+                                        React.createElement('thead', {},
+                                            React.createElement('tr', {
+                                                className: `border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`
+                                            },
+                                                React.createElement('th', { className: `text-left p-3 ${textClass}` }, '#'),
+                                                React.createElement('th', { className: `text-left p-3 ${textClass}` }, 'Tipo Attività'),
+                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'Ore Totali'),
+                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, '% del Totale'),
+                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'N° Lavoratori')
+                                            )
+                                        ),
+                                        React.createElement('tbody', {},
+                                            activityTableData.map((activity, idx) =>
+                                                React.createElement('tr', {
+                                                    key: idx,
+                                                    className: `border-b ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'} transition-colors`
+                                                },
+                                                    React.createElement('td', { className: 'p-3 font-semibold' }, idx + 1),
+                                                    React.createElement('td', { className: 'p-3' }, activity.name),
+                                                    React.createElement('td', {
+                                                        className: `p-3 text-right font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`
+                                                    }, `${activity.hours}h`),
+                                                    React.createElement('td', {
+                                                        className: `p-3 text-right ${darkMode ? 'text-purple-400' : 'text-purple-600'} font-semibold`
+                                                    }, `${activity.percentage}%`),
+                                                    React.createElement('td', {
+                                                        className: `p-3 text-right ${textClass}`
+                                                    }, activity.workers)
+                                                )
+                                            )
+                                        )
+                                    )
+                                ),
+                                
+                                // Totale
+                                React.createElement('div', {
+                                    className: `mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`
+                                },
+                                    React.createElement('span', { className: 'font-bold' }, 'TOTALE'),
+                                    React.createElement('span', {
+                                        className: `font-bold text-lg ${darkMode ? 'text-green-400' : 'text-green-600'}`
+                                    }, `${totalActivityHours.toFixed(1)}h`)
+                                )
+                            );
+                        })(),
+
+                        // === ANDAMENTO MENSILE - LINE CHART ===
+                        (() => {
+                            const { DailyHoursLineChart } = window.AdvancedCharts || {};
+                            if (!DailyHoursLineChart || Object.keys(aggregateStats.monthlyHours).length === 0) return null;
+
+                            const monthlyData = Object.entries(aggregateStats.monthlyHours)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .slice(-6) // Ultimi 6 mesi
+                                .map(([month, hours]) => ({
+                                    day: month,
+                                    hours: parseFloat(hours.toFixed(1))
+                                }));
+
+                            return React.createElement(DailyHoursLineChart, {
+                                data: monthlyData,
+                                darkMode,
+                                title: '📈 Andamento Ore Mensili (Ultimi 6 Mesi)'
+                            });
+                        })(),
+
+                        // === ORE CUMULATIVE - AREA CHART ===
+                        (() => {
+                            const { CumulativeAreaChart } = window.AdvancedCharts || {};
+                            if (!CumulativeAreaChart || Object.keys(aggregateStats.monthlyHours).length === 0) return null;
+
+                            let cumulative = 0;
+                            const cumulativeData = Object.entries(aggregateStats.monthlyHours)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .slice(-6)
+                                .map(([month, hours]) => {
+                                    cumulative += hours;
+                                    return {
+                                        day: month,
+                                        cumulative: parseFloat(cumulative.toFixed(1))
+                                    };
+                                });
+
+                            return React.createElement(CumulativeAreaChart, {
+                                data: cumulativeData,
+                                darkMode,
+                                title: '📊 Ore Cumulative (Ultimi 6 Mesi)'
+                            });
+                        })(),
+
+                        // === TABELLA TOP PERFORMERS ===
+                        React.createElement('div', { className: `${cardClass} rounded-xl shadow-lg p-6` },
+                            React.createElement('h3', {
+                                className: `text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                            }, '🏆 Top 15 Lavoratori'),
+                            
+                            React.createElement('div', { className: 'overflow-x-auto' },
+                                React.createElement('table', { className: 'w-full' },
+                                    React.createElement('thead', {},
+                                        React.createElement('tr', {
+                                            className: `border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`
+                                        },
+                                            React.createElement('th', { className: `text-left p-3 ${textClass}` }, '#'),
+                                            React.createElement('th', { className: `text-left p-3 ${textClass}` }, 'Lavoratore'),
+                                            React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'Ore Totali'),
+                                            React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'Media/Presenza')
+                                        )
+                                    ),
+                                    React.createElement('tbody', {},
+                                        Object.entries(aggregateStats.workerHours)
+                                            .sort(([,a], [,b]) => b - a)
+                                            .slice(0, 15)
+                                            .map(([normalizedName, hours], idx) => {
+                                                // Conta presenze per questo lavoratore
+                                                let presences = 0;
+                                                sheets.forEach(sheet => {
+                                                    sheet.lavoratori?.forEach(w => {
+                                                        if (normalizeWorkerName(w.nome, w.cognome) === normalizedName) {
+                                                            presences++;
+                                                        }
+                                                    });
+                                                });
+                                                const avgPerPresence = presences > 0 ? hours / presences : 0;
+                                                
+                                                // USA NOME CON MAIUSCOLE
+                                                const displayName = workerDisplayNames.get(normalizedName) || normalizedName;
+
+                                                return React.createElement('tr', {
+                                                    key: idx,
+                                                    className: `border-b ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'} transition-colors`
+                                                },
+                                                    React.createElement('td', { className: 'p-3 font-semibold' }, idx + 1),
+                                                    React.createElement('td', { className: 'p-3' }, displayName),
+                                                    React.createElement('td', {
+                                                        className: `p-3 text-right font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`
+                                                    }, `${hours.toFixed(1)}h`),
+                                                    React.createElement('td', {
+                                                        className: `p-3 text-right ${textClass}`
+                                                    }, `${avgPerPresence.toFixed(1)}h`)
+                                                );
+                                            })
+                                    )
+                                )
+                            )
+                        )
+                    );
+                })()}
             </div>
         );
     }
@@ -276,46 +913,282 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                 ))}
             </div>
 
-            {/* Monthly Trend */}
-            {Object.keys(stats.monthlyTrend).length > 0 && (
-                <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6 animate-fade-in`} style={{ animationDelay: '400ms' }}>
-                    <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
-                        <span>📈</span> {t.monthlyTrend}
-                    </h3>
-                    <div className="space-y-3">
-                        {Object.entries(stats.monthlyTrend)
-                            .sort(([a], [b]) => b.localeCompare(a))
-                            .slice(0, 6)
-                            .map(([month, hours], i) => {
-                                const maxHours = Math.max(...Object.values(stats.monthlyTrend));
-                                const percentage = maxHours > 0 ? (hours / maxHours) * 100 : 0;
-                                
-                                return (
-                                    <div key={month} className="flex items-center gap-3">
-                                        <span className={`font-semibold w-20 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                            {month}
-                                        </span>
-                                        <div className="flex-1 relative">
-                                            <div className={`rounded-full h-6 overflow-hidden ${
-                                                darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                                            }`}>
-                                                <div 
-                                                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-6 rounded-full transition-all duration-1000 ease-out flex items-center justify-center text-white text-xs sm:text-sm font-semibold"
-                                                    style={{ 
-                                                        width: `${percentage}%`,
-                                                        minWidth: hours > 0 ? '40px' : '0px'
-                                                    }}
-                                                >
-                                                    {hours.toFixed(1)}h
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                    </div>
-                </div>
-            )}
+            {/* Monthly Trend - Grafico Recharts */}
+            {Object.keys(stats.monthlyTrend).length > 0 && (() => {
+                const { DailyHoursLineChart } = window.AdvancedCharts || {};
+                if (!DailyHoursLineChart) return null;
+                
+                // Prepara dati ultimi 3 mesi
+                const monthlyData = Object.entries(stats.monthlyTrend)
+                    .sort(([a], [b]) => b.localeCompare(a))
+                    .slice(0, 3)
+                    .reverse()
+                    .map(([month, hours]) => ({
+                        day: month,
+                        hours: parseFloat(hours.toFixed(1))
+                    }));
+                
+                return React.createElement(DailyHoursLineChart, {
+                    data: monthlyData,
+                    darkMode,
+                    title: `📈 ${t.monthlyTrend || 'Andamento Mensile'} (ultimi 3 mesi)`
+                });
+            })()}
+
+            {/* 📊 Top Aziende - Bar Chart */}
+            {stats.companies.length > 0 && (() => {
+                const { TopItemsBarChart } = window.AdvancedCharts || {};
+                if (!TopItemsBarChart) return null;
+                
+                // Calcola ore per azienda
+                const companyHours = {};
+                stats.entries.forEach(entry => {
+                    const company = entry.company || 'N/D';
+                    companyHours[company] = (companyHours[company] || 0) + entry.hours;
+                });
+                
+                const companyData = Object.entries(companyHours)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 5)
+                    .map(([name, value]) => ({
+                        name,
+                        value: parseFloat(value.toFixed(1))
+                    }));
+                
+                return React.createElement(TopItemsBarChart, {
+                    data: companyData,
+                    darkMode,
+                    title: `📊 ${t.companiesWorked || 'Aziende'} - Top 5`,
+                    dataKey: 'value',
+                    nameKey: 'name'
+                });
+            })()}
+
+            {/* 🎯 Performance Radar - Metriche Lavoratore */}
+            {(() => {
+                const { PerformanceRadarChart } = window.AdvancedCharts || {};
+                if (!PerformanceRadarChart) return null;
+                
+                // Calcola metriche performance (0-100)
+                const avgHoursPerDay = stats.totalHours / Math.max(stats.totalDays, 1);
+                const productivity = Math.min((avgHoursPerDay / 8) * 100, 100); // Basato su 8h standard
+                const consistency = stats.totalDays > 0 ? Math.min((stats.totalSheets / stats.totalDays) * 100, 100) : 0;
+                const experience = Math.min((stats.totalDays / 30) * 100, 100); // Max 30 giorni
+                const reliability = stats.totalSheets > 0 ? 85 : 0; // Placeholder (può essere calcolato da presenze)
+                
+                const performanceData = [
+                    { metric: 'Produttività', value: Math.round(productivity) },
+                    { metric: 'Costanza', value: Math.round(consistency) },
+                    { metric: 'Esperienza', value: Math.round(experience) },
+                    { metric: 'Affidabilità', value: Math.round(reliability) },
+                    { metric: 'Ore Totali', value: Math.min((stats.totalHours / 100) * 100, 100) }
+                ];
+                
+                return React.createElement(PerformanceRadarChart, {
+                    data: performanceData,
+                    darkMode,
+                    title: `🎯 ${t.performance || 'Performance'} ${selectedWorker}`
+                });
+            })()}
+
+            {/* 🎨 Radar Tipi di Attività */}
+            {(() => {
+                const { PerformanceRadarChart } = window.AdvancedCharts || {};
+                const activityTypes = window.activityTypes || [];
+                
+                if (!PerformanceRadarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
+                    // Mostra messaggio se non ci sono attività
+                    return React.createElement('div', {
+                        className: `${cardClass} rounded-xl shadow-lg p-6 text-center animate-fade-in`,
+                        style: { animationDelay: '400ms' }
+                    },
+                        React.createElement('div', { className: 'text-5xl mb-3' }, '🎨'),
+                        React.createElement('h3', {
+                            className: `text-lg font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
+                        }, 'Nessuna Attività Registrata'),
+                        React.createElement('p', {
+                            className: `text-sm ${textClass}`
+                        }, `${selectedWorker} non ha fogli con tipi di attività assegnati.`)
+                    );
+                }
+                
+                // Calcola max ore per normalizzazione
+                const maxHours = Math.max(...Object.values(stats.activityHours), 1);
+                
+                // Mappa ID attività → nome attività
+                const activityData = Object.entries(stats.activityHours)
+                    .map(([activityId, hours]) => {
+                        const activity = activityTypes.find(a => a.id === activityId);
+                        // USA .nome e .emoji dalle impostazioni
+                        const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                        const percentage = Math.round((hours / maxHours) * 100);
+                        
+                        return {
+                            metric: activityName,
+                            value: percentage
+                        };
+                    })
+                    .slice(0, 8); // Max 8 attività per leggibilità
+                
+                if (activityData.length === 0) return null;
+                
+                return React.createElement(PerformanceRadarChart, {
+                    data: activityData,
+                    darkMode,
+                    title: `🎨 ${t.activityTypes || 'Tipi di Attività'} - ${selectedWorker}`
+                });
+            })()}
+
+            {/* 📊 BAR CHART - Ore per Tipo di Attività (Lavoratore Singolo) */}
+            {(() => {
+                const { TopItemsBarChart } = window.AdvancedCharts || {};
+                const activityTypes = window.activityTypes || [];
+                
+                if (!TopItemsBarChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
+                    return null;
+                }
+                
+                const activityBarData = Object.entries(stats.activityHours)
+                    .map(([activityId, hours]) => {
+                        const activity = activityTypes.find(a => a.id === activityId);
+                        // USA .nome e .emoji dalle impostazioni
+                        const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                        
+                        return {
+                            name: activityName,
+                            value: parseFloat(hours.toFixed(1))
+                        };
+                    })
+                    .sort((a, b) => b.value - a.value);
+                
+                return React.createElement(TopItemsBarChart, {
+                    data: activityBarData,
+                    darkMode,
+                    title: `🎨 Ore per Tipo di Attività - ${selectedWorker}`
+                });
+            })()}
+
+            {/* 🥧 PIE CHART - Distribuzione Attività (Lavoratore Singolo) */}
+            {(() => {
+                const { DistributionPieChart } = window.AdvancedCharts || {};
+                const activityTypes = window.activityTypes || [];
+                
+                if (!DistributionPieChart || !stats.activityHours || Object.keys(stats.activityHours).length === 0) {
+                    return null;
+                }
+                
+                const activityPieData = Object.entries(stats.activityHours)
+                    .map(([activityId, hours]) => {
+                        const activity = activityTypes.find(a => a.id === activityId);
+                        // USA .nome e .emoji dalle impostazioni
+                        const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                        
+                        return {
+                            name: activityName,
+                            value: parseFloat(hours.toFixed(1))
+                        };
+                    })
+                    .sort((a, b) => b.value - a.value);
+                
+                return React.createElement(DistributionPieChart, {
+                    data: activityPieData,
+                    darkMode,
+                    title: `📊 Distribuzione Percentuale Attività - ${selectedWorker}`
+                });
+            })()}
+
+            {/* 📋 TABELLA DETTAGLIATA ATTIVITÀ (Lavoratore Singolo) */}
+            {(() => {
+                const activityTypes = window.activityTypes || [];
+                
+                if (!stats.activityHours || Object.keys(stats.activityHours).length === 0) {
+                    return null;
+                }
+                
+                const totalActivityHours = Object.values(stats.activityHours).reduce((sum, h) => sum + h, 0);
+                
+                const activityTableData = Object.entries(stats.activityHours)
+                    .map(([activityId, hours]) => {
+                        const activity = activityTypes.find(a => a.id === activityId);
+                        // USA .nome e .emoji dalle impostazioni
+                        const activityName = activity ? `${activity.emoji || '📋'} ${activity.nome}` : `Attività #${activityId}`;
+                        const percentage = ((hours / totalActivityHours) * 100).toFixed(1);
+                        
+                        // Conta quante volte ha fatto questa attività
+                        let count = 0;
+                        stats.entries.forEach(entry => {
+                            if (entry.tipoAttivita === activityId) {
+                                count++;
+                            }
+                        });
+                        
+                        return {
+                            name: activityName,
+                            hours: hours.toFixed(1),
+                            percentage: percentage,
+                            count: count
+                        };
+                    })
+                    .sort((a, b) => parseFloat(b.hours) - parseFloat(a.hours));
+                
+                return React.createElement('div', {
+                    className: `${cardClass} rounded-xl shadow-lg p-4 sm:p-6 animate-fade-in`,
+                    style: { animationDelay: '450ms' }
+                },
+                    React.createElement('h3', {
+                        className: `text-lg sm:text-xl font-bold mb-4 flex items-center gap-2`
+                    }, 
+                        React.createElement('span', {}, '🎨'),
+                        ` Dettaglio Attività - ${selectedWorker}`
+                    ),
+                    
+                    React.createElement('div', { className: 'overflow-x-auto' },
+                        React.createElement('table', { className: 'w-full text-sm sm:text-base' },
+                            React.createElement('thead', {},
+                                React.createElement('tr', {
+                                    className: `border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`
+                                },
+                                    React.createElement('th', { className: `text-left p-2 sm:p-3 ${textClass}` }, '#'),
+                                    React.createElement('th', { className: `text-left p-2 sm:p-3 ${textClass}` }, 'Tipo Attività'),
+                                    React.createElement('th', { className: `text-right p-2 sm:p-3 ${textClass}` }, 'Ore'),
+                                    React.createElement('th', { className: `text-right p-2 sm:p-3 ${textClass}` }, '%'),
+                                    React.createElement('th', { className: `text-right p-2 sm:p-3 ${textClass}` }, 'N° Volte')
+                                )
+                            ),
+                            React.createElement('tbody', {},
+                                activityTableData.map((activity, idx) =>
+                                    React.createElement('tr', {
+                                        key: idx,
+                                        className: `border-b ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-100 hover:bg-gray-50'} transition-colors`
+                                    },
+                                        React.createElement('td', { className: 'p-2 sm:p-3 font-semibold' }, idx + 1),
+                                        React.createElement('td', { className: 'p-2 sm:p-3' }, activity.name),
+                                        React.createElement('td', {
+                                            className: `p-2 sm:p-3 text-right font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`
+                                        }, `${activity.hours}h`),
+                                        React.createElement('td', {
+                                            className: `p-2 sm:p-3 text-right ${darkMode ? 'text-purple-400' : 'text-purple-600'} font-semibold`
+                                        }, `${activity.percentage}%`),
+                                        React.createElement('td', {
+                                            className: `p-2 sm:p-3 text-right ${textClass}`
+                                        }, activity.count)
+                                    )
+                                )
+                            )
+                        )
+                    ),
+                    
+                    // Totale
+                    React.createElement('div', {
+                        className: `mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center flex-wrap gap-2`
+                    },
+                        React.createElement('span', { className: 'font-bold text-sm sm:text-base' }, 'TOTALE ORE ATTIVITÀ'),
+                        React.createElement('span', {
+                            className: `font-bold text-lg sm:text-xl ${darkMode ? 'text-green-400' : 'text-green-600'}`
+                        }, `${totalActivityHours.toFixed(1)}h (100%)`)
+                    )
+                );
+            })()}
 
             {/* Companies */}
             {stats.companies.length > 0 && (

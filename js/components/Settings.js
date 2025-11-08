@@ -23,13 +23,13 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
     // Submenu collapse states
     const [expandedSection, setExpandedSection] = React.useState('general'); // 'general', 'notifications', 'calendar', 'privacy', 'termsOfService', 'backup', 'audit', 'advanced'
     
-    // GDPR Privacy Notice
-    const [gdprText, setGdprText] = React.useState('');
+    // GDPR Privacy Notice (default placeholder - can be edited and saved to Firestore)
+    const [gdprText, setGdprText] = React.useState(`Informativa sulla privacy (versione predefinita)\n\nQuesto servizio è fornito da Apostu Marius Iulian (contatto: mapostu.04@gmail.com).\n\nFinalità: i dati inseriti dai lavoratori (nome, orari, firma e campi facoltativi) sono utilizzati esclusivamente per la registrazione delle ore e la generazione del documento di riepilogo.\n\nArchiviazione: i dati sono memorizzati in un database Firebase gestito dal proprietario dell'app. I dati vengono conservati finché necessario per lo scopo dichiarato o finché non vengono rimossi manualmente dall'amministratore.\n\nNessun valore legale: questo servizio è fornito a scopo informativo; i documenti generati non hanno valore legale certificato.\n\nPer richieste, cancellazione o rettifica dati contattare: mapostu.04@gmail.com`);
     const [editingGdpr, setEditingGdpr] = React.useState(false);
     const [loadingGdpr, setLoadingGdpr] = React.useState(true);
 
-    // Terms of Service
-    const [tosText, setTosText] = React.useState('');
+    // Terms of Service (default placeholder - can be edited and saved to Firestore)
+    const [tosText, setTosText] = React.useState(`Termini di Servizio (versione predefinita)\n\nProprietario e contatti: Apostu Marius Iulian - mapostu.04@gmail.com\n\nUso dell'app: l'app permette ai lavoratori di registrare orari e firme per creare un riepilogo delle ore lavorate. I dati inseriti sono salvati su Firebase e l'app è ospitata pubblicamente su GitHub.\n\nAccettazione: compilando e inviando il modulo, il lavoratore dichiara di aver preso visione di questi Termini e accetta che i dati siano salvati per le finalità indicate.\n\nLimitazioni: le informazioni fornite tramite l'app sono a scopo informativo e non costituiscono consulenza legale; i documenti prodotti non garantiscono valore legale.\n\nPer domande o richieste contattare: mapostu.04@gmail.com`);
     const [editingTos, setEditingTos] = React.useState(false);
     const [loadingTos, setLoadingTos] = React.useState(true);
 
@@ -117,62 +117,66 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
     // ==================== CHANGELOG ====================
     const changelog = changelogs[language] || changelogs.it;
 
-    // ==================== LOAD SETTINGS ====================
+    // 🚀 OTTIMIZZAZIONE: Batch query per tutti i settings (1 lettura invece di 3+)
     React.useEffect(() => {
         if (!db) return;
         
-        const loadSettings = async () => {
+        const loadAllSettings = async () => {
             try {
-                const doc = await db.collection('settings').doc('linkExpiration').get();
+                // Carica TUTTI i settings in una singola query batch
+                const snapshot = await db.collection('settings').get();
                 
-                if (doc.exists) {
+                snapshot.docs.forEach(doc => {
                     const data = doc.data();
-                    setSettings({
-                        expirationDays: data.expirationDays ?? 1,
-                        notifications: data.notifications || {
-                            enabled: false,
-                            newWorker: true,
-                            sheetCompleted: true,
-                            reminders: false
-                        }
-                    });
-                    if (typeof data.weekStart !== 'undefined' && data.weekStart !== null) {
-                        setWeekStart(Number(data.weekStart));
+                    
+                    switch (doc.id) {
+                        case 'linkExpiration':
+                            setSettings({
+                                expirationDays: data.expirationDays ?? 1,
+                                notifications: data.notifications || {
+                                    enabled: false,
+                                    newWorker: true,
+                                    sheetCompleted: true,
+                                    reminders: false
+                                }
+                            });
+                            if (typeof data.weekStart !== 'undefined' && data.weekStart !== null) {
+                                setWeekStart(Number(data.weekStart));
+                            }
+                            break;
+                            
+                        case 'privacyGDPR':
+                            const gdprRemote = data.text;
+                            if (gdprRemote && String(gdprRemote).trim().length > 0) {
+                                setGdprText(gdprRemote);
+                            } else {
+                                console.log('privacyGDPR present but empty - keeping default in-code GDPR text');
+                            }
+                            setLoadingGdpr(false);
+                            break;
+                            
+                        case 'termsOfService':
+                            const tosRemote = data.text;
+                            if (tosRemote && String(tosRemote).trim().length > 0) {
+                                setTosText(tosRemote);
+                            } else {
+                                console.log('termsOfService present but empty - keeping default in-code ToS text');
+                            }
+                            setLoadingTos(false);
+                            break;
                     }
-                }
+                });
+                
+                console.log('✅ Settings batch loaded - 1 query instead of 3+');
             } catch (error) {
-                console.error('Error loading settings:', error);
+                console.error('Error loading settings batch:', error);
+                setLoadingGdpr(false);
+                setLoadingTos(false);
             }
             setLoading(false);
         };
         
-        loadSettings();
-    }, [db]);
-
-    // Load GDPR
-    React.useEffect(() => {
-        if (!db) return;
-        const loadGdpr = async () => {
-            try {
-                const doc = await db.collection('settings').doc('privacyGDPR').get();
-                if (doc.exists) setGdprText(doc.data().text || '');
-            } catch (e) { console.error('Error loading GDPR text:', e); }
-            setLoadingGdpr(false);
-        };
-        loadGdpr();
-    }, [db]);
-
-    // Load Terms of Service
-    React.useEffect(() => {
-        if (!db) return;
-        const loadTos = async () => {
-            try {
-                const doc = await db.collection('settings').doc('termsOfService').get();
-                if (doc.exists) setTosText(doc.data().text || '');
-            } catch (e) { console.error('Error loading Terms of Service:', e); }
-            setLoadingTos(false);
-        };
-        loadTos();
+        loadAllSettings();
     }, [db]);
 
     // Load Scheduled Notifications
@@ -1150,14 +1154,14 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                                         )
                                     )
                                 ),
-                                React.createElement('div', { className: 'flex gap-2' },
+                                React.createElement('div', { className: 'flex flex-col sm:flex-row gap-2 flex-shrink-0' },
                                     React.createElement('button', {
                                         onClick: () => openEditActivityModal(activity),
-                                        className: 'px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm'
+                                        className: 'px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap'
                                     }, '✏️ ' + (t.edit || 'Modifica')),
                                     React.createElement('button', {
                                         onClick: () => handleDeleteActivity(activity.id),
-                                        className: 'px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm'
+                                        className: 'px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap'
                                     }, '🗑️ ' + (t.delete || 'Elimina'))
                                 )
                             )

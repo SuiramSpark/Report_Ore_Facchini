@@ -106,9 +106,9 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
     let totalHours = 0;
     let completedSheets = 0;
 
-    // Overall counts (not limited to period)
-    const overallTotalSheets = Array.isArray(sheets) ? sheets.length : 0;
-    const overallCompletedSheets = Array.isArray(sheets) ? sheets.filter(s => s.status === 'completed').length : 0;
+    // Overall counts (not limited to period) - exclude archived sheets
+    const overallTotalSheets = Array.isArray(sheets) ? sheets.filter(s => !s.archived).length : 0;
+    const overallCompletedSheets = Array.isArray(sheets) ? sheets.filter(s => s.status === 'completed' && !s.archived).length : 0;
     // Calcolo ore totali effettive su tutti i fogli completati
     let overallTotalHours = 0;
     if (Array.isArray(sheets)) {
@@ -212,6 +212,24 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
     const draftSheets = filtered.filter(s => s.status === 'draft').length;
     const archivedSheets = filtered.filter(s => s.archived).length;
     const totalWorkers = Object.keys(workerMap).length;
+    
+    // 🔧 FIX: Conta TUTTI i lavoratori unici da TUTTI i fogli (non solo periodo selezionato)
+    const allWorkersSet = new Set();
+    const normalizeFunction = window.normalizeWorkerName || ((nome, cognome) => {
+        return `${nome || ''} ${cognome || ''}`.replace(/\s+/g, ' ').trim().toLowerCase();
+    });
+    
+    if (Array.isArray(sheets)) {
+        sheets.forEach(sheet => {
+            if (Array.isArray(sheet.lavoratori)) {
+                sheet.lavoratori.forEach(w => {
+                    const normalized = normalizeFunction(w.nome, w.cognome);
+                    if (normalized) allWorkersSet.add(normalized);
+                });
+            }
+        });
+    }
+    const totalUniqueWorkers = allWorkersSet.size;
 
     // Average daily hours - count only days with hours
     const daysWithHours = Object.values(chartMap).filter(h => h > 0).length;
@@ -245,7 +263,7 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
         weeklyHours: Math.round(totalHours * 10) / 10,
         overallTotalHours,
         avgDailyHours,
-        activeWorkers: totalWorkers,
+        activeWorkers: totalUniqueWorkers, // Usa il conteggio corretto di tutti i lavoratori
         efficiency,
         workerMap,
         chartDayKeys,
@@ -257,7 +275,7 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
 // 📊 DASHBOARD COMPONENT - v4.2 FIXED
 // ========================================
 if (!window.Dashboard) {
-const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
+const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigate, appSettings = {} }) => {
     // Stato per la location meteo (admin)
     // Immediate input value shown in the field
     const defaultCity = (typeof window !== 'undefined' && typeof window.t === 'function') ? window.t('defaultCity') : (t.defaultCity || 'Roma');
@@ -905,8 +923,8 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
 
                     {/* Extra small widget: Unique workers */}
                     <div className={`text-center p-3 rounded-lg shadow-sm border ${darkMode ? 'border-indigo-700' : 'border-transparent'}`}>
-                        <div className={`p-2 rounded-lg ${darkMode ? 'bg-gradient-to-br from-indigo-700 to-indigo-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-indigo-300 text-white'}`} title={`${stats.totalWorkers} ${t.uniqueWorkers || 'Lavoratori unici'}`}>
-                            <div className="text-lg font-bold">{stats.totalWorkers}</div>
+                        <div className={`p-2 rounded-lg ${darkMode ? 'bg-gradient-to-br from-indigo-700 to-indigo-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-indigo-300 text-white'}`} title={`${stats.activeWorkers} ${t.uniqueWorkers || 'Lavoratori unici'}`}>
+                            <div className="text-lg font-bold">{stats.activeWorkers}</div>
                             <div className="text-xs opacity-90 mt-1">{t.uniqueWorkers}</div>
                         </div>
                     </div>
@@ -917,7 +935,9 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                     <div className="flex items-center justify-between">
                         <div>
                             <div className="text-xl font-bold">{stats.weeklyHours}h</div>
-                            <div className="text-xs opacity-90 mt-1">{t.totalHoursPeriod}</div>
+                            <div className="text-xs opacity-90 mt-1">
+                                {t.totalHoursThisMonth || 'Ore totali questo mese'} ({new Date().toLocaleDateString(localeTag, { day: 'numeric', month: 'short' })})
+                            </div>
                         </div>
                         <div className="text-xs text-gray-500">{t.lastUpdated}: {lastDataUpdate.toLocaleTimeString(localeTag)}</div>
                     </div>
@@ -1194,7 +1214,9 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                     return (
                         <div
                             key={i}
-                            className={`${cardClass} p-4 sm:p-6 border-l-4 border-${metric.color}-500 ${animated ? 'animate-fade-in' : ''}`}
+                            onClick={metric.onClick}
+                            className={`${cardClass} p-4 sm:p-6 border-l-4 border-${metric.color}-500 ${animated ? 'animate-fade-in' : ''} 
+                                       ${metric.onClick ? 'cursor-pointer hover:scale-105 hover:shadow-xl transition-all duration-300' : ''}`}
                             style={{ animationDelay: `${i * 150}ms` }}
                         >
                             <div className="flex items-center justify-between mb-3">
@@ -1206,13 +1228,15 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                             <p className={`text-2xl sm:text-3xl font-bold text-${metric.color}-600 dark:text-${metric.color}-400`}>
                                 {metric.value}{metric.suffix || ''}
                             </p>
-                            <div className={`text-xs mt-2 ${textClass}`}>
-                                {/* Small provenance line: number of sheets used + last update time */}
-                                {(() => {
-                                    const sheetsCount = stats.totalSheets || (Array.isArray(sheets) ? sheets.length : 0);
-                                    const updatedAt = new Date().toLocaleTimeString(localeTag);
-                                    return `${t.metricCalculatedOn} ${sheetsCount} ${t.sheets} • ${updatedAt}`;
-                                })()}
+                            <div className={`text-xs mt-2 ${textClass} flex items-center justify-between`}>
+                                <span>
+                                    {(() => {
+                                        const sheetsCount = stats.totalSheets || (Array.isArray(sheets) ? sheets.length : 0);
+                                        const updatedAt = new Date().toLocaleTimeString(localeTag);
+                                        return `${t.metricCalculatedOn} ${sheetsCount} ${t.sheets} • ${updatedAt}`;
+                                    })()}
+                                </span>
+                                {metric.onClick && <span className="text-indigo-500">👆 {t.clickToView || 'Clicca per dettagli'}</span>}
                             </div>
                         </div>
                     );
@@ -1268,6 +1292,108 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
             </div>
 
             {/* ========================================
+                GRAFICI AVANZATI RECHARTS
+                ======================================== */}
+            {(() => {
+                const { DailyHoursLineChart, TopItemsBarChart, DistributionPieChart, CumulativeAreaChart, PerformanceRadarChart } = window.AdvancedCharts || {};
+                if (!DailyHoursLineChart) return null;
+                
+                // Prepara dati per grafici
+                const lineData = stats.chartData.slice(-30).map(d => ({
+                    day: d.label || d.day,
+                    hours: d.hours || 0
+                }));
+                
+                const topCompaniesData = stats.topCompanies.slice(0, 5).map(c => ({
+                    name: c.name,
+                    value: parseFloat(c.hours.toFixed(1))
+                }));
+                
+                const topWorkersData = stats.topWorkers.slice(0, 5).map(w => ({
+                    name: w.name,
+                    value: parseFloat(w.hours.toFixed(1))
+                }));
+                
+                // Distribuzione status fogli
+                const statusData = [
+                    { name: t.completed || 'Completati', value: stats.completedSheets },
+                    { name: t.draft || 'Bozze', value: stats.draftSheets },
+                    { name: t.archived || 'Archiviati', value: stats.archivedSheets }
+                ].filter(s => s.value > 0);
+                
+                // Dati cumulativi
+                let cumulative = 0;
+                const cumulativeData = lineData.map(d => {
+                    cumulative += d.hours;
+                    return {
+                        day: d.day,
+                        cumulative: parseFloat(cumulative.toFixed(1))
+                    };
+                });
+                
+                // 🎨 Aggregazione ore per tipo di attività (tutti i fogli)
+                const activityHoursMap = {};
+                sheets.forEach(sheet => {
+                    if (sheet.archiviato) return; // Salta fogli archiviati
+                    
+                    const hours = window.calculateTotalHours 
+                        ? window.calculateTotalHours(sheet.oreLavorate || {})
+                        : 0;
+                    
+                    if (sheet.tipoAttivita && Array.isArray(sheet.tipoAttivita)) {
+                        sheet.tipoAttivita.forEach(activityId => {
+                            activityHoursMap[activityId] = (activityHoursMap[activityId] || 0) + hours;
+                        });
+                    }
+                });
+                
+                // Crea dati radar per attività
+                const maxActivityHours = Math.max(...Object.values(activityHoursMap), 1);
+                const activityRadarData = Object.entries(activityHoursMap)
+                    .map(([activityId, hours]) => {
+                        const activity = appSettings.tipiAttivita?.find(a => a.id === activityId);
+                        const activityName = activity ? `${activity.emoji || ''} ${activity.nome || activityId}` : `Attività #${activityId}`;
+                        const percentage = Math.round((hours / maxActivityHours) * 100);
+                        
+                        return {
+                            metric: activityName,
+                            value: percentage
+                        };
+                    })
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 8); // Max 8 attività
+                
+                return React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+                    React.createElement(DailyHoursLineChart, {
+                        data: lineData,
+                        darkMode,
+                        title: `📈 ${t.dailyTrend || 'Andamento Giornaliero'} (ultimi 30 giorni)`
+                    }),
+                    React.createElement(TopItemsBarChart, {
+                        data: topCompaniesData,
+                        darkMode,
+                        title: `🏢 ${t.topCompanies || 'Top Aziende'}`
+                    }),
+                    React.createElement(TopItemsBarChart, {
+                        data: topWorkersData,
+                        darkMode,
+                        title: `👷 ${t.topWorkers || 'Top Lavoratori'}`
+                    }),
+                    React.createElement(DistributionPieChart, {
+                        data: statusData,
+                        darkMode,
+                        title: `🥧 ${t.sheetsDistribution || 'Distribuzione Fogli'}`
+                    }),
+                    // Radar Tipi di Attività (se ci sono dati)
+                    activityRadarData.length > 0 ? React.createElement(PerformanceRadarChart, {
+                        data: activityRadarData,
+                        darkMode,
+                        title: `🎨 ${t.activityTypes || 'Tipi di Attività'} - Distribuzione Ore`
+                    }) : null
+                );
+            })()}
+
+            {/* ========================================
                 TABELLA E WIDGETS
                 ======================================== */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1292,15 +1418,10 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
             {/* ========================================
                 WIDGETS AGGIUNTIVI
                 ======================================== */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
                 <div className={`${cardClass} p-4 sm:p-6`}>
                     <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>🏆 {t.topWorkers || 'Top lavoratori'}</h3>
                     {renderTopWorkers({ hideTitle: true })}
-                </div>
-
-                <div className={`${cardClass} p-4 sm:p-6`}>
-                    <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>🕐 {t.hourlyDistribution || 'Distribuzione oraria'}</h3>
-                    {renderHourlyChart({ hideTitle: true })}
                 </div>
             </div>
 
@@ -1308,35 +1429,35 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1 }) => {
                 STATISTICHE AGGIUNTIVE
                 ======================================== */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6">
-                {/* Stat: Total Sheets */}
+                {/* Stat: Total Sheets (Overall - non-archived) */}
                 <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `800ms` }}>
                     <div className="text-2xl mb-2">📋</div>
-                    <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totalSheets}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.overallTotalSheets}</div>
                     <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.totalSheets}</div>
                 </div>
-                {/* Stat: Draft Sheets */}
+                {/* Stat: Draft Sheets (Overall) */}
                 <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `900ms` }}>
                     <div className="text-2xl mb-2">✏️</div>
-                    <div className="text-xl sm:text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.draftSheets}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-yellow-600 dark:text-yellow-400">{Array.isArray(sheets) ? sheets.filter(s => s.status === 'draft').length : 0}</div>
                     <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.inDraft}</div>
                 </div>
-                {/* Stat: Archived Sheets */}
+                {/* Stat: Archived Sheets (Overall) */}
                 <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `1000ms` }}>
                     <div className="text-2xl mb-2">📦</div>
-                    <div className="text-xl sm:text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.archivedSheets}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-gray-600 dark:text-gray-400">{Array.isArray(sheets) ? sheets.filter(s => s.archived === true).length : 0}</div>
                     <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.archivedSheets}</div>
                 </div>
-                {/* Stat: Total Workers */}
+                {/* Stat: Total Unique Workers (Overall) */}
                 <div className={`${cardClass} p-4 text-center ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `1100ms` }}>
                     <div className="text-2xl mb-2">👷</div>
-                    <div className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.totalWorkers}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.activeWorkers}</div>
                     <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{t.totalWorkers}</div>
                 </div>
-                {/* Stat: All-Time Hours (NEW) */}
+                {/* Stat: All-Time Hours (Overall completed sheets) */}
                 <div className={`${cardClass} p-4 text-center border-2 border-green-500 bg-green-50 dark:bg-green-900/30 ${animated ? 'animate-fade-in' : ''}`} style={{ animationDelay: `1200ms` }}>
                     <div className="text-2xl mb-2">⏳</div>
                     <div className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-300">{stats.overallTotalHours}h</div>
-                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{t.totalHoursAllTime || 'Ore totali (tutti i fogli)'}</div>
+                    <div className={`text-sm font-semibold mt-2 ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{t.totalHoursAllTime || 'Ore totali (fogli completati)'}</div>
                 </div>
             </div>
         </div>

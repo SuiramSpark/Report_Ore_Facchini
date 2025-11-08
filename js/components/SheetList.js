@@ -8,13 +8,17 @@ const translations = window.translations;
 const { getStatusBadge, formatDate, generatePDF } = window;
 
 if (!window.SheetList) {
-// Sheet List Component - robust version with local state and safe lookups
+// Sheet List Component - 🚀 OTTIMIZZATO con paginazione lazy load
 const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () => {}, onArchiveSheet = () => {}, darkMode = false, language = 'it', companyLogo }) => {
     // Usa la funzione globale per normalizzare nome e cognome
     const normalizeWorkerName = window.normalizeWorkerName;
     // Local UI state
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // 🚀 OTTIMIZZAZIONE: Paginazione lazy load (20 items per pagina)
+    const [displayLimit, setDisplayLimit] = useState(20);
+    const ITEMS_PER_PAGE = 20;
 
     // Safe translations lookup (fall back to Italian or empty object)
     // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
@@ -57,17 +61,39 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
             arr = arr.filter(s => {
                 // Normalizza responsabile (nome+cognome)
                 const normResp = normalizeWorkerName(s.responsabile, '');
+                
+                // 🔢 Search by sheet number (#001, #14, 014, etc)
+                const sheetNumStr = s.sheetNumber ? String(s.sheetNumber).padStart(3, '0') : '';
+                const searchNum = q.replace('#', ''); // Remove # if present
+                
                 return (
                     (s.titoloAzienda || '').toLowerCase().includes(q) ||
                     normResp.includes(q) ||
                     ((s.location || s.localita || '') + '').toLowerCase().includes(q) ||
-                    ((s.indirizzoEvento || '') + '').toLowerCase().includes(q)
+                    ((s.indirizzoEvento || '') + '').toLowerCase().includes(q) ||
+                    sheetNumStr.includes(searchNum) || // Match sheet number
+                    String(s.sheetNumber || '').includes(searchNum) // Match raw number
                 );
             });
         }
 
         return arr;
     }, [sheets, filter, searchTerm]);
+    
+    // 🚀 Displayed sheets (con limite paginazione)
+    const displayedSheets = useMemo(() => {
+        return filteredSheets.slice(0, displayLimit);
+    }, [filteredSheets, displayLimit]);
+    
+    // Funzione per caricare altri items
+    const loadMore = () => {
+        setDisplayLimit(prev => prev + ITEMS_PER_PAGE);
+    };
+    
+    // Reset limit quando cambiano filtri
+    React.useEffect(() => {
+        setDisplayLimit(ITEMS_PER_PAGE);
+    }, [filter, searchTerm]);
 
     return (
         <div>
@@ -136,11 +162,17 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
             </div>
             <p className={`${textClass} text-sm sm:text-base px-2`}>
                 {filteredSheets.length} {filteredSheets.length === 1 ? (t.sheets ? t.sheets.slice(0,-1) : 'Sheet') : (t.sheets ? t.sheets.toLowerCase() : 'sheets')}
+                {displayedSheets.length < filteredSheets.length && (
+                    <span className="text-blue-500 ml-2">
+                        (showing {displayedSheets.length} of {filteredSheets.length})
+                    </span>
+                )}
             </p>
             {/* Sheets List */}
             {filteredSheets.length > 0 ? (
+                <>
                 <div className="grid grid-cols-1 gap-3">
-                    {filteredSheets.map(sheet => {
+                    {displayedSheets.map(sheet => {
                         // Determina colore bordo sinistro basato su stato
                         let borderColor = 'border-l-yellow-500'; // Default: draft
                         if (sheet.archived || sheet.status === 'archived') {
@@ -158,6 +190,14 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
                                     {/* Sheet Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                            {/* 🔢 Sheet Number Badge */}
+                                            {sheet.sheetNumber && (
+                                                <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                                                    darkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                                                }`}>
+                                                    #{String(sheet.sheetNumber).padStart(3, '0')}
+                                                </span>
+                                            )}
                                             <h3 className="text-base sm:text-lg font-bold truncate">
                                                 {sheet.titoloAzienda || t.company || 'Company'}
                                             </h3>
@@ -173,6 +213,34 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
                                                     ✍️ {t.responsibleSignature || 'Signature'}
                                                 </p>
                                             )}
+                                            {/* Authorization Badges */}
+                                            {(sheet.orarioStimatoDa || sheet.orarioStimatoA) && (() => {
+                                                const delayAuthorized = sheet.lavoratori?.filter(w => w.ritardoIngressoAutorizzato === true) || [];
+                                                const earlyAuthorized = sheet.lavoratori?.filter(w => w.uscitaAnticipoAutorizzata === true) || [];
+                                                
+                                                if (delayAuthorized.length === 0 && earlyAuthorized.length === 0) return null;
+                                                
+                                                return (
+                                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                                        {delayAuthorized.length > 0 && (
+                                                            <span 
+                                                                className="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-500 text-white"
+                                                                title={delayAuthorized.map(w => `${w.nome}: ${w.noteRitardoIngresso || 'Autorizzato'}`).join('\n')}
+                                                            >
+                                                                ⏰ {delayAuthorized.length} {t.authorizedDelays || 'Ritardi Autorizzati'}
+                                                            </span>
+                                                        )}
+                                                        {earlyAuthorized.length > 0 && (
+                                                            <span 
+                                                                className="px-2 py-0.5 rounded-md text-xs font-semibold bg-purple-500 text-white"
+                                                                title={earlyAuthorized.map(w => `${w.nome}: ${w.noteUscitaAnticipo || 'Autorizzato'}`).join('\n')}
+                                                            >
+                                                                🏃 {earlyAuthorized.length} {t.authorizedEarlyExits || 'Uscite Anticipate'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                     {/* Actions */}
@@ -254,6 +322,23 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
                         );
                     })}
                 </div>
+                
+                {/* 🚀 Load More Button */}
+                {displayedSheets.length < filteredSheets.length && (
+                    <div className="mt-4 text-center">
+                        <button
+                            onClick={loadMore}
+                            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                darkMode 
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                            }`}
+                        >
+                            📥 {t.loadMore || 'Carica altri'} ({filteredSheets.length - displayedSheets.length} {t.remaining || 'rimanenti'})
+                        </button>
+                    </div>
+                )}
+                </>
             ) : (
                 <div className={`${cardClass} rounded-xl shadow-lg p-8 sm:p-12 text-center`}>
                     <p className="text-4xl sm:text-5xl mb-4">📋</p>

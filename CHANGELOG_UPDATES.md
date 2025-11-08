@@ -4,6 +4,84 @@ Questo file tiene traccia di tutti gli aggiornamenti e modifiche apportate all'a
 
 ---
 
+## 🗓️ 08 Novembre 2025 - v4.3
+
+### 🎯 OTTIMIZZAZIONE DASHBOARD E SISTEMA AUTORIZZAZIONI
+
+**Tipo:** Major Feature Update + Data Accuracy Improvements  
+**File modificati:** 
+- `js/components/Dashboard.js` (widget ottimizzati, statistiche corrette)
+- `js/components/WorkerStats.js` (filtri avanzati, grafici attività)
+- `js/components/SheetList.js` (badge autorizzazioni)
+- `js/locales/*.json` (tutte le lingue aggiornate)
+
+**Descrizione:**  
+Miglioramenti sostanziali alle statistiche, sistema di autorizzazioni sincronizzato e filtri avanzati per analisi dati.
+
+**Cambiamenti Principali:**
+
+**1. Sistema Autorizzazioni Sincronizzato** 🔒
+- ✅ **Badge autorizzazioni** visibili in SheetList per TUTTI i fogli (attivi, completati, archiviati)
+- ✅ **Badge ritardi autorizzati** (⏰ colore ambra) con conteggio e tooltip dettagliato
+- ✅ **Badge uscite anticipate** (🏃 colore viola) con nomi lavoratori e note
+- ✅ **Controllo rigoroso** con `=== true` per evitare falsi positivi
+- ✅ **Traduzioni complete** in 5 lingue (IT, EN, RO, ES, FR)
+- **Risultato**: Visibilità completa delle autorizzazioni indipendentemente dallo stato del foglio
+
+**2. Statistiche Dashboard Corrette** 📊
+- ✅ **Fogli completati**: Ora esclude fogli archiviati (5/5 invece di 28/28)
+- ✅ **Lavoratori unici**: Usa conteggio normalizzato globale (12 invece di 7)
+- ✅ **Periodo chiarito**: "Ore totali questo mese (8 nov)" invece di "periodo selezionato"
+- ✅ **Widget globali**: Totale fogli, bozze, archiviati calcolati su tutti i dati
+- ✅ **Ore totali**: 552.5h da tutti i fogli completati (corretto)
+- **Risultato**: Dati accurati e coerenti in tutto il sistema
+
+**3. Filtri Avanzati WorkerStats** 🔍
+- ✅ **Filtro per azienda**: Dropdown dinamico con tutte le aziende
+- ✅ **Filtro per tipo attività**: Dropdown da appSettings.tipiAttivita
+- ✅ **Filtro ore minime/massime**: Input numerici per range ore lavorate
+- ✅ **Filtro date**: Da/A per periodo personalizzato
+- ✅ **Reset filtri**: Pulsante per azzerare tutti i filtri
+- ✅ **Contatore risultati**: Mostra "X lavoratori trovati" in tempo reale
+- **Risultato**: Analisi dati flessibile e potente
+
+**4. Grafici Attività Tipo Dinamici** 📈
+- ✅ **Radar chart attività**: Distribuzione ore per tipo attività con emoji e colori
+- ✅ **Bar chart attività**: Grafico a barre orizzontali con percentuali
+- ✅ **Pie chart attività**: Torta colorata con legenda interattiva
+- ✅ **Tabelle dettagliate**: Globali e per singolo lavoratore
+- ✅ **Nomi dinamici**: Usa `activity.nome` e `activity.emoji` da settings
+- ✅ **Distribuzione equa**: Ore divise tra tutte le attività del foglio
+- **Risultato**: Visualizzazione completa delle tipologie di lavoro svolte
+
+**5. Widget Dashboard Ottimizzato** 🎨
+- ✅ **Widget inutile rimosso**: Eliminato "Distribuzione Oraria" vuoto e confuso
+- ✅ **Layout semplificato**: "Top lavoratori" a tutta larghezza
+- ✅ **Performance widget**: Mostra dati globali invece di periodo filtrato
+- ✅ **Efficienza corretta**: 100% quando tutti i fogli attivi sono completati
+- ✅ **Media giornaliera**: 22.4h calcolata correttamente
+- **Risultato**: Dashboard più chiaro e informativo
+
+**6. Normalizzazione Nomi Lavoratori** 👥
+- ✅ **Conteggio accurato**: Da 7 a 12 lavoratori unici usando `normalizeWorkerName`
+- ✅ **Deduplica efficace**: Set-based per evitare conteggi doppi
+- ✅ **Funzione globale**: `window.normalizeWorkerName` disponibile ovunque
+- **Risultato**: Statistiche lavoratori sempre accurate
+
+**7. Fix Dati Aziende** 🏢
+- ✅ **Campo corretto**: Usa `sheet.titoloAzienda` invece di `sheet.azienda`
+- ✅ **Fallback sicuro**: `titoloAzienda || azienda || 'N/D'`
+- ✅ **Top 6 aziende**: Nomi reali invece di "N/D"
+- **Risultato**: Distribuzioni aziende accurate nei grafici
+
+**Note Tecniche:**
+- Tutte le modifiche mantengono retrocompatibilità
+- Prestazioni ottimizzate con `useMemo` e `JSON.stringify` per dependencies
+- Traduzioni complete in IT, EN, RO, ES, FR
+- Dark mode supportato in tutti i nuovi componenti
+
+---
+
 ## 🗓️ 04 Novembre 2025
 
 ### 🎨 REDESIGN COMPLETO SEZIONE IMPOSTAZIONI + INTEGRAZIONE NOTIFICHE

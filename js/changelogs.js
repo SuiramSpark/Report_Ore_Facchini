@@ -3,6 +3,24 @@
 const changelogs = {
     it: [
         {
+            version: 'v5.2',
+            date: '8 Novembre 2025',
+            changes: [
+                '🔒 NEW: Sistema autorizzazioni orari sincronizzato per tutti i fogli',
+                '⏰ NEW: Badge autorizzazioni ritardi/uscite anticipate in SheetList',
+                '📊 FIX: Statistiche Dashboard corrette (fogli, lavoratori, ore)',
+                '🔍 NEW: Filtri avanzati WorkerStats (azienda, attività, ore, date)',
+                '📈 NEW: Grafici attività tipo dinamici con emoji e colori',
+                '👥 FIX: Conteggio lavoratori unici normalizzato (12 invece di 7)',
+                '🏢 FIX: Distribuzione aziende con nomi reali invece di "N/D"',
+                '🎯 FIX: Widget Performance con dati globali accurati',
+                '⚡ IMPROVED: Performance grafici ottimizzata con useMemo',
+                '🗑️ REMOVED: Widget "Distribuzione Oraria" inutile e vuoto',
+                '🌐 NEW: Traduzioni complete IT/EN/ES/FR/RO per nuove features',
+                '📅 FIX: Periodo chiarito "Ore totali questo mese (8 nov)"'
+            ]
+        },
+        {
             version: 'v5.1',
             date: '4 Novembre 2025',
             changes: [
@@ -46,7 +64,7 @@ const changelogs = {
             changes: [
                 '🌟 NEW: Miglioramenti al sistema di notifiche programmate',
                 '📊 NEW: Statistiche avanzate per lavoratori',
-                '🔒 FIX: Ottimizzazioni di sicurezza per backup e restore',
+                '� FIX: Ottimizzazioni di sicurezza per backup e restore',
                 '🌐 IMPROVED: Traduzioni aggiornate in tutte le lingue supportate'
             ]
         },
@@ -170,6 +188,24 @@ const changelogs = {
         }
     ],
     en: [
+        {
+            version: 'v5.2',
+            date: 'November 8, 2025',
+            changes: [
+                '🔒 NEW: Synchronized schedule authorization system for all sheets',
+                '⏰ NEW: Authorization badges for delays/early exits in SheetList',
+                '📊 FIX: Corrected Dashboard statistics (sheets, workers, hours)',
+                '🔍 NEW: Advanced WorkerStats filters (company, activity, hours, dates)',
+                '📈 NEW: Dynamic activity type charts with emoji and colors',
+                '👥 FIX: Normalized unique workers count (12 instead of 7)',
+                '🏢 FIX: Company distribution with real names instead of "N/A"',
+                '🎯 FIX: Performance widget with accurate global data',
+                '⚡ IMPROVED: Charts performance optimized with useMemo',
+                '🗑️ REMOVED: Useless and empty "Hourly Distribution" widget',
+                '🌐 NEW: Complete translations IT/EN/ES/FR/RO for new features',
+                '📅 FIX: Clarified period "Total hours this month (Nov 8)"'
+            ]
+        },
         {
             version: 'v5.1',
             date: 'November 4, 2025',

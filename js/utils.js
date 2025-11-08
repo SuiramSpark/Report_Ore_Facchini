@@ -1026,6 +1026,7 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
     const entries = [];
     const companies = new Set();
     const monthlyTrend = {};
+    const activityHours = {}; // 🎯 Ore per tipo attività
     let totalHours = 0;
     
     sheets.forEach(sheet => {
@@ -1040,17 +1041,31 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
                     companies.add(sheet.titoloAzienda);
                 }
                 
+                // Prendi tipoAttivita dal FOGLIO (sheet), non dal lavoratore
+                const sheetActivities = sheet.tipoAttivita || [];
+                
                 entries.push({
                     date: sheet.data,
                     company: sheet.titoloAzienda || 'N/A',
                     oraIn: worker.oraIn,
                     oraOut: worker.oraOut,
-                    oreTotali: worker.oreTotali
+                    oreTotali: worker.oreTotali,
+                    hours, // Per calcolo aziende
+                    tipoAttivita: sheetActivities.length > 0 ? sheetActivities[0] : null // Prima attività del foglio
                 });
                 
                 if (sheet.data) {
                     const month = sheet.data.substring(0, 7);
                     monthlyTrend[month] = (monthlyTrend[month] || 0) + hours;
+                }
+                
+                // 🎯 Aggrega ore per tipo attività (dal FOGLIO - array)
+                // Se il foglio ha più attività, distribuisci le ore equamente
+                if (sheet.tipoAttivita && Array.isArray(sheet.tipoAttivita) && sheet.tipoAttivita.length > 0) {
+                    const hoursPerActivity = hours / sheet.tipoAttivita.length;
+                    sheet.tipoAttivita.forEach(activityId => {
+                        activityHours[activityId] = (activityHours[activityId] || 0) + hoursPerActivity;
+                    });
                 }
             }
         });
@@ -1069,7 +1084,10 @@ window.getWorkerDetailedStats = (sheets, normalizedWorkerKey, normalizeFunction)
         avgHours: entries.length > 0 ? (totalHours / entries.length).toFixed(1) : '0.0',
         companies: Array.from(companies),
         monthlyTrend,
-        entries
+        activityHours, // 🎯 Nuovo campo
+        entries,
+        totalDays: entries.length, // Per calcoli performance
+        totalSheets: entries.length
     };
 };
 
