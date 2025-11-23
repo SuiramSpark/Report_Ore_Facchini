@@ -1,5 +1,5 @@
 // Calendar Component - Vista Calendario con FullCalendar
-const Calendar = ({ sheets, darkMode, language = 'it', onSelectSheet }) => {
+const Calendar = ({ sheets, darkMode, language = 'it', onSelectSheet, currentUser }) => {
     const calendarRef = React.useRef(null);
     const [calendar, setCalendar] = React.useState(null);
     
@@ -79,6 +79,10 @@ const Calendar = ({ sheets, darkMode, language = 'it', onSelectSheet }) => {
             },
             events: events,
             eventClick: function(info) {
+                // Worker NON può cliccare sui fogli nel calendario
+                if (currentUser?.role === 'worker') {
+                    return false;
+                }
                 if (onSelectSheet) {
                     onSelectSheet(info.event.extendedProps.sheet);
                 }

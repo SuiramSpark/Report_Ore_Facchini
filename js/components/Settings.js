@@ -1,4 +1,5 @@
-// Settings Component - v4.3 REDESIGNED - Interfaccia Moderna con Submenu Collassabili
+// Settings Component - v4.3 REDESIGNED - Interfaccia Moderna con Submenu Collassabili + COMPANIES & ADDRESSES
+console.log('⚙️ Settings v4.3 loaded - Companies & Addresses sections enabled');
 
 // Helper function for formatDateTime
 function formatDateTime(timestamp) {
@@ -18,7 +19,20 @@ function formatDateTime(timestamp) {
     }
 }
 
-const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, setCompanyLogo, autoArchiveDay = 5, setAutoArchiveDay, auditLog = [], appSettings, setAppSettings }) => {
+const Settings = ({ db, storage, sheets = [], darkMode, language = 'it', companyLogo, setCompanyLogo, companies = [], setCompanies, activeCompanyId, setActiveCompanyId, autoArchiveDay = 5, setAutoArchiveDay, auditLog = [], appSettings, setAppSettings, currentUser, recentAddresses = [] }) => {
+    // Debug: Log current user per verificare visibilità sezione sicurezza
+    console.log('🔍 Settings currentUser:', {
+        id: currentUser?.id,
+        role: currentUser?.role,
+        isPermanent: currentUser?.isPermanent,
+        email: currentUser?.email,
+        shouldShowSecurity: currentUser?.id === 'admin' || (currentUser?.role === 'admin' && !currentUser?.isPermanent)
+    });
+    
+    // ==================== RUOLI ====================
+    const isWorker = currentUser?.role === 'worker';
+    const canModifySettings = !isWorker; // Worker può solo vedere, non modificare
+    
     // ==================== STATI ====================
     // Submenu collapse states
     const [expandedSection, setExpandedSection] = React.useState('general'); // 'general', 'notifications', 'calendar', 'privacy', 'termsOfService', 'backup', 'audit', 'advanced'
@@ -93,6 +107,34 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         emoji: '📋',
         colore: '#3B82F6'
     });
+
+    // Companies Management states
+    const [showCompanyModal, setShowCompanyModal] = React.useState(false);
+    const [editingCompany, setEditingCompany] = React.useState(null);
+    const [companyForm, setCompanyForm] = React.useState({
+        nome: '',
+        logo: '',
+        colore: '#10B981',
+        partitaIva: ''
+    });
+
+    // Addresses Management states
+    const [showAddressModal, setShowAddressModal] = React.useState(false);
+    const [editingAddress, setEditingAddress] = React.useState(null);
+    const [addressForm, setAddressForm] = React.useState({
+        nome: '',
+        indirizzo: '',
+        citta: '',
+        cap: '',
+        provincia: '',
+        emoji: '📍',
+        colore: '#8B5CF6',
+        googleMapsUrl: ''
+    });
+    const [addressTab, setAddressTab] = React.useState('fixed'); // 'fixed' or 'recent'
+
+    // Multi-Company Logo System (companies e activeCompanyId vengono passati come props da app.js)
+    const [loadingCompanies, setLoadingCompanies] = React.useState(false);
 
     // ==================== TRANSLATION HELPER ====================
     const t = new Proxy({}, {
@@ -193,6 +235,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         return () => unsubscribe();
     }, [db]);
 
+    // Companies sono caricati in app.js e passati come props, non caricarli qui
+
     // ==================== SAVE FUNCTIONS ====================
     const saveSettings = async () => {
         if (!db) return;
@@ -258,27 +302,168 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         }
 
         try {
-            const encoder = new TextEncoder();
-            // Hash delle risposte (case-insensitive, trimmed)
-            const answer1Buffer = await crypto.subtle.digest('SHA-256', encoder.encode(securityConfig.answer1.toLowerCase().trim()));
-            const answer2Buffer = await crypto.subtle.digest('SHA-256', encoder.encode(securityConfig.answer2.toLowerCase().trim()));
-            const question1Hash = Array.from(new Uint8Array(answer1Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-            const question2Hash = Array.from(new Uint8Array(answer2Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-            // 💾 Salva in Firebase (le domande in chiaro, le risposte hashate)
-            await db.collection('settings').doc('securityQuestions').set({
+            // 💾 Salva in Firebase (domande e risposte in chiaro per backup admin)
+            const dataToSave = {
+                note: '🔐 Domande di sicurezza per recupero password admin123 - SALVATE IN CHIARO per backup',
                 question1: securityConfig.question1,
                 question2: securityConfig.question2,
-                question1Hash,
-                question2Hash,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+                answer1: securityConfig.answer1,
+                answer2: securityConfig.answer2,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                // Backup leggibile per admin database
+                readableBackup: {
+                    domanda1: securityConfig.question1,
+                    risposta1: securityConfig.answer1,
+                    domanda2: securityConfig.question2,
+                    risposta2: securityConfig.answer2
+                }
+            };
+            
+            console.log('💾 Saving security questions to Firebase:', dataToSave);
+            await db.collection('settings').doc('securityQuestions').set(dataToSave, { merge: true });
+            console.log('✅ Security questions saved successfully!');
 
             showToast('✅ ' + (t.securityQuestionsSaved || 'Domande di sicurezza salvate!'), 'success');
             setSecurityConfig({ question1: '', answer1: '', question2: '', answer2: '' });
         } catch (e) {
             console.error('Error saving security questions:', e);
             showToast('❌ Errore salvataggio', 'error');
+        }
+    };
+
+    // ==================== COMPANIES MANAGEMENT (Multi-Logo System) ====================
+    const addCompany = async (companyName, logoFile) => {
+        if (!db || !storage) {
+            showToast('❌ Database/Storage non disponibile', 'error');
+            return;
+        }
+
+        if (!companyName || !companyName.trim()) {
+            showToast('❌ Inserisci il nome dell\'azienda', 'error');
+            return;
+        }
+
+        try {
+            showToast('⏳ Aggiunta azienda...', 'info');
+            
+            let logoURL = '';
+            let logoPath = '';
+            
+            // Upload logo se presente
+            if (logoFile) {
+                const path = `company-logos/${companyName.trim()}_${Date.now()}.${logoFile.type.split('/')[1]}`;
+                const storageRef = storage.ref(path);
+                const uploadTask = await storageRef.put(logoFile);
+                logoURL = await uploadTask.ref.getDownloadURL();
+                logoPath = path;
+            }
+            
+            // Crea documento company
+            const companyData = {
+                name: companyName.trim(),
+                logoURL: logoURL,
+                logoPath: logoPath,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                isActive: companies.length === 0 // Prima azienda è attiva di default
+            };
+            
+            const docRef = await db.collection('companies').add(companyData);
+            
+            // Se è la prima azienda, impostala come attiva
+            if (companies.length === 0) {
+                setActiveCompanyId(docRef.id);
+            }
+            
+            showToast('✅ Azienda aggiunta con successo', 'success');
+        } catch (error) {
+            console.error('Errore aggiunta azienda:', error);
+            console.error('Error code:', error.code);
+            console.error('Error message:', error.message);
+            showToast(`❌ Errore: ${error.message || 'Errore aggiunta azienda'}`, 'error');
+        }
+    };
+
+    const updateCompany = async (companyId, updates, newLogoFile = null) => {
+        if (!db || !storage) return;
+        
+        try {
+            const updateData = { ...updates };
+            
+            // Upload nuovo logo se presente
+            if (newLogoFile) {
+                const company = companies.find(c => c.id === companyId);
+                
+                // Elimina vecchio logo se esiste
+                if (company?.logoPath) {
+                    try {
+                        await storage.ref(company.logoPath).delete();
+                    } catch (err) {
+                        console.log('Vecchio logo già eliminato');
+                    }
+                }
+                
+                // Upload nuovo logo
+                const path = `company-logos/${updates.name || company.name}_${Date.now()}.${newLogoFile.type.split('/')[1]}`;
+                const uploadTask = await storage.ref(path).put(newLogoFile);
+                updateData.logoURL = await uploadTask.ref.getDownloadURL();
+                updateData.logoPath = path;
+            }
+            
+            await db.collection('companies').doc(companyId).update(updateData);
+            showToast('✅ Azienda aggiornata', 'success');
+        } catch (error) {
+            console.error('Errore aggiornamento azienda:', error);
+            showToast('❌ Errore aggiornamento', 'error');
+        }
+    };
+
+    const deleteCompany = async (companyId) => {
+        if (!db || !storage) return;
+        
+        const company = companies.find(c => c.id === companyId);
+        if (!company) return;
+        
+        if (!confirm(`Eliminare "${company.name}"? Questa azione è irreversibile.`)) return;
+        
+        try {
+            // Elimina logo da Storage
+            if (company.logoPath) {
+                try {
+                    await storage.ref(company.logoPath).delete();
+                } catch (err) {
+                    console.log('Logo già eliminato');
+                }
+            }
+            
+            // Elimina documento
+            await db.collection('companies').doc(companyId).delete();
+            
+            // Se era l'azienda attiva, seleziona la prima disponibile
+            if (activeCompanyId === companyId) {
+                const remaining = companies.filter(c => c.id !== companyId);
+                setActiveCompanyId(remaining.length > 0 ? remaining[0].id : null);
+            }
+            
+            showToast('🗑️ Azienda eliminata', 'info');
+        } catch (error) {
+            console.error('Errore eliminazione azienda:', error);
+            showToast('❌ Errore eliminazione', 'error');
+        }
+    };
+
+    const setActiveCompany = async (companyId) => {
+        setActiveCompanyId(companyId);
+        
+        // Opzionale: salva in Firestore per persistenza tra sessioni
+        if (db) {
+            try {
+                await db.collection('settings').doc('general').set({
+                    activeCompanyId: companyId,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (error) {
+                console.error('Errore salvataggio azienda attiva:', error);
+            }
         }
     };
 
@@ -290,21 +475,17 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         }
 
         try {
-            // Carica hash attuale da Firebase
+            // Carica password attuale da Firebase (in chiaro)
             const authDoc = await db.collection('settings').doc('adminAuth').get();
             if (!authDoc.exists) {
                 showToast('❌ Configurazione autenticazione non trovata', 'error');
                 return;
             }
 
-            const currentHashFromDB = authDoc.data().passwordHash;
+            const currentPasswordFromDB = authDoc.data().password;
 
-            // Verifica password attuale
-            const encoder = new TextEncoder();
-            const currentBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(passwordChange.currentPassword));
-            const currentHash = Array.from(new Uint8Array(currentBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-            if (currentHash !== currentHashFromDB) {
+            // Verifica password attuale (confronto diretto)
+            if (passwordChange.currentPassword !== currentPasswordFromDB) {
                 showToast('❌ ' + (t.wrongPassword || 'Password attuale errata'), 'error');
                 return;
             }
@@ -320,13 +501,11 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                 return;
             }
 
-            // Genera nuovo hash
-            const newBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(passwordChange.newPassword));
-            const newHash = Array.from(new Uint8Array(newBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-            // 💾 Salva in Firebase
+            // 💾 Salva in Firebase (password in chiaro per admin123 di sistema)
             await db.collection('settings').doc('adminAuth').set({
-                passwordHash: newHash,
+                note: 'Password default: admin123 - CAMBIARLA SUBITO!',
+                password: passwordChange.newPassword,
+                passwordHash: '240be51bfabd2724ddb6f04ee61da59674f8d7e031c08c8f',
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedVia: 'settings'
             }, { merge: true });
@@ -602,6 +781,264 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         setShowActivityModal(true);
     };
 
+    // ==================== COMPANIES MANAGEMENT ====================
+    const handleAddCompany = async () => {
+        if (!companyForm.nome.trim()) {
+            showToast('⚠️ Nome azienda obbligatorio', 'warning');
+            return;
+        }
+
+        try {
+            const companyData = {
+                name: companyForm.nome.trim(),
+                logoURL: companyForm.logo || '',
+                logoPath: '',
+                color: companyForm.colore,
+                partitaIva: companyForm.partitaIva.trim(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                isActive: companies.length === 0
+            };
+            
+            const docRef = await db.collection('companies').add(companyData);
+            
+            // Se è la prima azienda, impostala come attiva
+            if (companies.length === 0) {
+                setActiveCompanyId(docRef.id);
+            }
+            
+            showToast('✅ Azienda aggiunta', 'success');
+            setShowCompanyModal(false);
+            setCompanyForm({ nome: '', logo: '', colore: '#10B981', partitaIva: '' });
+        } catch (error) {
+            console.error('Error adding company:', error);
+            showToast('❌ Errore durante l\'aggiunta', 'error');
+        }
+    };
+
+    const handleEditCompany = async () => {
+        if (!companyForm.nome.trim()) {
+            showToast('⚠️ Nome azienda obbligatorio', 'warning');
+            return;
+        }
+
+        try {
+            const updateData = {
+                name: companyForm.nome.trim(),
+                logoURL: companyForm.logo || '',
+                color: companyForm.colore,
+                partitaIva: companyForm.partitaIva.trim()
+            };
+            
+            await db.collection('companies').doc(editingCompany.id).update(updateData);
+            
+            showToast('✅ Azienda aggiornata', 'success');
+            setShowCompanyModal(false);
+            setEditingCompany(null);
+            setCompanyForm({ nome: '', logo: '', colore: '#10B981', partitaIva: '' });
+        } catch (error) {
+            console.error('Error updating company:', error);
+            showToast('❌ Errore durante l\'aggiornamento', 'error');
+        }
+    };
+
+    const handleDeleteCompany = async (companyId) => {
+        const company = companies.find(c => c.id === companyId);
+        if (!company) return;
+        
+        if (!confirm(`⚠️ Eliminare "${company.name}"? Questa azione è irreversibile.`)) {
+            return;
+        }
+
+        try {
+            // Elimina logo da Storage se presente
+            if (company.logoPath && storage) {
+                try {
+                    await storage.ref(company.logoPath).delete();
+                } catch (err) {
+                    console.log('Logo già eliminato o non presente');
+                }
+            }
+            
+            // Elimina documento dalla collezione companies
+            await db.collection('companies').doc(companyId).delete();
+            
+            // Se era l'azienda attiva, seleziona la prima disponibile
+            if (activeCompanyId === companyId) {
+                const remaining = companies.filter(c => c.id !== companyId);
+                setActiveCompanyId(remaining.length > 0 ? remaining[0].id : null);
+            }
+            
+            showToast('✅ Azienda eliminata', 'success');
+        } catch (error) {
+            console.error('Error deleting company:', error);
+            showToast('❌ Errore durante l\'eliminazione', 'error');
+        }
+    };
+
+    const openAddCompanyModal = () => {
+        setCompanyForm({ nome: '', logo: '', colore: '#10B981', partitaIva: '' });
+        setEditingCompany(null);
+        setShowCompanyModal(true);
+    };
+
+    const openEditCompanyModal = (company) => {
+        setCompanyForm({ 
+            nome: company.name || company.nome || '', 
+            logo: company.logoURL || company.logo || '', 
+            colore: company.color || company.colore || '#10B981', 
+            partitaIva: company.partitaIva || '' 
+        });
+        setEditingCompany(company);
+        setShowCompanyModal(true);
+    };
+
+    // ==================== ADDRESSES MANAGEMENT ====================
+    const handleAddAddress = async () => {
+        if (!addressForm.nome.trim() || !addressForm.indirizzo.trim()) {
+            showToast('⚠️ Nome e indirizzo obbligatori', 'warning');
+            return;
+        }
+
+        const addressId = Date.now().toString();
+        const newAddress = {
+            name: addressForm.nome.trim(),
+            street: addressForm.indirizzo.trim(),
+            city: addressForm.citta.trim(),
+            zipCode: addressForm.cap.trim(),
+            province: addressForm.provincia.trim(),
+            emoji: addressForm.emoji,
+            color: addressForm.colore,
+            googleMapsUrl: addressForm.googleMapsUrl.trim(),
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            await db.collection('addresses').doc(addressId).set(newAddress);
+            showToast('✅ Indirizzo aggiunto', 'success');
+            setShowAddressModal(false);
+            setAddressForm({ nome: '', indirizzo: '', citta: '', cap: '', provincia: '', emoji: '📍', colore: '#8B5CF6', googleMapsUrl: '' });
+        } catch (error) {
+            console.error('Error adding address:', error);
+            showToast('❌ Errore durante l\'aggiunta', 'error');
+        }
+    };
+
+    const handleEditAddress = async () => {
+        if (!addressForm.nome.trim() || !addressForm.indirizzo.trim()) {
+            showToast('⚠️ Nome e indirizzo obbligatori', 'warning');
+            return;
+        }
+
+        const updatedAddress = {
+            name: addressForm.nome.trim(),
+            street: addressForm.indirizzo.trim(),
+            city: addressForm.citta.trim(),
+            zipCode: addressForm.cap.trim(),
+            province: addressForm.provincia.trim(),
+            emoji: addressForm.emoji,
+            color: addressForm.colore,
+            googleMapsUrl: addressForm.googleMapsUrl.trim()
+        };
+
+        try {
+            await db.collection('addresses').doc(editingAddress.id).update(updatedAddress);
+            showToast('✅ Indirizzo aggiornato', 'success');
+            setShowAddressModal(false);
+            setEditingAddress(null);
+            setAddressForm({ nome: '', indirizzo: '', citta: '', cap: '', provincia: '', emoji: '📍', colore: '#8B5CF6', googleMapsUrl: '' });
+        } catch (error) {
+            console.error('Error updating address:', error);
+            showToast('❌ Errore durante l\'aggiornamento', 'error');
+        }
+    };
+
+    const handleDeleteAddress = async (addressId) => {
+        if (!confirm('⚠️ Eliminare questo indirizzo?')) {
+            return;
+        }
+
+        try {
+            await db.collection('addresses').doc(addressId).delete();
+            showToast('✅ Indirizzo eliminato', 'success');
+        } catch (error) {
+            console.error('Error deleting address:', error);
+            showToast('❌ Errore durante l\'eliminazione', 'error');
+        }
+    };
+
+    const openAddAddressModal = () => {
+        setAddressForm({ nome: '', indirizzo: '', citta: '', cap: '', provincia: '', emoji: '📍', colore: '#8B5CF6', googleMapsUrl: '' });
+        setEditingAddress(null);
+        setShowAddressModal(true);
+    };
+
+    const openEditAddressModal = (address) => {
+        // Map NEW system fields (street, city, zipCode) to form fields (indirizzo, citta, cap)
+        setAddressForm({ 
+            nome: address.name || address.nome || '',
+            indirizzo: address.street || address.indirizzo || '', 
+            citta: address.city || address.citta || '', 
+            cap: address.zipCode || address.cap || '', 
+            provincia: address.province || address.provincia || '', 
+            emoji: address.emoji || '📍', 
+            colore: address.color || address.colore || '#8B5CF6', 
+            googleMapsUrl: address.googleMapsUrl || '' 
+        });
+        setEditingAddress(address);
+        setShowAddressModal(true);
+    };
+
+    const generateGoogleMapsUrl = () => {
+        const fullAddress = `${addressForm.indirizzo}, ${addressForm.cap} ${addressForm.citta}${addressForm.provincia ? ` (${addressForm.provincia})` : ''}`;
+        const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+        setAddressForm({ ...addressForm, googleMapsUrl: url });
+        showToast('✅ Link Google Maps generato', 'success');
+    };
+
+    // Salva indirizzo recente come fisso
+    const saveRecentAsFixed = async (recentAddress) => {
+        const addressName = prompt('📍 Dai un nome a questo indirizzo:', recentAddress.address.substring(0, 30));
+        if (!addressName || !addressName.trim()) return;
+
+        try {
+            const newAddress = {
+                name: addressName.trim(),
+                street: recentAddress.address,
+                city: '',
+                zipCode: '',
+                province: '',
+                emoji: '📍',
+                color: '#8B5CF6',
+                googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(recentAddress.address)}`,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                source: 'promoted'
+            };
+
+            await db.collection('addresses').add(newAddress);
+            
+            // Elimina da recentAddresses per evitare duplicati
+            await db.collection('recentAddresses').doc(recentAddress.id).delete();
+            
+            showToast('✅ Indirizzo salvato come fisso', 'success');
+        } catch (error) {
+            console.error('Error promoting address:', error);
+            showToast('❌ Errore durante il salvataggio', 'error');
+        }
+    };
+
+    // Elimina indirizzo recente
+    const deleteRecentAddress = async (recentId) => {
+        if (!confirm('⚠️ Eliminare questo indirizzo recente?')) return;
+
+        try {
+            await db.collection('recentAddresses').doc(recentId).delete();
+            showToast('✅ Indirizzo recente eliminato', 'success');
+        } catch (error) {
+            console.error('Error deleting recent address:', error);
+            showToast('❌ Errore durante l\'eliminazione', 'error');
+        }
+    };
+
     // ==================== HELPER COMPONENTS ====================
     const SectionHeader = ({ icon, title, sectionKey, count }) => (
         <button
@@ -673,6 +1110,14 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             ),
             React.createElement('p', { className: textClass + ' mt-2' },
                 t.settingsDescription || 'Configura l\'applicazione secondo le tue esigenze'
+            ),
+            // Worker View-Only Warning
+            isWorker && React.createElement('div', { 
+                className: `mt-4 p-3 rounded-lg ${darkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} border-2`
+            },
+                React.createElement('p', { className: `text-sm font-semibold ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}` },
+                    '👁️ Modalità Solo Visualizzazione - Non puoi modificare le impostazioni'
+                )
             )
         ),
 
@@ -685,48 +1130,6 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             }),
             
             expandedSection === 'general' && React.createElement('div', { className: 'p-4 space-y-6 animate-fade-in' },
-                // Logo aziendale
-                React.createElement('div', {},
-                    React.createElement('h3', { className: subSectionHeaderClass }, 
-                        '🏢 ' + (t.companyLogo || 'Logo Aziendale')
-                    ),
-                    React.createElement('div', { className: 'flex flex-col sm:flex-row items-center gap-4' },
-                        companyLogo && React.createElement('img', { 
-                            src: companyLogo, 
-                            alt: 'Company Logo',
-                            className: 'w-32 h-32 object-contain border-2 rounded-lg ' + (darkMode ? 'border-gray-600' : 'border-gray-300')
-                        }),
-                        React.createElement('div', { className: 'flex-1 w-full' },
-                            React.createElement('input', {
-                                type: 'file',
-                                accept: 'image/*',
-                                onChange: (e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                        const reader = new FileReader();
-                                        reader.onload = (event) => {
-                                            const logo = event.target.result;
-                                            setCompanyLogo(logo);
-                                            localStorage.setItem('companyLogo', logo);
-                                            showToast('✅ Logo caricato', 'success');
-                                        };
-                                        reader.readAsDataURL(file);
-                                    }
-                                },
-                                className: inputClass + ' p-2 rounded border w-full'
-                            }),
-                            companyLogo && React.createElement('button', {
-                                onClick: () => {
-                                    setCompanyLogo(null);
-                                    localStorage.removeItem('companyLogo');
-                                    showToast('🗑️ Logo rimosso', 'info');
-                                },
-                                className: 'mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors w-full sm:w-auto'
-                            }, '🗑️ ' + (t.removeLogo || 'Rimuovi Logo'))
-                        )
-                    )
-                ),
-
                 // Scadenza link
                 React.createElement('div', {},
                     React.createElement('h3', { className: subSectionHeaderClass }, 
@@ -752,8 +1155,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     )
                 ),
 
-                // Save button
-                React.createElement('button', {
+                // Save button (solo se può modificare)
+                canModifySettings && React.createElement('button', {
                     onClick: saveSettings,
                     disabled: saving,
                     className: 'w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-bold text-lg transition-colors shadow-lg'
@@ -761,8 +1164,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )
         ),
 
-        // ========== SEZIONE: NOTIFICHE ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        // ========== SEZIONE: NOTIFICHE ========== (NON per worker)
+        !isWorker && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '🔔', 
                 title: t.notificationSettings || 'Notifiche', 
@@ -963,8 +1366,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     )
                 ),
 
-                // Auto-archiviazione
-                React.createElement('div', {},
+                // Auto-archiviazione (solo Manager e Admin)
+                window.hasRoleAccess(currentUser, 'settings.modify') && React.createElement('div', {},
                     React.createElement('h3', { className: subSectionHeaderClass },
                         '📦 ' + (t.autoArchiveLabel || 'Auto-Archiviazione')
                     ),
@@ -989,8 +1392,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     )
                 ),
 
-                // Save button
-                React.createElement('button', {
+                // Save button (solo se può modificare)
+                canModifySettings && React.createElement('button', {
                     onClick: saveSettings,
                     disabled: saving,
                     className: 'w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-bold text-lg transition-colors shadow-lg'
@@ -998,8 +1401,8 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )
         ),
 
-        // ========== SEZIONE: PRIVACY ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        // ========== SEZIONE: PRIVACY ========== (solo Manager e Admin)
+        window.hasRoleAccess(currentUser, 'settings.modify') && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '🔒', 
                 title: t.privacySettings || 'Privacy & GDPR', 
@@ -1052,8 +1455,31 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )
         ),
 
-        // ========== SEZIONE: TERMINI DI SERVIZIO ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        // ========== SEZIONE: GDPR (View-Only per Worker) ==========
+        isWorker && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '🔒', 
+                title: 'Privacy & GDPR', 
+                sectionKey: 'privacy' 
+            }),
+            
+            expandedSection === 'privacy' && React.createElement('div', { className: 'p-4 space-y-4 animate-fade-in' },
+                React.createElement('h3', { className: subSectionHeaderClass },
+                    '📜 Informativa Privacy'
+                ),
+                React.createElement('div', { 
+                    className: `p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`,
+                    style: { maxHeight: '200px', overflowY: 'auto' }
+                },
+                    React.createElement('p', { className: textClass, style: { whiteSpace: 'pre-wrap' } },
+                        gdprText || 'Nessuna informativa configurata'
+                    )
+                )
+            )
+        ),
+
+        // ========== SEZIONE: TERMINI DI SERVIZIO ========== (solo Manager e Admin)
+        window.hasRoleAccess(currentUser, 'settings.modify') && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '📜', 
                 title: t.termsOfService || 'Termini di Servizio', 
@@ -1106,8 +1532,31 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )
         ),
 
+        // ========== SEZIONE: TERMINI DI SERVIZIO (View-Only per Worker) ==========
+        isWorker && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '📜', 
+                title: 'Termini di Servizio', 
+                sectionKey: 'termsOfService' 
+            }),
+            
+            expandedSection === 'termsOfService' && React.createElement('div', { className: 'p-4 space-y-4 animate-fade-in' },
+                React.createElement('h3', { className: subSectionHeaderClass },
+                    '📋 Termini e Condizioni'
+                ),
+                React.createElement('div', { 
+                    className: `p-4 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`,
+                    style: { maxHeight: '200px', overflowY: 'auto' }
+                },
+                    React.createElement('p', { className: textClass, style: { whiteSpace: 'pre-wrap' } },
+                        tosText || 'Nessun termine configurato'
+                    )
+                )
+            )
+        ),
+
         // ========== SEZIONE: TIPI ATTIVITÀ ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-3 sm:p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '🏷️', 
                 title: t.manageActivityTypes || 'Gestione Tipi Attività', 
@@ -1115,15 +1564,15 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                 count: appSettings?.tipiAttivita?.length || 0
             }),
             
-            expandedSection === 'activityTypes' && React.createElement('div', { className: 'p-4 space-y-6 animate-fade-in' },
-                // Header con pulsante aggiungi
-                React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+            expandedSection === 'activityTypes' && React.createElement('div', { className: 'p-3 sm:p-4 space-y-4 sm:space-y-6 animate-fade-in' },
+                // Header con pulsante aggiungi (solo se non worker)
+                React.createElement('div', { className: 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4' },
                     React.createElement('h3', { className: subSectionHeaderClass },
                         '🎯 ' + (t.activityTypes || 'Tipi di Attività')
                     ),
-                    React.createElement('button', {
+                    canModifySettings && React.createElement('button', {
                         onClick: openAddActivityModal,
-                        className: 'px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2'
+                        className: 'w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 min-h-[44px]'
                     }, '➕ ' + (t.addActivityType || 'Aggiungi Attività'))
                 ),
 
@@ -1137,16 +1586,16 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                         ...(appSettings?.tipiAttivita || []).map(activity =>
                             React.createElement('div', { 
                                 key: activity.id,
-                                className: `flex items-center justify-between p-4 rounded-lg border-2 transition-all ${darkMode ? 'bg-gray-700/50 border-gray-600 hover:border-gray-500' : 'bg-white border-gray-200 hover:border-gray-300'}`,
+                                className: `flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border-2 transition-all ${darkMode ? 'bg-gray-700/50 border-gray-600 hover:border-gray-500' : 'bg-white border-gray-200 hover:border-gray-300'}`,
                                 style: { borderLeftWidth: '6px', borderLeftColor: activity.colore }
                             },
-                                React.createElement('div', { className: 'flex items-center gap-3' },
+                                React.createElement('div', { className: 'flex items-center gap-3 w-full sm:w-auto' },
                                     React.createElement('span', { 
-                                        className: 'text-3xl',
+                                        className: 'text-2xl sm:text-3xl',
                                         style: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }
                                     }, activity.emoji),
-                                    React.createElement('div', {},
-                                        React.createElement('p', { className: 'font-semibold ' + (darkMode ? 'text-gray-100' : 'text-gray-900') }, 
+                                    React.createElement('div', { className: 'flex-1' },
+                                        React.createElement('p', { className: 'font-semibold text-sm sm:text-base ' + (darkMode ? 'text-gray-100' : 'text-gray-900') }, 
                                             activity.nome
                                         ),
                                         React.createElement('p', { className: 'text-xs ' + textClass },
@@ -1154,14 +1603,14 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                                         )
                                     )
                                 ),
-                                React.createElement('div', { className: 'flex flex-col sm:flex-row gap-2 flex-shrink-0' },
+                                canModifySettings && React.createElement('div', { className: 'flex flex-row gap-2 w-full sm:w-auto flex-shrink-0' },
                                     React.createElement('button', {
                                         onClick: () => openEditActivityModal(activity),
-                                        className: 'px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap'
+                                        className: 'flex-1 sm:flex-none px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
                                     }, '✏️ ' + (t.edit || 'Modifica')),
                                     React.createElement('button', {
                                         onClick: () => handleDeleteActivity(activity.id),
-                                        className: 'px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap'
+                                        className: 'flex-1 sm:flex-none px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
                                     }, '🗑️ ' + (t.delete || 'Elimina'))
                                 )
                             )
@@ -1170,11 +1619,221 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
             )
         ),
 
-        // ========== SEZIONE: SICUREZZA (NUOVA) ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        // ========== SEZIONE: GESTIONE AZIENDE ==========
+        window.hasRoleAccess(currentUser, 'settings.companies') && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-3 sm:p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '🏢', 
+                title: 'Gestione Aziende', 
+                sectionKey: 'companies',
+                count: companies.length || 0
+            }),
+            
+            expandedSection === 'companies' && React.createElement('div', { className: 'p-3 sm:p-4 space-y-4 sm:space-y-6 animate-fade-in' },
+                React.createElement('div', { className: 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4' },
+                    React.createElement('h3', { className: subSectionHeaderClass },
+                        '🏢 Aziende Configurate'
+                    ),
+                    canModifySettings && React.createElement('button', {
+                        onClick: openAddCompanyModal,
+                        className: 'w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 min-h-[44px]'
+                    }, '➕ Aggiungi Azienda')
+                ),
+
+                companies.length === 0
+                    ? React.createElement('div', { className: `p-8 rounded-lg border-2 border-dashed text-center ${darkMode ? 'border-gray-600 bg-gray-700/30' : 'border-gray-300 bg-gray-50'}` },
+                        React.createElement('p', { className: textClass + ' text-lg mb-2' }, '🏢'),
+                        React.createElement('p', { className: textClass }, 'Nessuna azienda configurata')
+                    )
+                    : React.createElement('div', { className: 'space-y-3' },
+                        ...companies.map(company =>
+                            React.createElement('div', { 
+                                key: company.id,
+                                className: `flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border-2 transition-all ${darkMode ? 'bg-gray-700/50 border-gray-600 hover:border-gray-500' : 'bg-white border-gray-200 hover:border-gray-300'}`,
+                                style: { borderLeftWidth: '6px', borderLeftColor: company.color || company.colore || '#10B981' }
+                            },
+                                React.createElement('div', { className: 'flex items-center gap-3 w-full sm:w-auto' },
+                                    (company.logoURL || company.logo) && React.createElement('img', { 
+                                        src: company.logoURL || company.logo,
+                                        alt: company.name || company.nome,
+                                        className: 'w-10 h-10 sm:w-12 sm:h-12 rounded object-cover flex-shrink-0'
+                                    }),
+                                    React.createElement('div', { className: 'flex-1 min-w-0' },
+                                        React.createElement('p', { className: 'font-semibold text-sm sm:text-base truncate ' + (darkMode ? 'text-gray-100' : 'text-gray-900') }, 
+                                            company.name || company.nome
+                                        ),
+                                        company.partitaIva && React.createElement('p', { className: 'text-xs truncate ' + textClass },
+                                            'P.IVA: ' + company.partitaIva
+                                        )
+                                    )
+                                ),
+                                canModifySettings && React.createElement('div', { className: 'flex flex-row gap-2 w-full sm:w-auto flex-shrink-0' },
+                                    React.createElement('button', {
+                                        onClick: () => openEditCompanyModal(company),
+                                        className: 'flex-1 sm:flex-none px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                    }, '✏️ Modifica'),
+                                    React.createElement('button', {
+                                        onClick: () => handleDeleteCompany(company.id),
+                                        className: 'flex-1 sm:flex-none px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                    }, '🗑️ Elimina')
+                                )
+                            )
+                        )
+                    )
+            )
+        ),
+
+        // ========== SEZIONE: GESTIONE INDIRIZZI ==========
+        window.hasRoleAccess(currentUser, 'settings.addresses') && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-3 sm:p-4 space-y-3' },
+            React.createElement(SectionHeader, { 
+                icon: '📍', 
+                title: 'Gestione Indirizzi', 
+                sectionKey: 'addresses',
+                count: appSettings?.addresses?.length || 0
+            }),
+            
+            expandedSection === 'addresses' && React.createElement('div', { className: 'p-3 sm:p-4 space-y-4 sm:space-y-6 animate-fade-in' },
+                // Tab Selector
+                React.createElement('div', { className: 'flex gap-2 mb-4 border-b overflow-x-auto ' + (darkMode ? 'border-gray-700' : 'border-gray-200') },
+                    React.createElement('button', {
+                        onClick: () => setAddressTab('fixed'),
+                        className: `px-3 sm:px-4 py-2 font-semibold text-sm sm:text-base whitespace-nowrap transition-colors ${addressTab === 'fixed' ? 'border-b-2 border-indigo-600 text-indigo-600' : textClass}`
+                    }, '📌 Fissi (' + ((appSettings?.addresses || []).length) + ')'),
+                    React.createElement('button', {
+                        onClick: () => setAddressTab('recent'),
+                        className: `px-3 sm:px-4 py-2 font-semibold text-sm sm:text-base whitespace-nowrap transition-colors ${addressTab === 'recent' ? 'border-b-2 border-indigo-600 text-indigo-600' : textClass}`
+                    }, '🕒 Recenti (' + (recentAddresses.length) + ')')
+                ),
+                
+                // Tab Content
+                addressTab === 'fixed' ? React.createElement(React.Fragment, null,
+                    React.createElement('div', { className: 'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4' },
+                        React.createElement('h3', { className: subSectionHeaderClass },
+                            '📌 Indirizzi Fissi'
+                        ),
+                        window.hasRoleAccess(currentUser, 'settings.addresses.modify') && React.createElement('button', {
+                            onClick: openAddAddressModal,
+                            className: 'w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 min-h-[44px]'
+                        }, '➕ Aggiungi Indirizzo')
+                    ),
+
+                (appSettings?.addresses || []).length === 0
+                    ? React.createElement('div', { className: `p-8 rounded-lg border-2 border-dashed text-center ${darkMode ? 'border-gray-600 bg-gray-700/30' : 'border-gray-300 bg-gray-50'}` },
+                        React.createElement('p', { className: textClass + ' text-lg mb-2' }, '📍'),
+                        React.createElement('p', { className: textClass }, 'Nessun indirizzo configurato')
+                    )
+                    : React.createElement('div', { className: 'space-y-3' },
+                        ...(appSettings?.addresses || []).map(address =>
+                            React.createElement('div', { 
+                                key: address.id,
+                                className: `flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-lg border-2 transition-all ${darkMode ? 'bg-gray-700/50 border-gray-600 hover:border-gray-500' : 'bg-white border-gray-200 hover:border-gray-300'}`,
+                                style: { borderLeftWidth: '6px', borderLeftColor: address.color || address.colore }
+                            },
+                                React.createElement('div', { className: 'flex items-start gap-3 flex-1 w-full sm:w-auto' },
+                                    React.createElement('span', { 
+                                        className: 'text-2xl sm:text-3xl flex-shrink-0',
+                                        style: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }
+                                    }, address.emoji),
+                                    React.createElement('div', { className: 'flex-1 min-w-0' },
+                                        React.createElement('p', { className: 'font-semibold text-sm sm:text-base ' + (darkMode ? 'text-gray-100' : 'text-gray-900') }, 
+                                            address.name || address.nome
+                                        ),
+                                        React.createElement('p', { className: 'text-xs break-words ' + textClass },
+                                            `${address.street || address.indirizzo}, ${address.zipCode || address.cap} ${address.city || address.citta}${(address.province || address.provincia) ? ` (${address.province || address.provincia})` : ''}`
+                                        )
+                                    ),
+                                    address.googleMapsUrl && React.createElement('a', {
+                                        href: address.googleMapsUrl,
+                                        target: '_blank',
+                                        rel: 'noopener noreferrer',
+                                        className: 'px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs sm:text-sm transition-colors flex-shrink-0 min-h-[44px] flex items-center justify-center'
+                                    }, '🗺️ Maps')
+                                ),
+                                window.hasRoleAccess(currentUser, 'settings.addresses.modify') && React.createElement('div', { className: 'flex flex-row gap-2 w-full sm:w-auto flex-shrink-0' },
+                                    React.createElement('button', {
+                                        onClick: () => openEditAddressModal(address),
+                                        className: 'flex-1 sm:flex-none px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                    }, '✏️ Modifica'),
+                                    React.createElement('button', {
+                                        onClick: () => handleDeleteAddress(address.id),
+                                        className: 'flex-1 sm:flex-none px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                    }, '🗑️ Elimina')
+                                )
+                            )
+                        )
+                    )
+                ) : React.createElement(React.Fragment, null,
+                    // Tab Recenti
+                    React.createElement('div', { className: 'flex flex-col gap-2 mb-4' },
+                        React.createElement('h3', { className: subSectionHeaderClass },
+                            '🕒 Indirizzi Recenti (' + recentAddresses.length + ')'
+                        ),
+                        React.createElement('p', { className: 'text-xs ' + textClass },
+                            'Indirizzi usati nei fogli, salvali come fissi per riutilizzarli'
+                        )
+                    ),
+
+                    recentAddresses.length === 0
+                        ? React.createElement('div', { className: `p-8 rounded-lg border-2 border-dashed text-center ${darkMode ? 'border-gray-600 bg-gray-700/30' : 'border-gray-300 bg-gray-50'}` },
+                            React.createElement('p', { className: textClass + ' text-lg mb-2' }, '🕒'),
+                            React.createElement('p', { className: textClass }, 'Nessun indirizzo recente')
+                        )
+                        : React.createElement('div', { className: 'space-y-3' },
+                            ...recentAddresses.map(recent =>
+                                React.createElement('div', { 
+                                    key: recent.id,
+                                    className: `flex flex-col gap-3 p-3 sm:p-4 rounded-lg border-2 transition-all ${darkMode ? 'bg-gray-700/50 border-gray-600 hover:border-gray-500' : 'bg-white border-gray-200 hover:border-gray-300'}`
+                                },
+                                    React.createElement('div', { className: 'flex items-start gap-3' },
+                                        React.createElement('span', { className: 'text-xl sm:text-2xl flex-shrink-0' }, '🕒'),
+                                        React.createElement('div', { className: 'flex-1 min-w-0' },
+                                            React.createElement('p', { className: 'font-medium text-sm sm:text-base break-words ' + (darkMode ? 'text-gray-100' : 'text-gray-900') }, 
+                                                recent.address
+                                            ),
+                                            React.createElement('p', { className: 'text-xs ' + textClass },
+                                                `Usato ${recent.usedCount} ${recent.usedCount === 1 ? 'volta' : 'volte'}`
+                                            )
+                                        ),
+                                        React.createElement('a', {
+                                            href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(recent.address)}`,
+                                            target: '_blank',
+                                            rel: 'noopener noreferrer',
+                                            className: 'px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs sm:text-sm transition-colors flex-shrink-0 min-h-[44px] flex items-center justify-center'
+                                        }, '🗺️')
+                                    ),
+                                    React.createElement('div', { className: 'flex flex-wrap gap-2' },
+                                        window.hasRoleAccess(currentUser, 'settings.addresses.modify') && React.createElement('button', {
+                                            onClick: () => saveRecentAsFixed(recent),
+                                            className: 'flex-1 sm:flex-none px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                        }, '💾 Salva Fisso'),
+                                        React.createElement('button', {
+                                            onClick: () => {
+                                                const text = `📍 ${recent.address}`;
+                                                if (navigator.share) {
+                                                    navigator.share({ text });
+                                                } else {
+                                                    navigator.clipboard.writeText(text);
+                                                    showToast('📋 Indirizzo copiato!', 'success');
+                                                }
+                                            },
+                                            className: 'flex-1 sm:flex-none px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                        }, '🔗 Condividi'),
+                                        window.hasRoleAccess(currentUser, 'settings.addresses.modify') && React.createElement('button', {
+                                            onClick: () => deleteRecentAddress(recent.id),
+                                            className: 'flex-1 sm:flex-none px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap min-h-[44px]'
+                                        }, '🗑️')
+                                    )
+                                )
+                            )
+                        )
+                )
+            )
+        ),
+
+        // ========== SEZIONE: SICUREZZA ========== (SOLO per admin123 di sistema - NON per admin users registrati)
+        (currentUser?.id === 'admin' || (currentUser?.role === 'admin' && !currentUser?.isPermanent)) && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '🔐', 
-                title: t.securitySettings || 'Impostazioni di Sicurezza', 
+                title: (t.securitySettings || 'Impostazioni di Sicurezza') + ' (Admin Sistema)', 
                 sectionKey: 'security' 
             }),
             
@@ -1261,14 +1920,14 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                         }, '💾 ' + (t.saveSecurityQuestions || 'Salva Domande di Sicurezza'))
                     ),
                     React.createElement('p', { className: textClass + ' text-xs mt-2' },
-                        '💡 ' + (t.securityQuestionsHint || 'Le risposte saranno salvate in modo sicuro (hash SHA-256)')
+                        '💡 ' + (t.securityQuestionsHint || 'Le domande e risposte saranno salvate in chiaro nel database')
                     )
                 )
             )
         ),
 
-        // ========== SEZIONE: BACKUP & RESTORE ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        // ========== SEZIONE: BACKUP & RESTORE ========== (NON per worker)
+        !isWorker && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '💾', 
                 title: t.backupData || 'Backup & Ripristino', 
@@ -1284,7 +1943,7 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     React.createElement('p', { className: textClass + ' text-sm mb-3' },
                         t.backupDescription || 'Scarica una copia completa di tutti i dati in formato JSON'
                     ),
-                    React.createElement('button', {
+                    (currentUser?.role === 'admin' || currentUser?.role === 'manager') && React.createElement('button', {
                         onClick: handleBackup,
                         disabled: isLoadingBackup,
                         className: 'w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-500 text-white rounded-lg font-semibold transition-colors'
@@ -1301,7 +1960,7 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                         React.createElement('strong', {}, t.warningAttention || 'Attenzione'),
                         ': ' + (t.currentDataWillBeReplaced || 'I dati attuali verranno sostituiti')
                     ),
-                    React.createElement('label', {
+                    (currentUser?.role === 'admin' || currentUser?.role === 'manager') && React.createElement('label', {
                         className: 'w-full px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded-lg font-semibold cursor-pointer inline-block text-center transition-colors'
                     },
                         isLoadingBackup ? '⏳ ' + (t.restoringBackup || 'Ripristino') + '...' : '📥 ' + (t.loadBackup || 'Carica Backup'),
@@ -1374,7 +2033,7 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                         disabled: deletingLogs,
                         className: 'px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded-lg font-semibold transition-colors'
                     }, deletingLogs ? '⏳ ' + (t.deleting || 'Eliminazione') + '...' : `🗑️ ${t.delete || 'Elimina'} (${selectedLogs.length})`),
-                    React.createElement('button', {
+                    currentUser?.role === 'admin' && React.createElement('button', {
                         onClick: clearAuditLog,
                         disabled: clearingAudit,
                         className: 'px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-500 text-white rounded-lg font-semibold transition-colors'
@@ -1395,34 +2054,69 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                             if (auditFilter === 'delete') return action.includes('delete');
                             return true;
                         })
-                        .map((log, index) =>
-                            React.createElement('div', {
+                        .map((log, index) => {
+                            // Traduci l'azione se disponibile
+                            const translatedAction = t[log.action] || log.action;
+                            
+                            // Icona in base al tipo di azione
+                            const getActionIcon = (action) => {
+                                const a = action.toLowerCase();
+                                if (a.includes('create')) return '➕';
+                                if (a.includes('edit') || a.includes('update')) return '✏️';
+                                if (a.includes('delete')) return '🗑️';
+                                if (a.includes('archive')) return '📦';
+                                if (a.includes('blacklist')) return '🚫';
+                                return '📝';
+                            };
+                            
+                            return React.createElement('div', {
                                 key: log.id || index,
                                 onClick: selectMode ? () => toggleLogSelection(log.id) : undefined,
-                                className: `p-3 rounded-lg border ${
+                                className: `p-3 sm:p-4 rounded-lg border-l-4 transition-all ${
                                     selectMode && selectedLogs.includes(log.id)
                                         ? 'border-indigo-500 bg-indigo-900/20'
-                                        : darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50'
-                                } ${selectMode ? 'cursor-pointer hover:border-indigo-400' : ''}`
+                                        : darkMode ? 'border-gray-600 bg-gray-700/50 hover:bg-gray-700' : 'border-gray-300 bg-white hover:bg-gray-50'
+                                } ${selectMode ? 'cursor-pointer hover:border-indigo-400' : ''}`,
+                                style: { 
+                                    borderLeftColor: log.action.toLowerCase().includes('delete') ? '#EF4444' : 
+                                                    log.action.toLowerCase().includes('create') ? '#10B981' : 
+                                                    log.action.toLowerCase().includes('edit') || log.action.toLowerCase().includes('update') ? '#F59E0B' : '#6366F1'
+                                }
                             },
-                                React.createElement('div', { className: 'flex items-start justify-between gap-2' },
-                                    React.createElement('div', { className: 'flex-1' },
-                                        React.createElement('p', { className: 'font-semibold text-sm' }, log.action),
-                                        React.createElement('p', { className: textClass + ' text-xs mt-1' }, log.details),
-                                        React.createElement('p', { className: textClass + ' text-xs mt-1' },
-                                            formatDateTime(log.timestamp?.toDate ? log.timestamp.toDate() : log.timestamp)
+                                React.createElement('div', { className: 'flex items-start justify-between gap-3' },
+                                    React.createElement('div', { className: 'flex-1 min-w-0' },
+                                        React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
+                                            React.createElement('span', { className: 'text-lg flex-shrink-0' }, getActionIcon(log.action)),
+                                            React.createElement('p', { className: 'font-bold text-sm sm:text-base ' + (darkMode ? 'text-white' : 'text-gray-900') }, 
+                                                translatedAction
+                                            )
+                                        ),
+                                        React.createElement('p', { className: textClass + ' text-xs sm:text-sm mb-2 break-words' }, log.details),
+                                        React.createElement('div', { className: 'flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ' + textClass },
+                                            React.createElement('span', { className: 'flex items-center gap-1' },
+                                                React.createElement('span', null, '👤'),
+                                                React.createElement('span', { className: 'font-medium' }, log.user || 'Sistema')
+                                            ),
+                                            log.userRole && React.createElement('span', { className: 'flex items-center gap-1' },
+                                                React.createElement('span', null, '🎭'),
+                                                React.createElement('span', null, log.userRole)
+                                            ),
+                                            React.createElement('span', { className: 'flex items-center gap-1' },
+                                                React.createElement('span', null, '🕒'),
+                                                React.createElement('span', null, formatDateTime(log.timestamp?.toDate ? log.timestamp.toDate() : log.timestamp))
+                                            )
                                         )
                                     ),
                                     selectMode && React.createElement('input', {
                                         type: 'checkbox',
                                         checked: selectedLogs.includes(log.id),
                                         onChange: () => toggleLogSelection(log.id),
-                                        className: 'w-5 h-5 rounded',
+                                        className: 'w-5 h-5 rounded flex-shrink-0 mt-1',
                                         onClick: (e) => e.stopPropagation()
                                     })
                                 )
-                            )
-                        )
+                            );
+                        })
                 ),
 
                 auditLog.length === 0 && React.createElement('div', { 
@@ -1434,7 +2128,7 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
         ),
 
         // ========== SEZIONE: AVANZATE (CHANGELOG) ==========
-        React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
+        window.hasRoleAccess(currentUser, 'settings.advanced') && React.createElement('div', { className: cardClass + ' rounded-xl shadow-lg p-4 space-y-3' },
             React.createElement(SectionHeader, { 
                 icon: '🔧', 
                 title: t.advancedSettings || 'Avanzate', 
@@ -1601,6 +2295,289 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
                     )
                 )
             )
+        ),
+
+        // ========== MODAL: AGGIUNGI/MODIFICA AZIENDA ==========
+        showCompanyModal && React.createElement('div', { 
+            className: 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50',
+            onClick: () => {
+                setShowCompanyModal(false);
+                setEditingCompany(null);
+                setCompanyForm({ nome: '', logo: '', colore: '#10B981', partitaIva: '' });
+            }
+        },
+            React.createElement('div', { 
+                className: `${cardClass} rounded-2xl shadow-2xl p-6 w-full max-w-md animate-fade-in`,
+                onClick: (e) => e.stopPropagation()
+            },
+                React.createElement('div', { className: 'flex items-center justify-between mb-6' },
+                    React.createElement('h2', { className: 'text-2xl font-bold ' + (darkMode ? 'text-gray-100' : 'text-gray-900') },
+                        editingCompany ? '✏️ Modifica Azienda' : '➕ Aggiungi Azienda'
+                    ),
+                    React.createElement('button', {
+                        onClick: () => {
+                            setShowCompanyModal(false);
+                            setEditingCompany(null);
+                            setCompanyForm({ nome: '', logo: '', colore: '#10B981', partitaIva: '' });
+                        },
+                        className: 'text-2xl hover:opacity-70 transition-opacity'
+                    }, '✖️')
+                ),
+                React.createElement('div', { className: 'space-y-4' },
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Nome Azienda *'
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: companyForm.nome,
+                            onChange: (e) => setCompanyForm({ ...companyForm, nome: e.target.value }),
+                            placeholder: 'es. 4MKTG S.r.l.',
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2 focus:ring-2 focus:ring-indigo-500'
+                        })
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Logo (opzionale)'
+                        ),
+                        companyForm.logo && React.createElement('div', { className: 'mb-3 flex items-center gap-3' },
+                            React.createElement('img', { 
+                                src: companyForm.logo,
+                                alt: 'Preview logo',
+                                className: 'w-20 h-20 object-contain rounded border ' + (darkMode ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50')
+                            }),
+                            React.createElement('button', {
+                                onClick: () => setCompanyForm({ ...companyForm, logo: '' }),
+                                className: 'px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors'
+                            }, '🗑️ Rimuovi')
+                        ),
+                        React.createElement('input', {
+                            type: 'file',
+                            accept: 'image/*',
+                            onChange: async (e) => {
+                                const file = e.target.files[0];
+                                if (!file) return;
+                                
+                                // Carica su Firebase Storage
+                                try {
+                                    showToast('⏳ Caricamento logo...', 'info');
+                                    const path = `company-logos/${companyForm.nome.trim() || 'company'}_${Date.now()}.${file.type.split('/')[1]}`;
+                                    const uploadTask = await storage.ref(path).put(file);
+                                    const downloadURL = await uploadTask.ref.getDownloadURL();
+                                    setCompanyForm({ ...companyForm, logo: downloadURL });
+                                    showToast('✅ Logo caricato', 'success');
+                                } catch (error) {
+                                    console.error('Errore upload logo:', error);
+                                    showToast(`❌ ${error.message || 'Errore upload'}`, 'error');
+                                }
+                            },
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-700'
+                        })
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Partita IVA'
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: companyForm.partitaIva,
+                            onChange: (e) => setCompanyForm({ ...companyForm, partitaIva: e.target.value }),
+                            placeholder: 'IT12345678901',
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2'
+                        })
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Colore'
+                        ),
+                        React.createElement('div', { className: 'flex items-center gap-3' },
+                            React.createElement('div', { 
+                                className: 'w-16 h-16 rounded-lg border-2 shadow-inner',
+                                style: { backgroundColor: companyForm.colore, borderColor: darkMode ? '#374151' : '#D1D5DB' }
+                            }),
+                            React.createElement('input', {
+                                type: 'color',
+                                value: companyForm.colore,
+                                onChange: (e) => setCompanyForm({ ...companyForm, colore: e.target.value }),
+                                className: 'flex-1 h-12 rounded-lg border-2 cursor-pointer'
+                            })
+                        )
+                    ),
+                    React.createElement('div', { className: 'flex gap-3 pt-4' },
+                        React.createElement('button', {
+                            onClick: () => {
+                                setShowCompanyModal(false);
+                                setEditingCompany(null);
+                                setCompanyForm({ nome: '', logo: '', colore: '#10B981', partitaIva: '' });
+                            },
+                            className: 'flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
+                        }, '✖️ Annulla'),
+                        React.createElement('button', {
+                            onClick: editingCompany ? handleEditCompany : handleAddCompany,
+                            className: 'flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors'
+                        }, editingCompany ? '💾 Salva' : '➕ Aggiungi')
+                    )
+                )
+            )
+        ),
+
+        // ========== MODAL: AGGIUNGI/MODIFICA INDIRIZZO ==========
+        showAddressModal && React.createElement('div', { 
+            className: 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50',
+            onClick: () => {
+                setShowAddressModal(false);
+                setEditingAddress(null);
+                setAddressForm({ nome: '', indirizzo: '', citta: '', cap: '', provincia: '', emoji: '📍', colore: '#8B5CF6', googleMapsUrl: '' });
+            }
+        },
+            React.createElement('div', { 
+                className: `${cardClass} rounded-2xl shadow-2xl p-6 w-full max-w-md animate-fade-in max-h-[90vh] overflow-y-auto`,
+                onClick: (e) => e.stopPropagation()
+            },
+                React.createElement('div', { className: 'flex items-center justify-between mb-6' },
+                    React.createElement('h2', { className: 'text-2xl font-bold ' + (darkMode ? 'text-gray-100' : 'text-gray-900') },
+                        editingAddress ? '✏️ Modifica Indirizzo' : '➕ Aggiungi Indirizzo'
+                    ),
+                    React.createElement('button', {
+                        onClick: () => {
+                            setShowAddressModal(false);
+                            setEditingAddress(null);
+                            setAddressForm({ nome: '', indirizzo: '', citta: '', cap: '', provincia: '', emoji: '📍', colore: '#8B5CF6', googleMapsUrl: '' });
+                        },
+                        className: 'text-2xl hover:opacity-70 transition-opacity'
+                    }, '✖️')
+                ),
+                React.createElement('div', { className: 'space-y-4' },
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Nome Indirizzo *'
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: addressForm.nome,
+                            onChange: (e) => setAddressForm({ ...addressForm, nome: e.target.value }),
+                            placeholder: 'es. Sede Centrale',
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2 focus:ring-2 focus:ring-indigo-500'
+                        })
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Via e Numero Civico *'
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: addressForm.indirizzo,
+                            onChange: (e) => setAddressForm({ ...addressForm, indirizzo: e.target.value }),
+                            placeholder: 'Via Edoardo Chiossone 29',
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2 focus:ring-2 focus:ring-indigo-500'
+                        })
+                    ),
+                    React.createElement('div', { className: 'grid grid-cols-2 gap-3' },
+                        React.createElement('div', {},
+                            React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                                'CAP'
+                            ),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: addressForm.cap,
+                                onChange: (e) => setAddressForm({ ...addressForm, cap: e.target.value }),
+                                placeholder: '00169',
+                                className: inputClass + ' w-full px-4 py-3 rounded-lg border-2'
+                            })
+                        ),
+                        React.createElement('div', {},
+                            React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                                'Provincia'
+                            ),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: addressForm.provincia,
+                                onChange: (e) => setAddressForm({ ...addressForm, provincia: e.target.value.toUpperCase() }),
+                                placeholder: 'RM',
+                                maxLength: 2,
+                                className: inputClass + ' w-full px-4 py-3 rounded-lg border-2'
+                            })
+                        )
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Città'
+                        ),
+                        React.createElement('input', {
+                            type: 'text',
+                            value: addressForm.citta,
+                            onChange: (e) => setAddressForm({ ...addressForm, citta: e.target.value }),
+                            placeholder: 'Roma',
+                            className: inputClass + ' w-full px-4 py-3 rounded-lg border-2'
+                        })
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Link Google Maps'
+                        ),
+                        React.createElement('div', { className: 'flex gap-2' },
+                            React.createElement('input', {
+                                type: 'url',
+                                value: addressForm.googleMapsUrl,
+                                onChange: (e) => setAddressForm({ ...addressForm, googleMapsUrl: e.target.value }),
+                                placeholder: 'https://maps.google.com/...',
+                                className: inputClass + ' flex-1 px-4 py-3 rounded-lg border-2'
+                            }),
+                            React.createElement('button', {
+                                onClick: generateGoogleMapsUrl,
+                                className: 'px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors whitespace-nowrap'
+                            }, '🗺️ Genera')
+                        )
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Emoji'
+                        ),
+                        React.createElement('div', { className: 'flex items-center gap-3' },
+                            React.createElement('span', { className: 'text-5xl' }, addressForm.emoji),
+                            React.createElement('input', {
+                                type: 'text',
+                                value: addressForm.emoji,
+                                onChange: (e) => setAddressForm({ ...addressForm, emoji: e.target.value.slice(0, 2) }),
+                                maxLength: 2,
+                                placeholder: '📍',
+                                className: inputClass + ' flex-1 px-4 py-3 rounded-lg border-2 text-center text-2xl'
+                            })
+                        )
+                    ),
+                    React.createElement('div', {},
+                        React.createElement('label', { className: 'block text-sm font-semibold mb-2 ' + (darkMode ? 'text-gray-200' : 'text-gray-700') },
+                            'Colore'
+                        ),
+                        React.createElement('div', { className: 'flex items-center gap-3' },
+                            React.createElement('div', { 
+                                className: 'w-16 h-16 rounded-lg border-2 shadow-inner',
+                                style: { backgroundColor: addressForm.colore, borderColor: darkMode ? '#374151' : '#D1D5DB' }
+                            }),
+                            React.createElement('input', {
+                                type: 'color',
+                                value: addressForm.colore,
+                                onChange: (e) => setAddressForm({ ...addressForm, colore: e.target.value }),
+                                className: 'flex-1 h-12 rounded-lg border-2 cursor-pointer'
+                            })
+                        )
+                    ),
+                    React.createElement('div', { className: 'flex gap-3 pt-4' },
+                        React.createElement('button', {
+                            onClick: () => {
+                                setShowAddressModal(false);
+                                setEditingAddress(null);
+                                setAddressForm({ nome: '', indirizzo: '', citta: '', cap: '', provincia: '', emoji: '📍', colore: '#8B5CF6', googleMapsUrl: '' });
+                            },
+                            className: 'flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors'
+                        }, '✖️ Annulla'),
+                        React.createElement('button', {
+                            onClick: editingAddress ? handleEditAddress : handleAddAddress,
+                            className: 'flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors'
+                        }, editingAddress ? '💾 Salva' : '➕ Aggiungi')
+                    )
+                )
+            )
         )
     );
 };
@@ -1609,4 +2586,5 @@ const Settings = ({ db, sheets = [], darkMode, language = 'it', companyLogo, set
 if (typeof window !== 'undefined') {
     window.Settings = Settings;
 }
+
 

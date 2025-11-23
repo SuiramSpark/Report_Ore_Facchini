@@ -3,6 +3,27 @@
 const changelogs = {
     it: [
         {
+            version: 'v5.3',
+            date: '23 Novembre 2025',
+            changes: [
+                '🔐 NEW: Sistema ruoli completo a 5 livelli (admin, manager, responsabile, worker, worker-link)',
+                '👥 NEW: Gestione utenti avanzata con profili permanenti e temporanei',
+                '📸 NEW: Sistema avatar utenti con upload/sostituzione/eliminazione (2MB max, JPG/PNG)',
+                '⏱️ NEW: Cooldown 15 giorni per cambio avatar (bypass admin/manager)',
+                '🔒 NEW: Profili utente con gestione password e documenti personali',
+                '📊 NEW: Dashboard con widget Performance e Notifiche ottimizzati',
+                '📈 NEW: Grafici avanzati Recharts con statistiche in tempo reale',
+                '🏷️ NEW: Gestione Tipi Attività personalizzate (nome, emoji, colore)',
+                '🏢 NEW: Gestione Aziende multi-logo con selezione attiva per PDF',
+                '📍 NEW: Gestione Indirizzi con salvataggio fisso e recenti',
+                '📋 NEW: Menu dropdown in SheetEditor per aziende, attività e indirizzi',
+                '🌐 NEW: Sistema traduzioni completo IT/EN/ES/FR/RO per tutte le funzionalità',
+                '📊 IMPROVED: Conteggio fogli con normalizzazione nomi lavoratori',
+                '⚙️ IMPROVED: Separazione admin system (adminAuth) da utenti normali',
+                '🗑️ CLEANUP: Rimossi file obsoleti (3 HTML scripts + 3 MD docs)'
+            ]
+        },
+        {
             version: 'v5.2',
             date: '8 Novembre 2025',
             changes: [
@@ -188,6 +209,27 @@ const changelogs = {
         }
     ],
     en: [
+        {
+            version: 'v5.3',
+            date: 'November 23, 2025',
+            changes: [
+                '🔐 NEW: Complete 5-level role system (admin, manager, responsabile, worker, worker-link)',
+                '👥 NEW: Advanced user management with permanent and temporary profiles',
+                '📸 NEW: User avatar system with upload/replace/delete (2MB max, JPG/PNG)',
+                '⏱️ NEW: 15-day cooldown for avatar changes (admin/manager bypass)',
+                '🔒 NEW: User profiles with password management and personal documents',
+                '📊 NEW: Dashboard with optimized Performance and Notifications widgets',
+                '📈 NEW: Advanced Recharts with real-time statistics',
+                '🏷️ NEW: Custom Activity Types management (name, emoji, color)',
+                '🏢 NEW: Multi-logo Company management with active selection for PDFs',
+                '📍 NEW: Address management with fixed and recent storage',
+                '📋 NEW: Dropdown menus in SheetEditor for companies, activities, and addresses',
+                '🌐 NEW: Complete translation system IT/EN/ES/FR/RO for all features',
+                '📊 IMPROVED: Sheet counting with worker name normalization',
+                '⚙️ IMPROVED: Separation of admin system (adminAuth) from normal users',
+                '🗑️ CLEANUP: Removed obsolete files (3 HTML scripts + 3 MD docs)'
+            ]
+        },
         {
             version: 'v5.2',
             date: 'November 8, 2025',

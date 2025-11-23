@@ -82,6 +82,80 @@ window.countWorkingDays = (startDate, endDate) => {
     return count;
 };
 
+// 📍 Normalizza indirizzo per confronto anti-duplicati
+window.normalizeAddress = (address) => {
+    if (!address || typeof address !== 'string') return '';
+    
+    return address
+        .toLowerCase()
+        .trim()
+        // Rimuovi punteggiatura
+        .replace(/[.,;:]/g, '')
+        // Normalizza spazi multipli
+        .replace(/\s+/g, ' ')
+        // Normalizza abbreviazioni comuni
+        .replace(/\bvia\b/g, 'v')
+        .replace(/\bviale\b/g, 'v')
+        .replace(/\bpiazza\b/g, 'p')
+        .replace(/\bcorso\b/g, 'c')
+        .replace(/\bstrada\b/g, 'str')
+        // Rimuovi numeri civici per confronto più ampio (opzionale)
+        // .replace(/\d+/g, '')
+        .trim();
+};
+
+// 📍 Salva indirizzo in recentAddresses con anti-duplicati
+window.saveRecentAddress = async (db, address) => {
+    if (!db || !address || !address.trim()) return;
+    
+    const addressTrimmed = address.trim();
+    const normalized = window.normalizeAddress(addressTrimmed);
+    
+    try {
+        // Cerca duplicati usando normalizzazione
+        const snapshot = await db.collection('recentAddresses')
+            .where('normalized', '==', normalized)
+            .limit(1)
+            .get();
+        
+        if (!snapshot.empty) {
+            // Esiste già, aggiorna contatore e timestamp
+            const existingDoc = snapshot.docs[0];
+            await existingDoc.ref.update({
+                usedCount: firebase.firestore.FieldValue.increment(1),
+                lastUsed: firebase.firestore.FieldValue.serverTimestamp(),
+                address: addressTrimmed // Aggiorna con versione più recente (case sensitivity)
+            });
+            console.log('📍 Recent address updated:', addressTrimmed);
+        } else {
+            // Nuovo indirizzo, crea
+            await db.collection('recentAddresses').add({
+                address: addressTrimmed,
+                normalized: normalized,
+                usedCount: 1,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUsed: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log('📍 Recent address saved:', addressTrimmed);
+        }
+        
+        // Cleanup: mantieni solo ultimi 100 indirizzi
+        const allRecent = await db.collection('recentAddresses')
+            .orderBy('lastUsed', 'desc')
+            .get();
+        
+        if (allRecent.size > 100) {
+            const toDelete = allRecent.docs.slice(100);
+            const batch = db.batch();
+            toDelete.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            console.log(`📍 Cleaned up ${toDelete.length} old addresses`);
+        }
+    } catch (error) {
+        console.error('Error saving recent address:', error);
+    }
+};
+
 // Toast Notification System
 window.showToast = (message, type = 'info', duration = 3000) => {
     const container = document.getElementById('toast-container') || (() => {

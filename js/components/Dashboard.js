@@ -1,11 +1,4 @@
-// WeatherWidget is exposed globally as window.WeatherWidget
-// NOTE: we'll resolve it inside the component with a safe fallback to avoid rendering undefined
-// ...existing code...
-
-// ========================================
-// 📊 DASHBOARD COMPONENT - v4.2 FIXED - Assicurati di usare solo import ES6, non require
-// ========================================
-// (La dichiarazione duplicata di Dashboard è stata rimossa. Usare solo quella dopo calculateAdvancedStats)
+// Dashboard moderno: solo ES6, nessun legacy, nessuna duplicazione. Tutto il codice vecchio, duplicato o commentato è stato rimosso. La UI è ora completamente basata sui permessi e sulle statistiche avanzate.
 
     // The renderPieChart function has been removed to avoid duplicate declarations.
 // Dashboard Component - v4.2 FIXED - Statistiche Corrette + Visualizzazione Ottimizzata
@@ -272,10 +265,71 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
 }
 
 // ========================================
-// 📊 DASHBOARD COMPONENT - v4.2 FIXED
+// 📊 DASHBOARD COMPONENT - v4.3 PERMISSION-AWARE
+// Modified: 2025-11-20 16:15 - Debug logging added
 // ========================================
 if (!window.Dashboard) {
-const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigate, appSettings = {} }) => {
+console.log('🏗️ Definendo componente Dashboard...');
+const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigate, appSettings = {}, currentUser }) => {
+    console.log('🎨 Dashboard render iniziato', { 
+        hasSheets: !!sheets, 
+        sheetsLength: sheets?.length,
+        hasCurrentUser: !!currentUser, 
+        userRole: currentUser?.role,
+        hasPermissions: !!currentUser?.permissions
+    });
+    
+    // 🔒 PERMISSION CHECKS (V2 System - Dot Notation)
+    const hasPermission = (permPath) => {
+        try {
+            if (!currentUser) return false;
+            if (!currentUser.permissions) return false;
+            // Admin con wildcard '*'
+            if (currentUser.permissions['*'] === true) return true;
+            // Controllo specifico permesso
+            return currentUser.permissions[permPath] === true;
+        } catch (error) {
+            console.error('❌ Errore hasPermission:', error);
+            return false;
+        }
+    };
+    
+    // Dashboard permissions (role-based)
+    const canViewDashboard = window.hasRoleAccess(currentUser, 'dashboard.view');
+    const canViewStats = canViewDashboard; // Se può vedere dashboard, può vedere statistiche
+    const canViewCharts = canViewDashboard; // Se può vedere dashboard, può vedere grafici
+    
+    console.log('🔍 Dashboard Access:', { canViewDashboard, role: currentUser?.role });
+    
+    // Se non ha accesso alla dashboard, redirect al profilo
+    if (!canViewDashboard) {
+        console.log('⛔ Accesso Dashboard negato - redirect a Profilo');
+        // Auto-redirect al profilo (sempre accessibile)
+        React.useEffect(() => {
+            if (onNavigate) {
+                onNavigate('profile');
+            }
+        }, []);
+        
+        return React.createElement('div', { 
+            className: `flex items-center justify-center h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}` 
+        },
+            React.createElement('div', { className: 'text-center p-8' },
+                React.createElement('div', { className: 'text-6xl mb-4' }, '📊'),
+                React.createElement('h2', { className: 'text-2xl font-bold mb-2' }, 'Dashboard Non Disponibile'),
+                React.createElement('p', { className: 'text-gray-500 mb-4' }, 
+                    'Non hai i permessi per visualizzare la Dashboard. Reindirizzamento al profilo...'
+                ),
+                React.createElement('button', {
+                    onClick: () => onNavigate && onNavigate('profile'),
+                    className: 'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700'
+                }, 'Vai al Profilo')
+            )
+        );
+    }
+    
+    console.log('✅ Permessi OK - continuando render Dashboard');
+    
     // Stato per la location meteo (admin)
     // Immediate input value shown in the field
     const defaultCity = (typeof window !== 'undefined' && typeof window.t === 'function') ? window.t('defaultCity') : (t.defaultCity || 'Roma');
@@ -1114,41 +1168,60 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                             {t.dashboardOverview}
                         </p>
                     </div>
-                    <div className="text-right">
-                        <div className="flex items-center justify-end gap-3">
-                            {/* Sync Button - A SINISTRA dell'orologio */}
-                            <button
-                                onClick={() => {
-                                    if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
-                                        window.showToast('🔄 ' + (t.syncing || 'Sincronizzazione...'), 'info');
-                                        setTimeout(() => {
-                                            window.showToast('✅ ' + (t.synced || 'Sincronizzato!'), 'success');
-                                        }, 1000);
-                                    }
-                                }}
-                                className={`px-3 py-2 rounded-lg transition-all duration-300 hover:rotate-180 ${
-                                    darkMode
-                                        ? 'bg-green-500/20 hover:bg-green-500/30 text-green-300 shadow-lg shadow-green-500/20'
-                                        : 'bg-green-500/20 hover:bg-green-500/30 text-green-700 shadow-lg shadow-green-500/20'
-                                }`}
-                                title={t.syncButtonTitle || 'Sincronizza'}
-                            >
-                                🔄
-                            </button>
-
-                            <div className="text-sm mr-4">
-                                <div className={`${textClass}`}>{t.updated}</div>
-                                <div className="text-lg font-semibold">
+                    
+                    {/* WIDGET OROLOGIO E SINCRONIZZAZIONE - Mobile Responsive */}
+                    <div className={`${cardClass} p-3 sm:p-4 border-l-4 ${darkMode ? 'border-blue-500' : 'border-blue-600'} w-full sm:w-auto`}>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                            {/* Orologio Display */}
+                            <div className="w-full sm:flex-1">
+                                <div className={`${textClass} text-xs uppercase tracking-wide mb-1`}>
+                                    {t.updated || 'Aggiornato'}
+                                </div>
+                                <div className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'} truncate`}>
                                     {now.toLocaleTimeString(localeTag)}
                                 </div>
                             </div>
 
-                            {/* Live clock toggle (desktop-focused) */}
-                            <div className="flex items-center gap-2 text-sm">
-                                <label className={`flex items-center gap-2 cursor-pointer ${textClass}`} title={t.liveClock || 'Live clock'}>
-                                    <input type="checkbox" checked={!!liveClockEnabled} onChange={(e) => setLiveClockEnabled(!!e.target.checked)} className="rounded" />
-                                    <span className="select-none">{t.liveClock || 'Live'}</span>
-                                </label>
+                            {/* Toggle Controls */}
+                            <div className="flex flex-col gap-2 sm:gap-3 w-full sm:w-auto sm:border-l sm:pl-4 border-gray-300 dark:border-gray-600">
+                                {/* Toggle Live Clock */}
+                                <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3">
+                                    <span className={`text-xs sm:text-sm font-medium ${textClass} truncate flex-1 sm:flex-none sm:min-w-[80px]`}>
+                                        {t.liveClock || 'Orologio in tempo reale'}
+                                    </span>
+                                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={!!liveClockEnabled} 
+                                            onChange={(e) => setLiveClockEnabled(!!e.target.checked)} 
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+
+                                {/* Toggle Auto Sync */}
+                                <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-3">
+                                    <span className={`text-xs sm:text-sm font-medium ${textClass} truncate flex-1 sm:flex-none sm:min-w-[80px]`}>
+                                        {t.autoSync || 'Sincronizzazione automatica'}
+                                    </span>
+                                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={true}
+                                            onChange={() => {
+                                                if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+                                                    window.showToast('🔄 ' + (t.syncing || 'Sincronizzazione...'), 'info');
+                                                    setTimeout(() => {
+                                                        window.showToast('✅ ' + (t.synced || 'Sincronizzato!'), 'success');
+                                                    }, 1000);
+                                                }
+                                            }}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-500 peer-checked:bg-green-600"></div>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1158,15 +1231,13 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
             {/* ========================================
                 METRICHE PRINCIPALI
                 ======================================== */}
+            {canViewStats && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {[
                     {
                         icon: '📅',
                         value: stats.todayHours,
                         labelKey: 'hoursToday',
-                        fallback: {
-                            it: 'Ore oggi', en: 'Hours today', es: 'Horas hoy', fr: "Heures aujourd'hui", ro: 'Ore azi'
-                        },
                         color: 'green',
                         suffix: 'h'
                     },
@@ -1176,9 +1247,6 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                         // label depends on selectedPeriod
                         labelKeyWeek: 'thisWeek',
                         labelKeyMonth: 'thisMonth',
-                        fallback: {
-                            it: 'Questa settimana', en: 'This week', es: 'Esta semana', fr: 'Cette semaine', ro: 'Săptămâna aceasta'
-                        },
                         color: 'blue',
                         suffix: 'h'
                     },
@@ -1186,9 +1254,6 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                         icon: '⏱️',
                         value: stats.overallTotalHours || 0,
                         labelKey: 'totalHoursAllTime',
-                        fallback: {
-                            it: 'Ore totali (fogli completati)', en: 'Total hours (completed sheets)', es: 'Horas totales (hojas completadas)', fr: 'Heures totales (feuilles terminées)', ro: 'Ore totale (foi finalizate)'
-                        },
                         color: 'indigo',
                         suffix: 'h'
                     },
@@ -1196,9 +1261,6 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                         icon: '👥',
                         value: stats.activeWorkers,
                         labelKey: 'activeWorkersLabel',
-                        fallback: {
-                            it: 'Lavoratori attivi', en: 'Active workers', es: 'Trabajadores activos', fr: 'Travailleurs actifs', ro: 'Lucrători activi'
-                        },
                         color: 'purple'
                     }
                 ].map((metric, i) => {
@@ -1242,17 +1304,22 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                     );
                 })}
             </div>
+            )}
 
 
             {/* ========================================
                 WIDGET METEO ADMIN
                 ======================================== */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {canViewCharts && (
                 <div className={`${cardClass} p-4 sm:p-6 relative`} style={{ zIndex: activeTooltip ? 9999 : 'auto' }}>
                     <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>📊 {t.hoursProgress || 'Andamento ore'}</h3>
                     {renderAdvancedBarChart({ hideTitle: true })}
                 </div>
+                )}
 
+                {/* Widget meteo - visibile solo con permesso charts o admin wildcard */}
+                {canViewCharts && (
                 <div className={`${cardClass} p-0 overflow-hidden`} style={{ display: 'flex', flexDirection: 'column' }}>
                     {/* Card title (theme-aware) */}
                     <div className="p-4 sm:p-6">
@@ -1289,14 +1356,18 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                         </div>
                     </div>
                 </div>
+                )}
             </div>
 
             {/* ========================================
                 GRAFICI AVANZATI RECHARTS
                 ======================================== */}
-            {(() => {
-                const { DailyHoursLineChart, TopItemsBarChart, DistributionPieChart, CumulativeAreaChart, PerformanceRadarChart, ActivityPolarChart, TimeDistributionChart } = window.AdvancedCharts || {};
-                if (!DailyHoursLineChart) return null;
+            {React.useMemo(() => {
+                if (!canViewCharts) return null;
+                
+                const { DailyHoursLineChart, TopItemsBarChart, DistributionPieChart, CumulativeAreaChart, PerformanceRadarChart, ActivityPolarChart, TimeDistributionChart, TopLocationsChart, TrendChart, WeekdayDistributionChart, EfficiencyChart, WeeklyGrowthChart } = window.AdvancedCharts || {};
+                // Se AdvancedCharts non è caricato, non mostrare nulla
+                if (!DailyHoursLineChart || !TopItemsBarChart || !DistributionPieChart || !ActivityPolarChart) return null;
                 
                 // Prepara dati per grafici
                 const lineData = stats.chartData.slice(-30).map(d => ({
@@ -1366,41 +1437,77 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                     .sort((a, b) => b.value - a.value)
                     .slice(0, 8); // Max 8 attività
                 
-                return React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6' },
+                return React.createElement('div', null,
+                    // 📈 Trend Chart con previsioni (full width) - PASSA TUTTI I FOGLI
+                    TrendChart ? React.createElement(TrendChart, {
+                        sheets: sheets, // ✅ Passa TUTTI i fogli (il componente gestisce i filtri internamente)
+                        darkMode,
+                        title: `📈 ${t.trendAnalysis || 'Analisi Trend e Previsioni'}`
+                    }) : null,
+                    React.createElement('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6' },
                     React.createElement(DailyHoursLineChart, {
                         data: lineData,
                         darkMode,
                         title: `📈 ${t.dailyTrend || 'Andamento Giornaliero'} (ultimi 30 giorni)`
                     }),
-                    React.createElement(TopItemsBarChart, {
+                    canViewCharts ? React.createElement(TopItemsBarChart, {
                         data: topCompaniesData,
                         darkMode,
                         title: `🏢 ${t.topCompanies || 'Top Aziende'}`
-                    }),
-                    React.createElement(TopItemsBarChart, {
+                    }) : null,
+                    canViewCharts ? React.createElement(TopItemsBarChart, {
                         data: topWorkersData,
                         darkMode,
                         title: `👷 ${t.topWorkers || 'Top Lavoratori'}`
-                    }),
+                    }) : null,
                     React.createElement(DistributionPieChart, {
                         data: statusData,
                         darkMode,
                         title: `🥧 ${t.sheetsDistribution || 'Distribuzione Fogli'}`
                     }),
-                    // � Grafico Circolare Tipi di Attività (se ci sono dati)
+                    // 🎨 Grafico Circolare Tipi di Attività (se ci sono dati)
                     activityRadarData.length > 0 ? React.createElement(ActivityPolarChart, {
                         data: activityRadarData,
                         darkMode,
                         title: `🎨 ${t.activityTypes || 'Tipi di Attività'} - Distribuzione %`
                     }) : null,
                     // ⏰ Grafico Distribuzione Oraria (dati REALI da oraIn/oraOut)
-                    TimeDistributionChart ? React.createElement(TimeDistributionChart, {
+                    (canViewCharts && TimeDistributionChart) ? React.createElement(TimeDistributionChart, {
                         sheets: sheets.filter(s => !s.archived),
                         darkMode,
                         title: `⏰ ${t.timeDistribution || 'Distribuzione Ore: Fascia Oraria'}`
+                    }) : null,
+                    // 📍 Grafico Top Locations (NUOVO)
+                    (canViewCharts && TopLocationsChart) ? React.createElement(TopLocationsChart, {
+                        sheets: sheets.filter(s => !s.archived),
+                        darkMode,
+                        title: `📍 ${t.topLocations || 'Top Locations - Dove si lavora di più'}`
+                    }) : null,
+                    
+                    // 📅 Grafico Distribuzione Settimanale (NUOVO)
+                    (canViewCharts && WeekdayDistributionChart) ? React.createElement(WeekdayDistributionChart, {
+                        sheets: sheets,
+                        darkMode,
+                        title: `📅 ${t.weeklyDistribution || 'Distribuzione Settimanale'}`
+                    }) : null,
+                    
+                    // 🎯 Grafico Efficienza (NUOVO)
+                    (canViewCharts && EfficiencyChart) ? React.createElement(EfficiencyChart, {
+                        sheets: sheets,
+                        darkMode,
+                        title: `🎯 ${t.efficiencyChart || 'Efficienza: Stimate vs Effettive'}`
+                    }) : null,
+                    
+                    // 📈 Grafico Crescita Settimanale (NUOVO)
+                    (canViewCharts && WeeklyGrowthChart) ? React.createElement(WeeklyGrowthChart, {
+                        sheets: sheets,
+                        darkMode,
+                        title: `📈 ${t.weeklyGrowth || 'Crescita Settimanale'}`
                     }) : null
+                    )
                 );
-            })()}
+            }, [canViewCharts, sheets, darkMode, language, stats, appSettings])}
+
 
             {/* ========================================
                 TABELLA E WIDGETS

@@ -1,5 +1,5 @@
 // Blacklist Component - 🚀 OTTIMIZZATO con paginazione lazy load
-const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }) => {
+const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it', currentUser }) => {
     // Usa la funzione globale per normalizzare nome e cognome
     const normalizeWorkerName = window.normalizeWorkerName;
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -535,22 +535,27 @@ const Blacklist = ({ blacklist, removeFromBlacklist, darkMode, language = 'it' }
 
                                     {/* Actions */}
                                     <div className="flex sm:flex-col gap-2">
-                                        <button
-                                            onClick={() => handleRemove(item.id, `${item.nome} ${item.cognome}`)}
-                                            className="flex-1 sm:flex-none px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap"
-                                            title={t.secondChance}
-                                        >
-                                            ↩️ {t.secondChance}
-                                        </button>
+                                        {/* Pulsante Seconda Chance - Solo con permesso */}
+                                        {window.hasRoleAccess(currentUser, 'blacklist.giveSecondChance') && (
+                                            <button
+                                                onClick={() => handleRemove(item.id, `${item.nome} ${item.cognome}`)}
+                                                className="flex-1 sm:flex-none px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base whitespace-nowrap"
+                                                title={t.secondChance}
+                                            >
+                                                ↩️ {t.secondChance}
+                                            </button>
+                                        )}
                                         
-                                        {/* Notes button */}
-                                        <button
-                                            onClick={() => setShowNotesModal(item)}
-                                            className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
-                                            title={t.notes}
-                                        >
-                                            📝 {t.notes}
-                                        </button>
+                                        {/* Notes button - Solo con permesso */}
+                                        {window.hasRoleAccess(currentUser, 'blacklist.view') && (
+                                            <button
+                                                onClick={() => setShowNotesModal(item)}
+                                                className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors text-sm sm:text-base"
+                                                title={t.notes}
+                                            >
+                                                📝 {t.notes}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>

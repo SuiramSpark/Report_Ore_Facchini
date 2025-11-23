@@ -1,7 +1,58 @@
-// Worker Statistics Component - v4.2 FIX DUPLICATI
-const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlacklist, blacklist = [], activityTypes = [] }) => {
-    const [selectedWorker, setSelectedWorker] = React.useState(null);
+// Worker Statistics Component - v4.2 FIX DUPLICATI + SINGLE USER SUPPORT
+const WorkerStats = ({ 
+    sheets, 
+    darkMode, 
+    language = 'it', 
+    onBack, 
+    onAddToBlacklist, 
+    blacklist = [], 
+    activityTypes = [], 
+    onViewProfile, 
+    db,
+    currentUser, // 👤 Utente corrente per controllo permessi
+    selectedWorker: initialSelectedWorker = null // 🎯 Supporto per vista singolo utente
+}) => {
+    const [selectedWorker, setSelectedWorker] = React.useState(initialSelectedWorker);
     const [stats, setStats] = React.useState(null);
+    const [permanentWorkers, setPermanentWorkers] = React.useState([]); // 👥 Lista lavoratori fissi
+    
+    // 🎯 Aggiorna selectedWorker se la prop cambia (per supporto vista profilo utente)
+    React.useEffect(() => {
+        if (initialSelectedWorker) {
+            setSelectedWorker(initialSelectedWorker);
+        }
+    }, [initialSelectedWorker]);
+    
+    // 📥 Carica lista lavoratori permanenti da Firestore
+    React.useEffect(() => {
+        if (!db) return;
+        
+        const loadPermanentWorkers = async () => {
+            try {
+                const snapshot = await db.collection('users')
+                    .where('isPermanent', '==', true)
+                    .get();
+                
+                // ✅ FILTRA: Solo utenti VERAMENTE permanenti (esclude worker-link)
+                const permanentNames = snapshot.docs
+                    .filter(doc => {
+                        const data = doc.data();
+                        // Worker-link NON è considerato permanente per WorkerStats
+                        return data.role !== 'worker-link';
+                    })
+                    .map(doc => {
+                        const data = doc.data();
+                        return window.normalizeWorkerName(data.firstName || '', data.lastName || '');
+                    });
+                
+                setPermanentWorkers(permanentNames);
+            } catch (error) {
+                console.error('Errore caricamento lavoratori permanenti:', error);
+            }
+        };
+        
+        loadPermanentWorkers();
+    }, [db]);
     
     // Rendi activityTypes disponibile globalmente per i grafici
     React.useEffect(() => {
@@ -120,8 +171,11 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
             arr = arr.filter(worker => worker.normalized.includes(normSearch));
         }
         
+        // 🚫 ESCLUDI lavoratori già FISSI (isPermanent: true in Firestore)
+        arr = arr.filter(worker => !permanentWorkers.includes(worker.normalized));
+        
         return arr.map(worker => worker.displayName).sort();
-    }, [sheets, normalizeWorkerName, search, filters]);
+    }, [sheets, normalizeWorkerName, search, filters, permanentWorkers]);
 
     // Calculate stats when worker selected - CON NORMALIZZAZIONE
     React.useEffect(() => {
@@ -136,6 +190,75 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
             setStats(workerStats);
         }
     }, [selectedWorker, sheets, normalizeWorkerName]);
+
+    // 👥 Rendi utente permanente
+    const handleMakePermanent = async () => {
+        if (!selectedWorker || !db) return;
+        
+        const [firstName, ...lastNameParts] = selectedWorker.split(' ');
+        const lastName = lastNameParts.join(' ');
+        
+        if (!confirm(t.confirmMakePermanent || `Confermi di rendere ${selectedWorker} un utente fisso?`)) {
+            return;
+        }
+        
+        try {
+            const normalized = normalizeWorkerName(firstName, lastName);
+            const userId = 'worker-' + normalized;
+            
+            // Verifica se esiste già
+            const userDoc = await db.collection('users').doc(userId).get();
+            
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                
+                // ✅ RIPRISTINO: Se era worker-link, lo riportiamo a worker permanente
+                if (userData.role === 'worker-link') {
+                    await db.collection('users').doc(userId).update({
+                        role: 'worker',
+                        isPermanent: true,
+                        restoredAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        movedToOnCallAt: null // Rimuovi il timestamp di quando fu spostato
+                    });
+                    
+                    alert('✅ ' + (t.userRestored || `${selectedWorker} è stato ripristinato come utente fisso con tutti i suoi dati precedenti!`));
+                } else {
+                    // Utente già permanente, solo aggiorna timestamp
+                    await db.collection('users').doc(userId).update({
+                        isPermanent: true,
+                        madePermanentAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        madePermanentBy: 'admin'
+                    });
+                    
+                    alert('✅ ' + (t.userMadePermanent || `${selectedWorker} è ora un utente fisso!`));
+                }
+            } else {
+                // Crea nuovo utente
+                await db.collection('users').doc(userId).set({
+                    firstName: firstName || '',
+                    lastName: lastName || '',
+                    email: '',
+                    phone: '',
+                    role: 'worker',
+                    isPermanent: true,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    madePermanentAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    madePermanentBy: 'admin',
+                    documenti: [],
+                    uploadCounter: { count: 0, resetDate: new Date() }
+                });
+                
+                alert('✅ ' + (t.userMadePermanent || `${selectedWorker} è ora un utente fisso!`));
+            }
+            
+            // Chiudi il dettaglio e torna alla lista
+            setSelectedWorker(null);
+            
+        } catch (error) {
+            console.error('Errore durante conversione:', error);
+            alert('❌ Errore durante la conversione');
+        }
+    };
 
     const handleAddToBlacklist = async () => {
         if (!selectedWorker) return;
@@ -178,6 +301,14 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
     };
 
     if (!selectedWorker) {
+        // 🎯 Se siamo in vista profilo utente (initialSelectedWorker passato), non mostrare nulla
+        if (initialSelectedWorker) {
+            return React.createElement('div', { className: `${cardClass} rounded-lg shadow-md p-6 text-center` },
+                React.createElement('p', { className: textClass }, '⏳ Caricamento statistiche utente...')
+            );
+        }
+        
+        // Vista normale: lista lavoratori
         return (
             <div className="space-y-4">
                 <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
@@ -358,15 +489,16 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                                     <button
                                         key={i}
                                         onClick={() => setSelectedWorker(worker)}
-                                        className={`p-4 rounded-lg text-left transition-all ${
+                                        className={`w-full p-4 rounded-lg transition-all ${
                                             darkMode 
                                                 ? 'bg-gray-700 hover:bg-gray-600' 
                                                 : 'bg-gray-50 hover:bg-gray-100'
-                                        } border-2 ${borderColor} hover:border-indigo-500 shadow-sm hover:shadow-md`}
+                                        } border-2 ${borderColor} shadow-sm hover:shadow-md text-left cursor-pointer`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <span className="text-2xl">👤</span>
-                                            <span className="font-semibold text-sm sm:text-base">{worker}</span>
+                                            <span className="font-semibold text-sm sm:text-base flex-1">{worker}</span>
+                                            <span className="text-xl opacity-50">→</span>
                                         </div>
                                     </button>
                                 );
@@ -390,7 +522,7 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     // Mappa per mantenere i nomi originali con maiuscole
                     const workerDisplayNames = new Map(); // normalizedKey -> displayName
                     
-                    // Calcola statistiche aggregate di tutti i lavoratori
+                    // Calcola statistiche aggregate di tutti i lavoratori ON-CALL (esclusi fissi)
                     const aggregateStats = {
                         totalWorkers: workers.length,
                         totalHours: 0,
@@ -402,10 +534,16 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                         dailyAverages: [] // per ogni lavoratore
                     };
 
-                    // Aggrega dati da tutti i fogli
+                    // Aggrega dati da tutti i fogli (SOLO LAVORATORI ON-CALL)
                     sheets.forEach(sheet => {
                         sheet.lavoratori?.forEach(w => {
                             const normalizedKey = normalizeWorkerName(w.nome, w.cognome);
+                            
+                            // 🚫 SALTA se è un lavoratore permanente
+                            if (permanentWorkers.includes(normalizedKey)) {
+                                return; // Skip this worker
+                            }
+                            
                             const hours = parseFloat(w.oreTotali) || 0;
                             
                             // Salva il nome originale con maiuscole
@@ -454,10 +592,10 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                         // === KPI CARDS ===
                         React.createElement('div', { className: 'grid grid-cols-2 lg:grid-cols-4 gap-4' },
                             [
-                                { icon: '👷', label: 'Lavoratori Totali', value: aggregateStats.totalWorkers, color: 'blue' },
-                                { icon: '⏰', label: 'Ore Totali', value: `${aggregateStats.totalHours.toFixed(1)}h`, color: 'green' },
-                                { icon: '📈', label: 'Media Ore/Lavoratore', value: `${avgHoursPerWorker.toFixed(1)}h`, color: 'purple' },
-                                { icon: '📅', label: 'Presenze Totali', value: aggregateStats.totalPresences, color: 'orange' }
+                                { icon: '👷', label: t.totalWorkersLabel, value: aggregateStats.totalWorkers, color: 'blue' },
+                                { icon: '⏰', label: t.totalHoursLabel, value: `${aggregateStats.totalHours.toFixed(1)}h`, color: 'green' },
+                                { icon: '📈', label: t.avgHoursPerWorker, value: `${avgHoursPerWorker.toFixed(1)}h`, color: 'purple' },
+                                { icon: '📅', label: t.totalPresencesLabel, value: aggregateStats.totalPresences, color: 'orange' }
                             ].map((kpi, idx) =>
                                 React.createElement('div', {
                                     key: idx,
@@ -548,10 +686,10 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                                 }, 'Nessun Tipo di Attività Registrato'),
                                 React.createElement('p', {
                                     className: `${textClass} mb-4`
-                                }, 'I fogli ore non hanno tipi di attività assegnati.'),
+                                }, t.noActivityTypesAssigned || 'I fogli ore non hanno tipi di attività assegnati.'),
                                 React.createElement('p', {
                                     className: `text-sm ${textClass}`
-                                }, 'Vai in "Modifica Fogli" e aggiungi i tipi di attività ai fogli archiviati per vedere le statistiche.')
+                                }, t.goToSheetEditorInstruction || 'Vai in "Modifica Fogli" e aggiungi i tipi di attività ai fogli archiviati per vedere le statistiche.')
                             );
                         })(),
 
@@ -662,7 +800,7 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                                 React.createElement('div', {
                                     className: `mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`
                                 },
-                                    React.createElement('span', { className: 'font-bold' }, 'TOTALE'),
+                                    React.createElement('span', { className: 'font-bold' }, t.total),
                                     React.createElement('span', {
                                         className: `font-bold text-lg ${darkMode ? 'text-green-400' : 'text-green-600'}`
                                     }, `${totalActivityHours.toFixed(1)}h`)
@@ -727,9 +865,9 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                                             className: `border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`
                                         },
                                             React.createElement('th', { className: `text-left p-3 ${textClass}` }, '#'),
-                                            React.createElement('th', { className: `text-left p-3 ${textClass}` }, 'Lavoratore'),
-                                            React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'Ore Totali'),
-                                            React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'Media/Presenza')
+                                            React.createElement('th', { className: `text-left p-3 ${textClass}` }, t.worker || 'Lavoratore'),
+                                            React.createElement('th', { className: `text-right p-3 ${textClass}` }, t.totalHoursLabel),
+                                            React.createElement('th', { className: `text-right p-3 ${textClass}` }, t.avgPerAttendance)
                                         )
                                     ),
                                     React.createElement('tbody', {},
@@ -791,24 +929,36 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
                         <span>👤</span> {selectedWorker}
                     </h2>
-                    <div className="flex gap-2">
-                        {onAddToBlacklist && (
+                    {/* 🎯 Nascondi azioni quando siamo in vista profilo utente */}
+                    {!initialSelectedWorker && (
+                        <div className="flex gap-2">
+                            {onAddToBlacklist && window.hasRoleAccess(currentUser, 'onCall.addToBlacklist') && (
+                                <button
+                                    onClick={isWorkerBlacklisted ? undefined : handleAddToBlacklist}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md ${isWorkerBlacklisted ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                                    title={isWorkerBlacklisted ? t.blacklistWarning : t.addToBlacklist}
+                                    disabled={isWorkerBlacklisted}
+                                >
+                                    🚫 <span className="hidden sm:inline">{isWorkerBlacklisted ? t.blacklistWarning : t.addToBlacklist}</span>
+                                </button>
+                            )}
+                            {db && window.hasRoleAccess(currentUser, 'users.modify') && (
+                                <button
+                                    onClick={handleMakePermanent}
+                                    className="px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md bg-green-600 hover:bg-green-700 text-white"
+                                    title={t.makePermanent || 'Rendi User Fisso'}
+                                >
+                                    ✅ <span className="hidden sm:inline">{t.makePermanent || 'Rendi User Fisso'}</span>
+                                </button>
+                            )}
                             <button
-                                onClick={isWorkerBlacklisted ? undefined : handleAddToBlacklist}
-                                className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md ${isWorkerBlacklisted ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white'}`}
-                                title={isWorkerBlacklisted ? t.blacklistWarning : t.addToBlacklist}
-                                disabled={isWorkerBlacklisted}
+                                onClick={() => setSelectedWorker(null)}
+                                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors shadow-md"
                             >
-                                🚫 <span className="hidden sm:inline">{isWorkerBlacklisted ? t.blacklistWarning : t.addToBlacklist}</span>
+                                ← {t.back}
                             </button>
-                        )}
-                        <button
-                            onClick={() => setSelectedWorker(null)}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors shadow-md"
-                        >
-                            ← {t.back}
-                        </button>
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -972,35 +1122,35 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     React.createElement('div', { className: 'grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4' },
                         [
                             { 
-                                label: 'Produttività', 
+                                label: t.productivity, 
                                 value: Math.round(productivity), 
                                 icon: '⚡', 
                                 color: 'purple',
                                 tooltip: `Media ${avgHoursPerDay.toFixed(1)}h/giorno su 8h standard`
                             },
                             { 
-                                label: 'Costanza', 
+                                label: t.consistency, 
                                 value: Math.round(consistency), 
                                 icon: '📊', 
                                 color: 'blue',
                                 tooltip: `${stats.totalSheets} fogli in ${stats.totalDays} giorni`
                             },
                             { 
-                                label: 'Esperienza', 
+                                label: t.experience, 
                                 value: Math.round(experience), 
                                 icon: '🎓', 
                                 color: 'green',
                                 tooltip: `${stats.uniqueWorkDays} giorni su ${stats.workingDaysInPeriod} lavorativi`
                             },
                             { 
-                                label: 'Disponibilità', 
+                                label: t.availability, 
                                 value: Math.round(availability), 
                                 icon: '📅', 
                                 color: 'indigo',
                                 tooltip: `${stats.weekendDaysWorked} weekend/festivi lavorati`
                             },
                             { 
-                                label: 'Affidabilità', 
+                                label: t.reliability, 
                                 value: Math.round(reliability), 
                                 icon: '🎯', 
                                 color: 'orange',
@@ -1137,7 +1287,7 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                                     React.createElement('span', { className: 'text-lg' }, '🎯'),
                                     React.createElement('span', {
                                         className: `font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`
-                                    }, 'Affidabilità Totale')
+                                    }, t.totalReliability || 'Affidabilità Totale')
                                 ),
                                 React.createElement('div', {
                                     className: `text-2xl font-bold ${darkMode ? 'text-orange-400' : 'text-orange-600'}`
@@ -1162,10 +1312,10 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                         React.createElement('div', { className: 'text-5xl mb-3' }, '🎨'),
                         React.createElement('h3', {
                             className: `text-lg font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
-                        }, 'Nessuna Attività Registrata'),
+                        }, t.noActivityRegistered || 'Nessuna Attività Registrata'),
                         React.createElement('p', {
                             className: `text-sm ${textClass}`
-                        }, `${selectedWorker} non ha fogli con tipi di attività assegnati.`)
+                        }, `${selectedWorker} ${t.workerNoActivityTypes || 'non ha fogli con tipi di attività assegnati.'}`)
                     );
                 }
                 
@@ -1274,7 +1424,7 @@ const WorkerStats = ({ sheets, darkMode, language = 'it', onBack, onAddToBlackli
                     React.createElement('div', {
                         className: `mt-4 pt-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center flex-wrap gap-2`
                     },
-                        React.createElement('span', { className: 'font-bold text-sm sm:text-base' }, 'TOTALE ORE ATTIVITÀ'),
+                        React.createElement('span', { className: 'font-bold text-sm sm:text-base' }, t.totalActivityHours),
                         React.createElement('span', {
                             className: `font-bold text-lg sm:text-xl ${darkMode ? 'text-green-400' : 'text-green-600'}`
                         }, `${totalActivityHours.toFixed(1)}h (100%)`)

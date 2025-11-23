@@ -1043,6 +1043,67 @@ header > div {
 }
 
 /* ========================================
+   MOBILE BOTTOM NAVIGATION FIX
+   ======================================== */
+
+/* Bottom navigation sempre visibile e sopra tutto */
+nav.fixed.bottom-0 {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 50 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Touch targets minimi 44x44px */
+nav.fixed.bottom-0 button {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    touch-action: manipulation;
+}
+
+/* Icone bottom nav */
+nav.fixed.bottom-0 button span:first-child {
+    font-size: 20px !important;
+    line-height: 1;
+}
+
+/* Label bottom nav */
+nav.fixed.bottom-0 button span:last-child {
+    font-size: 11px !important;
+    line-height: 1.2;
+}
+
+/* Popup menu "Altro" */
+nav.fixed.bottom-0 > div:last-child {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Main content padding per bottom nav */
+main {
+    padding-bottom: 80px !important;
+}
+
+@media (min-width: 1024px) {
+    main {
+        padding-bottom: 24px !important;
+    }
+}
+
+/* Fix safe area per notch iPhone */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    nav.fixed.bottom-0 {
+        padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    }
+    
+    main {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    }
+}
+
+/* ========================================
    LANGUAGE SELECTOR DARK MODE FIX
    ======================================== */
 

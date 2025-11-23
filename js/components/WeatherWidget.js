@@ -111,7 +111,13 @@ function WeatherWidget(props) {
                     setLocationLabel(exact.name + (exact.admin1 ? ', ' + exact.admin1 : ''));
                     setWeatherKey(codeToKey(w.weathercode));
                     if (props && typeof props.onWeatherChange === 'function') {
-                        try { props.onWeatherChange(codeToKey(w.weathercode)); } catch (e) {}
+                        try { 
+                            props.onWeatherChange(codeToKey(w.weathercode), {
+                                temp: w.temperature,
+                                condition: w.weathercode,
+                                location: exact.name + (exact.admin1 ? ', ' + exact.admin1 : '')
+                            }); 
+                        } catch (e) {}
                     }
                     return;
                 }
@@ -128,7 +134,13 @@ function WeatherWidget(props) {
             setLocationLabel(best.name + (best.admin1 ? ', ' + best.admin1 : ''));
             setWeatherKey(codeToKey(w.weathercode));
             if (props && typeof props.onWeatherChange === 'function') {
-                try { props.onWeatherChange(codeToKey(w.weathercode)); } catch (e) {}
+                try { 
+                    props.onWeatherChange(codeToKey(w.weathercode), {
+                        temp: w.temperature,
+                        condition: w.weathercode,
+                        location: best.name + (best.admin1 ? ', ' + best.admin1 : '')
+                    }); 
+                } catch (e) {}
             }
         } catch (e) {
             setError(e && e.message ? e.message : String(e));
@@ -247,7 +259,13 @@ function WeatherWidget(props) {
                             setLocationLabel(c.name + (c.admin1 ? ', ' + c.admin1 : ''));
                             setWeatherKey(codeToKey(w.weathercode));
                             if (props && typeof props.onWeatherChange === 'function') {
-                                try { props.onWeatherChange(codeToKey(w.weathercode)); } catch (e) {}
+                                try { 
+                                    props.onWeatherChange(codeToKey(w.weathercode), {
+                                        temp: w.temperature,
+                                        condition: w.weathercode,
+                                        location: c.name + (c.admin1 ? ', ' + c.admin1 : '')
+                                    }); 
+                                } catch (e) {}
                             }
                         } catch (e) { setError(e && e.message ? e.message : String(e)); }
                         finally { setLoading(false); }

@@ -1,0 +1,115 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+// Gestisce permessi granulari per upload documenti e avatar
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // ========================================
+    // HELPER FUNCTIONS
+    // ========================================
+    
+    // Ottieni dati utente da Firestore
+    function getUserData(userId) {
+      return firestore.get(/databases/(default)/documents/users/$(userId)).data;
+    }
+    
+    // Ottieni limiti per ruolo
+    function getRoleLimits(role) {
+      let limits = {
+        'admin': { maxFiles: 999999, maxSize: 10485760 }, // 10MB per admin
+        'datore': { maxFiles: 30, maxSize: 5242880 },     // 5MB, 30 files/mese
+        'manager': { maxFiles: 10, maxSize: 5242880 },    // 5MB, 10 files/15gg
+        'worker': { maxFiles: 10, maxSize: 5242880 }      // 5MB, 10 files/mese
+      };
+      return limits[role];
+    }
+    
+    // Verifica se utente è autenticato
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Verifica se è admin
+    function isAdmin() {
+      return isAuthenticated() 
+        && request.auth.uid == 'admin';
+    }
+    
+    // Verifica formato file documento
+    function isValidDocumentFormat() {
+      return request.resource.contentType.matches(
+        '(application/pdf|image/(jpeg|jpg|png))'
+      );
+    }
+    
+    // Verifica formato file avatar
+    function isValidAvatarFormat() {
+      return request.resource.contentType.matches(
+        'image/(jpeg|jpg|png)'
+      );
+    }
+    
+    // ========================================
+    // DOCUMENTI UTENTE
+    // ========================================
+    
+    match /documenti/{userId}/{fileName} {
+      
+      // LETTURA: Tutti possono leggere (temporaneo, da restringere con auth)
+      allow read: if true;
+      
+      // CREAZIONE: Tutti possono caricare (temporaneo, da restringere con auth)
+      allow create: if true && isValidDocumentFormat() && request.resource.size <= 10485760; // 10MB max
+      
+      // AGGIORNAMENTO/ELIMINAZIONE: Tutti possono modificare (temporaneo)
+      allow update, delete: if true;
+    }
+    
+    // ========================================
+    // AVATAR UTENTE
+    // ========================================
+    
+    match /avatars/{userId}/{fileName} {
+      
+      // LETTURA: Tutti possono leggere
+      allow read: if true;
+      
+      // SCRITTURA: TEMPORANEO - Permetti a tutti per testing
+      // TODO: Ripristinare autenticazione quando il sistema sarà configurato
+      allow write: if isValidAvatarFormat() 
+                   && request.resource.size <= 2097152; // 2MB max
+    }
+    
+    // ========================================
+    // BACKUP (Solo Admin)
+    // ========================================
+    
+    match /backups/{fileName} {
+      allow read, write: if isAdmin();
+    }
+    
+    // ========================================
+    // COMPANY LOGOS (Multi-Company System)
+    // ========================================
+    
+    match /company-logos/{fileName} {
+      // LETTURA: Tutti possono leggere i loghi aziendali
+      allow read: if true;
+      
+      // SCRITTURA: Permetti a tutti senza restrizioni (TEMPORANEO per testing)
+      // TODO: Aggiungere validazioni formato e dimensione dopo fix autenticazione
+      allow write: if true;
+    }
+    
+    // ========================================
+    // DENY ALL (Sicurezza)
+    // ========================================
+    
+    // Blocca accesso a tutto il resto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

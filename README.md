@@ -8,11 +8,34 @@
 ![Firebase](https://img.shields.io/badge/firebase-integrated-orange.svg)
 ![Languages](https://img.shields.io/badge/languages-5-red.svg)
 
-**Sistema avanzato di gestione fogli ore con firma digitale, dashboard analytics e modalità lavoratore**
+**Sistema avanzato di gestione fogli ore con firma digitale, dashboard analytics e interfaccia unificata per tutti i ruoli**
 
 [🚀 Demo Live](#) | [📖 Documentazione](#-caratteristiche-principali) | [🌐 Multilingua](#-supporto-multilingua)
 
 </div>
+
+---
+
+## 🔐 Sistema di Login Unificato
+
+**Un'unica URL per tutti i ruoli!** - `https://suiramspark.github.io/Report_Ore_Facchini/`
+
+### 👨‍💼 Login Admin
+- **Password unica** (hash SHA-256 salvato in Firestore)
+- Accesso completo a tutte le funzionalità
+- Dashboard analytics avanzata
+- Gestione utenti e permessi
+
+### 👷 Login Lavoratore/Datore
+- **Email + Password** per accesso personale
+- Dashboard statistiche personali
+- Profilo con upload documenti (max 10/mese worker, 30/mese datore)
+- Cambio password autonomo
+
+### 🔄 Auto-Rilevamento Ruolo
+Il sistema rileva automaticamente il tipo di utente e carica l'interfaccia appropriata:
+- **Admin/Manager** → Interfaccia completa con tutte le dashboard
+- **Datore/Worker** → Interfaccia semplificata con dati personali
 
 ---
 
@@ -36,6 +59,8 @@
 - ✅ Ripristino sessione precedente
 - ✅ Selettore lingua indipendente
 - ✅ Campi opzionali estesi
+- ✅ **Dashboard statistiche personali**
+- ✅ **Profilo con documenti**
 
 </td>
 <td width="50%">

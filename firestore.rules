@@ -3,19 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow read access to all users
+    // Allow read/write access to all users (MODALITÀ TEST - da restringere in produzione)
     match /{document=**} {
-      allow read: if true;
+      allow read, write: if true;
     }
 
-    // Allow write access to modificationLogs collection for admins
+    // Allow write access to modificationLogs collection
     match /modificationLogs/{docId} {
-      allow create: if request.auth != null && request.auth.token.admin == true;
+      allow create: if true;
     }
 
-    // Allow write access to workerNotifications collection for admins
+    // Allow write access to workerNotifications collection
     match /workerNotifications/{docId} {
-      allow create: if request.auth != null && request.auth.token.admin == true;
+      allow create: if true;
     }
 
     // Timesheets
@@ -68,6 +68,42 @@ service cloud.firestore {
     // Scheduled Notifications
     match /scheduledNotifications/{notificationId} {
       allow read, write: if true;
+    }
+
+    // 👥 Users Collection (nuova implementazione)
+    // Lettura: tutti possono leggere i profili utenti
+    // Scrittura: tutti possono creare/modificare (da restringere in futuro con autenticazione)
+    match /users/{userId} {
+      allow read: if true;  // Tutti possono vedere i profili
+      allow create: if true; // Permette creazione nuovi utenti
+      allow update: if true; // Permette aggiornamenti (es. makePermanent)
+      allow delete: if true; // Permette eliminazione (solo admin in UI)
+    }
+
+    // 🏢 Companies Collection (NUOVO SISTEMA - Multi-Company)
+    match /companies/{companyId} {
+      allow read: if true;
+      allow write: if true; // TODO: Restringere con autenticazione
+    }
+
+    // 📍 Addresses Collection (NUOVO SISTEMA - Multi-Address)
+    match /addresses/{addressId} {
+      allow read: if true;
+      allow write: if true; // TODO: Restringere con autenticazione
+    }
+
+    // 🕒 Recent Addresses Collection (NUOVO - Auto-saved da fogli)
+    match /recentAddresses/{recentId} {
+      allow read: if true;
+      allow create: if true; // Auto-save quando si salva un foglio
+      allow update: if true; // Aggiornamento contatore usedCount
+      allow delete: if true; // Cleanup automatico e manuale da Settings
+    }
+
+    // 🔢 Counters Collection (NUOVO - Auto-numerazione fogli)
+    match /counters/{counterId} {
+      allow read: if true;
+      allow write: if true; // Permette creazione e aggiornamento counter
     }
   }
 }

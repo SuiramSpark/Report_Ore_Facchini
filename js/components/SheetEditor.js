@@ -1,6 +1,7 @@
 // React and other libs are expected to be available globally (loaded via CDN in index.html)
 // Avoid ES module imports when using in-page Babel/UMD environment to prevent `require is not defined`.
-// Sheet Editor Component - v3.0 FIX BUG LINK + FIRMA
+// Sheet Editor Component - v4.3 COMPACT UI - Multi-select compatto con tag inline
+console.log('🔄 SheetEditor v4.3 COMPACT loaded - Tag inline + traduzioni');
 const SheetEditor = ({ 
     sheet, 
     onSave, 
@@ -13,8 +14,40 @@ const SheetEditor = ({
     darkMode, 
     language = 'it',
     companyLogo,
-    appSettings = { expirationDays: 1 }
+    companies = [],
+    activeCompanyId,
+    appSettings = { expirationDays: 1 },
+    users = [],
+    currentUser,
+    recentAddresses = []
 }) => {
+    // Get logo from sheet's company (NEW system ONLY - companies/ collection)
+    const sheetCompanyLogo = React.useMemo(() => {
+        // Protezione contro currentSheet undefined o null
+        if (!currentSheet) {
+            return companyLogo;
+        }
+        
+        console.log('🖼️ DEBUG LOGO - currentSheet.companies:', currentSheet?.companies);
+        console.log('🖼️ DEBUG LOGO - companies (NEW system):', companies);
+        
+        // ✅ Usa SOLO il nuovo sistema companies[] (collection)
+        if (currentSheet?.companies && Array.isArray(currentSheet.companies) && currentSheet.companies.length > 0 && companies?.length > 0) {
+            const firstCompanyId = currentSheet.companies[0];
+            const company = companies.find(c => c.id === firstCompanyId);
+            console.log('🖼️ DEBUG LOGO - firstCompanyId:', firstCompanyId);
+            console.log('🖼️ DEBUG LOGO - found company:', company);
+            if (company?.logoURL) {
+                console.log('✅ DEBUG LOGO - Using company logoURL:', company.logoURL);
+                return company.logoURL;
+            }
+        }
+        
+        // Fallback al logo globale
+        console.log('⚠️ DEBUG LOGO - Fallback to global companyLogo:', companyLogo);
+        return companyLogo;
+    }, [currentSheet, companies, companyLogo]);
+
     // Translation helper: prefer the centralized runtime `window.t` (provided by js/i18n.js).
     // Keep a safe fallback to the legacy `translations` object so migration is incremental.
     // We return a Proxy so existing code that uses `t.someKey` continues to work.
@@ -45,6 +78,13 @@ const SheetEditor = ({
     const [weatherInput, setWeatherInput] = React.useState(sheet?.localita || sheet?.location || '');
     const [loading, setLoading] = React.useState(false);
     const [selectedWorkers, setSelectedWorkers] = React.useState([]);
+    
+    // 🍞 Toast notification system (local)
+    const [toast, setToast] = React.useState({ visible: false, message: '', type: 'info' });
+    const showToastLocal = (message, type = 'info') => {
+        setToast({ visible: true, message, type });
+        setTimeout(() => setToast({ visible: false, message: '', type: 'info' }), 3000);
+    };
     const [bulkEditMode, setBulkEditMode] = React.useState(false);
     const [partialPDFMode, setPartialPDFMode] = React.useState(false);
     const [bulkEditData, setBulkEditData] = React.useState({ pausaMinuti: '', oraIn: '', oraOut: '' });
@@ -68,18 +108,71 @@ const SheetEditor = ({
     const addWorkerCanvasRef = React.useRef(null);
     const [addWorkerSignaturePad, setAddWorkerSignaturePad] = React.useState(null);
     const [showActivityDropdown, setShowActivityDropdown] = React.useState(false);
+    const [showCompanyDropdown, setShowCompanyDropdown] = React.useState(false);
+    const [showSupervisorDropdown, setShowSupervisorDropdown] = React.useState(false);
+    const [showAddressDropdown, setShowAddressDropdown] = React.useState(false);
+    const [searchSupervisor, setSearchSupervisor] = React.useState(''); // Search filter for supervisors
+    const [addressInputFocused, setAddressInputFocused] = React.useState(false); // Controlla dropdown indirizzi
     const cardClass = darkMode ? 'bg-gray-800' : 'bg-white';
     const inputClass = darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-700';
 
-    // FUNZIONI HELPER LOCALI
-    const showToastLocal = (message, type = 'info') => {
-        if (typeof window.showToast === 'function') {
-            window.showToast(message, type);
-        } else {
-            console.log(`${type}: ${message}`);
+    // 🔐 CONTROLLO ACCESSO: Worker NON può accedere
+    React.useEffect(() => {
+        if (currentUser && currentUser.role === 'worker') {
+            showToastLocal('🚫 Accesso negato - Solo visualizzazione propri fogli', 'error');
+            if (typeof onBack === 'function') {
+                setTimeout(() => onBack(), 1500);
+            }
         }
-    };
+    }, [currentUser]);
+
+    // 🔐 PERMESSI BASATI SU RUOLI
+    const userRole = currentUser?.role;
+    const isAdmin = userRole === 'admin';
+    const isManager = userRole === 'manager';
+    const isResponsabile = userRole === 'responsabile';
+    const isWorker = userRole === 'worker';
+    
+    // Admin, manager e responsabile possono modificare quasi tutto
+    const canEditSheet = isAdmin || isManager || isResponsabile;
+    const canSignSheet = isAdmin || isManager || isResponsabile;
+    const canAddWorkers = isAdmin || isManager || isResponsabile;
+    const canGenerateWorkerLink = isAdmin || isManager || isResponsabile || isWorker;
+    
+    // Campi specifici per ruolo
+    const canEditCompanyName = isAdmin || isManager || isResponsabile;
+    const canEditSheetDate = isAdmin || isManager || isResponsabile;
+    const canEditManagerName = isAdmin || isManager || isResponsabile;
+    const canEditAddress = isAdmin || isManager || isResponsabile;
+    const canEditEstimatedHours = isAdmin || isManager || isResponsabile;
+    
+    // Activity: tutti possono modificare (incluso worker)
+    const canEditActivityType = isAdmin || isManager || isResponsabile || isWorker;
+    
+    // Hours: worker può modificare solo le proprie
+    const canEditHours = isAdmin || isManager || isResponsabile || isWorker;
+
+    const canEditWorker = isAdmin || isManager || isResponsabile;
+    const canDeleteWorker = isAdmin || isManager || isResponsabile;
+    
+    // 🔐 READ-ONLY per Datore (legacy, ora gestito da permessi)
+    const isReadOnly = currentUser && currentUser.role === 'datore';
+
+    // Se Worker, mostra messaggio e blocca rendering
+    if (currentUser && currentUser.role === 'worker') {
+        return React.createElement('div', { 
+            className: `${cardClass} rounded-xl shadow-lg p-8 text-center`
+        },
+            React.createElement('div', { className: 'text-6xl mb-4' }, '🚫'),
+            React.createElement('h2', { className: 'text-2xl font-bold mb-2 ' + (darkMode ? 'text-white' : 'text-gray-900') },
+                'Accesso Negato'
+            ),
+            React.createElement('p', { className: textClass },
+                'I lavoratori possono visualizzare i propri fogli dalla lista.'
+            )
+        );
+    }
 
 const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
     if (!oraIn || !oraOut) return '0.00';
@@ -259,33 +352,55 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             }
         }, [showOptionalFieldsAdd, addWorkerSignaturePad]);
 
-    // Close activity dropdown when clicking outside
+    // Close dropdowns when clicking outside
     React.useEffect(() => {
         const handleClickOutside = (event) => {
             if (showActivityDropdown && !event.target.closest('.activity-dropdown-container')) {
                 setShowActivityDropdown(false);
             }
+            if (showCompanyDropdown && !event.target.closest('.company-dropdown-container')) {
+                setShowCompanyDropdown(false);
+            }
+            if (showSupervisorDropdown && !event.target.closest('.supervisor-dropdown-container')) {
+                setShowSupervisorDropdown(false);
+            }
+            if (showAddressDropdown && !event.target.closest('.address-dropdown-container')) {
+                setShowAddressDropdown(false);
+            }
         };
 
-        if (showActivityDropdown) {
+        if (showActivityDropdown || showCompanyDropdown || showSupervisorDropdown || showAddressDropdown) {
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
-    }, [showActivityDropdown]);
+    }, [showActivityDropdown, showCompanyDropdown, showSupervisorDropdown, showAddressDropdown]);
 
     // --- Static Weather Fetch Logic ---
     // Copied/adapted from WeatherWidget.js for static weather snapshot
     async function geocodeIt(name) {
         const q = ('' + (name || '')).trim();
         if (!q) return null;
-        try {
-            const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=it`);
-            if (!res.ok) return null;
-            const j = await res.json();
-            if (j && j.results && j.results.length) {
-                return j.results[0];
+        
+        // 🔧 FIX: Se la località contiene virgola (es. "Roma, Lazio"), prova prima il nome completo
+        // poi solo la prima parte (città)
+        const queries = [q];
+        if (q.includes(',')) {
+            const cityOnly = q.split(',')[0].trim();
+            if (cityOnly) queries.push(cityOnly);
+        }
+        
+        for (const query of queries) {
+            try {
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=it`);
+                if (!res.ok) continue;
+                const j = await res.json();
+                if (j && j.results && j.results.length) {
+                    return j.results[0];
+                }
+            } catch (e) {
+                console.warn(`⚠️ Geocoding fallito per "${query}":`, e);
             }
-        } catch (e) {}
+        }
         return null;
     }
 
@@ -310,13 +425,33 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
     }
 
     const saveSheet = async () => {
-        if (!currentSheet.titoloAzienda || !currentSheet.responsabile) {
-            showToastLocal(`❌ ${t.fillRequired}`, 'error');
+        console.log('💾 DEBUG SAVE - Starting saveSheet...');
+        console.log('💾 DEBUG SAVE - currentSheet:', currentSheet);
+        console.log('💾 DEBUG SAVE - currentSheet.companies:', currentSheet.companies);
+        console.log('💾 DEBUG SAVE - currentSheet.addresses:', currentSheet.addresses);
+        console.log('💾 DEBUG SAVE - canEditSheet:', canEditSheet);
+        console.log('💾 DEBUG SAVE - isReadOnly:', isReadOnly);
+        
+        // ✅ Validazione campi obbligatori (companies e supervisors)
+        if (!currentSheet.companies || currentSheet.companies.length === 0) {
+            alert('❌ Seleziona almeno un\'azienda');
+            showToastLocal('❌ Seleziona almeno un\'azienda', 'error');
+            return;
+        }
+        
+        if (!currentSheet.supervisors || currentSheet.supervisors.length === 0) {
+            alert('❌ Seleziona almeno un responsabile');
+            showToastLocal('❌ Seleziona almeno un responsabile', 'error');
             return;
         }
 
         setLoading(true);
         try {
+            // --- Auto-save indirizzo in recentAddresses ---
+            if (currentSheet.indirizzoEvento && currentSheet.indirizzoEvento.trim()) {
+                await window.saveRecentAddress(db, currentSheet.indirizzoEvento);
+            }
+            
             // --- Static Weather Fetch ---
             let weatherStatic = null;
             const loc = currentSheet.localita || currentSheet.location;
@@ -327,8 +462,15 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     weatherStatic = await fetchWeather(geo.latitude, geo.longitude, dateStr);
                 }
             }
-            // Save static weather snapshot in sheet
-            const sheetToSave = { ...currentSheet, weatherStatic };
+            // Save static weather snapshot in sheet + current weatherData if available
+            const sheetToSave = { 
+                ...currentSheet, 
+                weatherStatic,
+                // Salva anche weatherData corrente (temperature, condition, icon) per ricordo
+                weatherData: currentSheet.weatherData || null
+            };
+            console.log('💾 DEBUG SAVE - sheetToSave.companies:', sheetToSave.companies);
+            console.log('💾 DEBUG SAVE - sheetToSave.addresses:', sheetToSave.addresses);
             await onSave(sheetToSave);
             if (addAuditLog) {
                 await addAuditLog('SHEET_EDIT', `${t.edit}: ${currentSheet.titoloAzienda}`);
@@ -702,19 +844,45 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
     };
 
     const completeSheet = async () => {
+        // Validazione campi obbligatori
+        if (!currentSheet.companies || currentSheet.companies.length === 0) {
+            alert('❌ Seleziona almeno un\'azienda');
+            showToastLocal('❌ Seleziona almeno un\'azienda', 'error');
+            return;
+        }
+        
+        if (!currentSheet.supervisors || currentSheet.supervisors.length === 0) {
+            alert('❌ Seleziona almeno un responsabile');
+            showToastLocal('❌ Seleziona almeno un responsabile', 'error');
+            return;
+        }
+        
         if (!currentSheet.firmaResponsabile) {
+            alert(`❌ ${t.signatureMissing || 'Firma del responsabile mancante'}`);
             showToastLocal(`❌ ${t.signatureMissing}`, 'error');
             return;
         }
         if (!currentSheet.lavoratori || currentSheet.lavoratori.length === 0) {
+            alert(`❌ ${t.noWorkers || 'Nessun lavoratore presente'}`);
             showToastLocal(`❌ ${t.noWorkers}`, 'error');
             return;
         }
         
         setLoading(true);
         try {
+            // --- Auto-save indirizzo in recentAddresses ---
+            if (currentSheet.indirizzoEvento && currentSheet.indirizzoEvento.trim()) {
+                await window.saveRecentAddress(db, currentSheet.indirizzoEvento);
+            }
+            
             await onComplete(currentSheet);
-            await generatePDF(currentSheet, companyLogo);
+            
+            // Genera PDF usando window.exportToPDF
+            if (typeof window.exportToPDF === 'function') {
+                await window.exportToPDF(currentSheet, sheetCompanyLogo);
+            } else {
+                console.error('❌ exportToPDF function not available');
+            }
             
             showToastLocal(`✅ ${t.sheetCompleted}`, 'success');
             
@@ -750,7 +918,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             const customFilename = `${filenamePrefix}_PARZIALE_${partialSheet.titoloAzienda || 'N_D'}_${partialSheet.data}.pdf`.replace(/\s+/g, '_');
             
             if (typeof window.exportToPDF === 'function') {
-                await window.exportToPDF(partialSheet, companyLogo, customFilename);
+                await window.exportToPDF(partialSheet, sheetCompanyLogo, customFilename);
             } else {
                 throw new Error('exportToPDF function not available');
             }
@@ -807,61 +975,433 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
 
             {/* Sheet Info */}
             <div className={`${cardClass} rounded-xl shadow-lg p-4 sm:p-6`}>
+                {isReadOnly && (
+                    <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-600 rounded-lg flex items-center gap-2">
+                        <span className="text-2xl">🔒</span>
+                        <span className="font-semibold text-yellow-800 dark:text-yellow-200">
+                            Modalità Sola Lettura - Visualizzazione dati senza possibilità di modifica
+                        </span>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-                    <input
-                        type="text"
-                        placeholder={`${t.company} *`}
-                        value={currentSheet.titoloAzienda}
-                        onChange={(e) => setCurrentSheet({...currentSheet, titoloAzienda: e.target.value})}
-                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                    />
-                    <input
-                        type="date"
-                        value={currentSheet.data}
-                        onChange={(e) => setCurrentSheet({...currentSheet, data: e.target.value})}
-                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                    />
-                    <input
-                        type="text"
-                        placeholder={`${t.responsible} *`}
-                        value={currentSheet.responsabile}
-                        onChange={(e) => setCurrentSheet({...currentSheet, responsabile: e.target.value})}
-                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                    />
+                    {/* 🏢 CAMPO AZIENDA (multi-select compatto) */}
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            🏢 {t.company || 'Azienda'} <span className="text-red-500">*</span>
+                        </label>
+                        
+                        {canEditCompanyName ? (
+                            <div className="relative company-dropdown-container">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCompanyDropdown(!showCompanyDropdown)}
+                                    disabled={isReadOnly}
+                                    className={`w-full px-3 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-left text-sm disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                    {currentSheet.companies && currentSheet.companies.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                            {currentSheet.companies.map(companyId => {
+                                                const company = companies?.find(c => c.id === companyId);
+                                                if (!company) return null;
+                                                const displayName = company.name || company.nome;
+                                                const displayColor = company.color || company.colore;
+                                                return (
+                                                    <span
+                                                        key={companyId}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-white text-xs"
+                                                        style={{ backgroundColor: displayColor }}
+                                                    >
+                                                        {displayName}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const updated = (currentSheet.companies || []).filter(id => id !== companyId);
+                                                                setCurrentSheet({...currentSheet, companies: updated});
+                                                            }}
+                                                            className="hover:bg-black/20 rounded-full w-3 h-3 flex items-center justify-center text-xs"
+                                                            disabled={isReadOnly}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <span className="text-gray-400 text-sm">{t.selectCompanies || 'Seleziona aziende...'}</span>
+                                    )}
+                                </button>
+                                {showCompanyDropdown && (
+                                    <div className={`absolute z-50 w-full mt-1 ${cardClass} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} rounded-lg shadow-lg max-h-48 overflow-y-auto`}>
+                                        {companies && companies.length > 0 ? (
+                                            companies.map(company => {
+                                                const isSelected = (currentSheet.companies || []).includes(company.id);
+                                                const displayName = company.name || company.nome;
+                                                const displayColor = company.color || company.colore;
+                                                return (
+                                                    <label
+                                                        key={company.id}
+                                                        className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                                                        style={{ borderLeft: `3px solid ${displayColor}` }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                const current = currentSheet.companies || [];
+                                                                const updated = e.target.checked
+                                                                    ? [...current, company.id]
+                                                                    : current.filter(id => id !== company.id);
+                                                                setCurrentSheet({...currentSheet, companies: updated});
+                                                            }}
+                                                            className="w-3 h-3"
+                                                        />
+                                                        <span className="flex-1">{displayName}</span>
+                                                    </label>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="px-3 py-2 text-gray-500 text-xs">
+                                                {t.noCompaniesConfigured || 'Nessuna azienda configurata'}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className={`px-3 py-2 rounded-lg border ${inputClass} bg-gray-100 text-sm`}>
+                                <span className="text-gray-600">
+                                    {currentSheet.companies?.map(cId => {
+                                        const c = companies?.find(comp => comp.id === cId);
+                                        return c ? (c.name || c.nome) : null;
+                                    }).filter(Boolean).join(', ') || t.company}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                     
-                    {/* 📍 NUOVO CAMPO: Indirizzo Evento/Magazzino */}
-                    <div className="space-y-2">
-                        <input
-                            type="text"
-                            placeholder={t.locationAddress || 'Indirizzo Evento/Magazzino'}
-                            value={currentSheet.indirizzoEvento || ''}
-                            onChange={(e) => setCurrentSheet({...currentSheet, indirizzoEvento: e.target.value})}
-                            className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
-                        />
-                        {currentSheet.indirizzoEvento && (
-                            <div className="flex gap-2">
+                    {/* 📅 CAMPO DATA */}
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            📅 {t.date || 'Data'} <span className="text-red-500">*</span>
+                        </label>
+                        {canEditSheetDate ? (
+                            <input
+                                type="date"
+                                value={currentSheet.data}
+                                onChange={(e) => setCurrentSheet({...currentSheet, data: e.target.value})}
+                                className={`w-full px-3 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-sm`}
+                            />
+                        ) : (
+                            <div className={`px-3 py-2 rounded-lg border ${inputClass} bg-gray-100 text-sm`}>
+                                <span className="text-gray-600">{currentSheet.data || t.date}</span>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* 👔 CAMPO RESPONSABILE (multi-select compatto) */}
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            👔 {t.responsible || 'Responsabile'} <span className="text-red-500">*</span>
+                        </label>
+                        
+                        {canEditManagerName ? (
+                            <div className="relative supervisor-dropdown-container">
                                 <button
                                     type="button"
-                                    onClick={shareAddress}
-                                    title={t.shareAddress || 'Condividi Indirizzo'}
-                                    className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
+                                    onClick={() => setShowSupervisorDropdown(!showSupervisorDropdown)}
+                                    className={`w-full px-3 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-left text-sm`}
                                 >
-                                    <span className="text-xl">📤</span>
-                                    <span>{t.share || 'Condividi'}</span>
+                                    {currentSheet.supervisors && currentSheet.supervisors.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                            {currentSheet.supervisors.map(userId => {
+                                                const user = users.find(u => u.id === userId);
+                                                if (!user) return null;
+                                                return (
+                                                    <span
+                                                        key={userId}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-600 text-white text-xs"
+                                                    >
+                                                        {user.firstName} {user.lastName}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const updated = (currentSheet.supervisors || []).filter(id => id !== userId);
+                                                                setCurrentSheet({...currentSheet, supervisors: updated});
+                                                            }}
+                                                            className="hover:bg-black/20 rounded-full w-3 h-3 flex items-center justify-center text-xs"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <span className="text-gray-400 text-sm">{t.selectSupervisors || 'Seleziona responsabili...'}</span>
+                                    )}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const encodedAddress = encodeURIComponent(currentSheet.indirizzoEvento);
-                                        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-                                        window.open(mapsUrl, '_blank');
-                                    }}
-                                    title={t.openInMaps || 'Apri in Google Maps'}
-                                    className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
-                                >
-                                    <span className="text-xl">📍</span>
-                                    <span>{t.openInMaps || 'Maps'}</span>
-                                </button>
+                                {showSupervisorDropdown && (
+                                    <div className={`absolute z-50 w-full mt-1 ${cardClass} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} rounded-lg shadow-lg max-h-64 overflow-hidden flex flex-col`}>
+                                        {/* Search Bar */}
+                                        <div className="p-2 border-b" style={{ borderColor: darkMode ? '#374151' : '#E5E7EB' }}>
+                                            <input
+                                                type="text"
+                                                placeholder={t.searchPlaceholder || "🔍 Cerca nome, cognome, email..."}
+                                                value={searchSupervisor}
+                                                onChange={(e) => setSearchSupervisor(e.target.value)}
+                                                className={`w-full px-2 py-1.5 rounded border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-xs`}
+                                                onClick={(e) => e.stopPropagation()}
+                                            />
+                                        </div>
+                                        
+                                        {/* Users List */}
+                                        <div className="overflow-y-auto max-h-48">
+                                            {users && users.length > 0 ? (
+                                                users
+                                                    .filter(user => !user.blocked) // ⚠️ ESCLUDI BLACKLIST
+                                                    .filter(user => !user.suspended) // ⚠️ ESCLUDI SOSPESI
+                                                    .filter(user => ['admin', 'manager', 'responsabile'].includes(user.role)) // ✅ SOLO RUOLI SUPERVISORI
+                                                    .filter(user => {
+                                                        if (!searchSupervisor.trim()) return true;
+                                                        const search = searchSupervisor.toLowerCase();
+                                                        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+                                                        const email = (user.email || '').toLowerCase();
+                                                        return fullName.includes(search) || email.includes(search);
+                                                    })
+                                                    .map(user => {
+                                                        const isSelected = (currentSheet.supervisors || []).includes(user.id);
+                                                        return (
+                                                            <label
+                                                                key={user.id}
+                                                                className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
+                                                                        const current = currentSheet.supervisors || [];
+                                                                        const updated = e.target.checked
+                                                                            ? [...current, user.id]
+                                                                            : current.filter(id => id !== user.id);
+                                                                        setCurrentSheet({...currentSheet, supervisors: updated});
+                                                                    }}
+                                                                    className="w-3 h-3"
+                                                                />
+                                                                <span className="flex-1">{user.firstName} {user.lastName}</span>
+                                                                <span className="text-xs text-gray-500">{user.role}</span>
+                                                            </label>
+                                                        );
+                                                    })
+                                            ) : (
+                                                <div className="px-3 py-2 text-gray-500 text-xs">
+                                                    {t.noUsersFound || 'Nessun utente trovato'}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className={`px-3 py-2 rounded-lg border ${inputClass} bg-gray-100 text-sm`}>
+                                <span className="text-gray-600">
+                                    {currentSheet.supervisors?.map(userId => {
+                                        const u = users.find(user => user.id === userId);
+                                        return u ? `${u.firstName} ${u.lastName}` : null;
+                                    }).filter(Boolean).join(', ') || t.responsible}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* 📍 CAMPO INDIRIZZO (sistema ibrido: autocomplete intelligente filtrato) */}
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            📍 {t.locationAddress || 'Indirizzo Evento/Magazzino'}
+                        </label>
+                        
+                        {canEditAddress ? (
+                            <div className="space-y-2 relative">
+                                {/* Input con autocomplete filtrato in tempo reale */}
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={currentSheet.indirizzoEvento || ''}
+                                        onChange={(e) => {
+                                            setCurrentSheet({...currentSheet, indirizzoEvento: e.target.value});
+                                            setAddressInputFocused(true); // Mostra dropdown quando si scrive
+                                        }}
+                                        onFocus={() => setAddressInputFocused(true)}
+                                        onBlur={() => setTimeout(() => setAddressInputFocused(false), 200)} // Delay per permettere click
+                                        placeholder="Via Roma 123, Milano oppure seleziona..."
+                                        className={`w-full px-3 py-2 pr-24 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-sm`}
+                                    />
+                                    
+                                    {/* Pulsanti condividi e maps */}
+                                    {currentSheet.indirizzoEvento && currentSheet.indirizzoEvento.trim() && (
+                                        <div className="absolute right-1 top-1 flex gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const text = `📍 ${t.address || 'Indirizzo'}: ${currentSheet.indirizzoEvento}`;
+                                                    if (navigator.share) {
+                                                        navigator.share({ text });
+                                                    } else {
+                                                        navigator.clipboard.writeText(text);
+                                                        alert(t.addressCopied || '📋 Indirizzo copiato negli appunti!');
+                                                    }
+                                                }}
+                                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition-colors"
+                                                title={t.shareAddress || 'Condividi indirizzo'}
+                                            >
+                                                🔗
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentSheet.indirizzoEvento)}`;
+                                                    window.open(mapsUrl, '_blank');
+                                                }}
+                                                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition-colors"
+                                                title={t.openInMaps || 'Apri in Google Maps'}
+                                            >
+                                                🗺️
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* 🔽 DROPDOWN AUTOCOMPLETE INTELLIGENTE (solo se focused O se sta scrivendo) */}
+                                {addressInputFocused && (() => {
+                                    const query = (currentSheet.indirizzoEvento || '').toLowerCase().trim();
+                                    
+                                    // Combina indirizzi fissi + recenti
+                                    const fixedAddresses = (appSettings.addresses || []).map(addr => {
+                                        const street = addr.street || addr.indirizzo || '';
+                                        const city = addr.city || addr.citta || '';
+                                        const zip = addr.zipCode || addr.cap || '';
+                                        const fullAddress = `${street}, ${zip} ${city}`.trim();
+                                        return {
+                                            id: `fixed-${addr.id}`,
+                                            display: `${addr.emoji || '📍'} ${addr.name || addr.nome}`,
+                                            value: fullAddress,
+                                            type: 'fixed',
+                                            priority: 100 // Priorità alta
+                                        };
+                                    });
+                                    
+                                    const recentList = (recentAddresses || []).map(rec => ({
+                                        id: `recent-${rec.id}`,
+                                        display: `🕒 ${rec.address}`,
+                                        value: rec.address,
+                                        type: 'recent',
+                                        usedCount: rec.usedCount || 0,
+                                        priority: rec.usedCount || 0 // Priorità in base a utilizzo
+                                    }));
+                                    
+                                    // Filtra in base alla query (se lunghezza >= 2)
+                                    let filtered = [...fixedAddresses, ...recentList];
+                                    if (query.length >= 2) {
+                                        filtered = filtered.filter(item => 
+                                            item.value.toLowerCase().includes(query) || 
+                                            item.display.toLowerCase().includes(query)
+                                        );
+                                    }
+                                    
+                                    // Ordina per priorità (fissi prima, poi recenti più usati)
+                                    filtered.sort((a, b) => {
+                                        if (a.type === 'fixed' && b.type !== 'fixed') return -1;
+                                        if (a.type !== 'fixed' && b.type === 'fixed') return 1;
+                                        return b.priority - a.priority;
+                                    });
+                                    
+                                    // Limita a 8 risultati max
+                                    filtered = filtered.slice(0, 8);
+                                    
+                                    return filtered.length > 0 ? (
+                                        <div className={`absolute z-50 w-full mt-1 rounded-lg shadow-lg border max-h-64 overflow-y-auto ${
+                                            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'
+                                        }`}>
+                                            {filtered.map(item => (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setCurrentSheet({...currentSheet, indirizzoEvento: item.value});
+                                                        setAddressInputFocused(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 hover:bg-indigo-600 hover:text-white transition-colors ${
+                                                        darkMode ? 'text-gray-200' : 'text-gray-800'
+                                                    }`}
+                                                >
+                                                    <div className="text-sm font-medium">{item.display}</div>
+                                                    <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                        {item.value}
+                                                        {item.type === 'recent' && item.usedCount > 0 && (
+                                                            <span className="ml-2 text-xs opacity-75">
+                                                                ({item.usedCount}x)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : null;
+                                })()}
+                                
+                                {/* Pulsanti rapidi (solo se input vuoto o < 3 caratteri) */}
+                                {(!currentSheet.indirizzoEvento || currentSheet.indirizzoEvento.length < 3) && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {appSettings.addresses && appSettings.addresses.slice(0, 3).map(address => {
+                                            const street = address.street || address.indirizzo || '';
+                                            const city = address.city || address.citta || '';
+                                            const zip = address.zipCode || address.cap || '';
+                                            const fullAddress = `${street}, ${zip} ${city}`.trim();
+                                            return (
+                                                <button
+                                                    key={address.id}
+                                                    type="button"
+                                                    onClick={() => setCurrentSheet({...currentSheet, indirizzoEvento: fullAddress})}
+                                                    className={`px-2 py-1 text-xs rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                                                >
+                                                    {address.emoji} {address.name || address.nome}
+                                                </button>
+                                            );
+                                        })}
+                                        {recentAddresses && recentAddresses.slice(0, 2).map(recent => (
+                                            <button
+                                                key={recent.id}
+                                                type="button"
+                                                onClick={() => setCurrentSheet({...currentSheet, indirizzoEvento: recent.address})}
+                                                className={`px-2 py-1 text-xs rounded ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                                            >
+                                                🕒 {recent.address.length > 30 ? recent.address.substring(0, 30) + '...' : recent.address}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className={`px-4 py-3 rounded-lg border ${inputClass} bg-gray-100 flex items-center justify-between`}>
+                                <span className="text-gray-600">
+                                    {currentSheet.indirizzoEvento || t.locationAddress || 'Indirizzo'}
+                                </span>
+                                {currentSheet.indirizzoEvento && (
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(currentSheet.indirizzoEvento)}`;
+                                                window.open(mapsUrl, '_blank');
+                                            }}
+                                            className="text-green-600 hover:text-green-700 text-sm"
+                                        >
+                                            🗺️
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -959,7 +1499,8 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 type="time"
                                 value={currentSheet.orarioStimatoDa || ''}
                                 onChange={(e) => setCurrentSheet({...currentSheet, orarioStimatoDa: e.target.value})}
-                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 ${!canEditEstimatedHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
+                                disabled={!canEditEstimatedHours}
                             />
                         </div>
                         <div>
@@ -970,46 +1511,60 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 type="time"
                                 value={currentSheet.orarioStimatoA || ''}
                                 onChange={(e) => setCurrentSheet({...currentSheet, orarioStimatoA: e.target.value})}
-                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
+                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 ${!canEditEstimatedHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
+                                disabled={!canEditEstimatedHours}
                             />
                         </div>
                     </div>
-                    
-                    <div className="flex items-center">
-                    <input
-                        type="text"
-                        placeholder={t.location}
-                        value={weatherInput}
-                        onChange={(e) => {
-                            const v = e.target.value;
-                            // Update visible input immediately
-                            setWeatherInput(v);
+                </div>
 
-                            // Apply immediate compat fields to currentSheet.location for other logic
-                            setCurrentSheet(prev => ({ ...prev, location: v }));
-
-                            // Debounced update for currentSheet.localita so WeatherWidget fetches after pause
-                            if (localitaDebounceRef.current) clearTimeout(localitaDebounceRef.current);
-                            localitaDebounceRef.current = setTimeout(() => {
-                                setCurrentSheet(prev => ({ ...prev, localita: v }));
-                            }, 600);
+                {/* 🌤️ Widget Meteo Full-Width Unificato */}
+                <div className="mb-4">
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        🌤️ {t.location || 'Località'}
+                    </label>
+                    <WeatherWidget 
+                        location={currentSheet.localita || currentSheet.location || 'Roma'} 
+                        darkMode={darkMode}
+                        showControls={true}
+                        onWeatherChange={async (weatherKey, weatherData) => {
+                            // Salva i dati meteo correnti nel foglio
+                            if (weatherData) {
+                                setCurrentSheet(prev => ({ 
+                                    ...prev,
+                                    localita: weatherData.location,
+                                    location: weatherData.location,
+                                    weatherData: {
+                                        temp: weatherData.temp,
+                                        condition: weatherData.condition,
+                                        icon: weatherKey,
+                                        location: weatherData.location,
+                                        timestamp: new Date().toISOString()
+                                    }
+                                }));
+                                
+                                // 🌤️ AUTO-CARICA DATI STORICI COMPLETI quando clicchi "Aggiorna"
+                                const dateStr = currentSheet.data || currentSheet.date;
+                                if (weatherData.location && dateStr) {
+                                    try {
+                                        const geo = await geocodeIt(weatherData.location);
+                                        if (geo && geo.latitude && geo.longitude) {
+                                            const weatherStatic = await fetchWeather(geo.latitude, geo.longitude, dateStr);
+                                            if (weatherStatic) {
+                                                setCurrentSheet(prev => ({
+                                                    ...prev,
+                                                    weatherStatic
+                                                }));
+                                                showToastLocal(`✅ ${weatherStatic.temp_max}°C/${weatherStatic.temp_min}°C • ${weatherStatic.precipitation}mm`, 'success');
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error('⚠️ Errore caricamento dati storici:', error);
+                                    }
+                                }
+                            }
                         }}
-                        className={`px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500`}
                     />
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (localitaDebounceRef.current) clearTimeout(localitaDebounceRef.current);
-                            setCurrentSheet(prev => ({ ...prev, localita: weatherInput }));
-                            // ensure compatibility location too
-                            setCurrentSheet(prev => ({ ...prev, location: weatherInput }));
-                        }}
-                        title={t.weatherUpdate}
-                        className="ml-3 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm"
-                    >
-                        {t.weatherUpdate}
-                    </button>
-                    </div>
                 </div>
 
                 <textarea
@@ -1021,22 +1576,26 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 />
 
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3">
-                    <button
-                        onClick={saveSheet}
-                        disabled={loading}
-                        className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
-                    >
-                        {loading ? `⏳ ${t.loading}...` : `💾 ${t.saveSheet}`}
-                    </button>
+                    {!isReadOnly && canEditSheet && (
+                        <button
+                            onClick={saveSheet}
+                            disabled={loading}
+                            className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                        >
+                            {loading ? `⏳ ${t.loading}...` : `💾 ${t.saveSheet}`}
+                        </button>
+                    )}
                     
                     {/* 🐛 FIX BUG #1: Nuovo handler per genera link */}
-                    <button
-                        onClick={handleGenerateLink}
-                        disabled={loading}
-                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
-                    >
-                        {loading ? `⏳ ${t.loading}...` : `🔗 ${t.generateLink}`}
-                    </button>
+                    {canGenerateWorkerLink && (
+                        <button
+                            onClick={handleGenerateLink}
+                            disabled={loading}
+                            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                        >
+                            {loading ? `⏳ ${t.loading}...` : `🔗 ${t.generateLink}`}
+                        </button>
+                    )}
                 </div>
 
                 {/* Link visibile con indicatore scadenza */}
@@ -1066,13 +1625,19 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                             onClick={(e) => e.target.select()}
                         />
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 const baseUrl = window.location.origin + window.location.pathname;
                                 const link = `${baseUrl}?mode=worker&sheet=${currentSheet.id}`;
-                                navigator.clipboard.writeText(link);
-                                showToastLocal('✅ Link copiato!', 'success');
+                                try {
+                                    await navigator.clipboard.writeText(link);
+                                    showToastLocal(`✅ ${t.linkCopied || 'Link copiato negli appunti!'}`, 'success');
+                                } catch (err) {
+                                    console.error('Errore copia link:', err);
+                                    showToastLocal(`❌ ${t.errorCopyingLink || 'Errore durante la copia'}`, 'error');
+                                }
                             }}
-                            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold"
+                            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold transition-colors"
+                            title={t.copyLink || 'Copia link'}
                         >
                             📋
                         </button>
@@ -1089,16 +1654,18 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {/* 🔧 FIX: Pulsante Aggiungi Lavoratore */}
-                        <button
-                            onClick={() => setShowAddWorkerForm(!showAddWorkerForm)}
-                            className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
-                                showAddWorkerForm 
-                                    ? 'bg-green-600 text-white' 
-                                    : 'bg-green-600 hover:bg-green-700 text-white'
-                            }`}
-                        >
-                            {showAddWorkerForm ? `✕ ${t.cancel}` : `➕ ${t.addWorker}`}
-                        </button>
+                        {canAddWorkers && (
+                            <button
+                                onClick={() => setShowAddWorkerForm(!showAddWorkerForm)}
+                                className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                                    showAddWorkerForm 
+                                        ? 'bg-green-600 text-white' 
+                                        : 'bg-green-600 hover:bg-green-700 text-white'
+                                }`}
+                            >
+                                {showAddWorkerForm ? `✕ ${t.cancel}` : `➕ ${t.addWorker}`}
+                            </button>
+                        )}
                         
                         {currentSheet.lavoratori?.length > 0 && (
                             <button
@@ -1360,20 +1927,23 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                     type="time"
                                                     value={editingWorker.oraIn}
                                                     onChange={(e) => setEditingWorker({...editingWorker, oraIn: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm ${!canEditHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
+                                                    disabled={!canEditHours}
                                                 />
                                                 <input
                                                     type="time"
                                                     value={editingWorker.oraOut}
                                                     onChange={(e) => setEditingWorker({...editingWorker, oraOut: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm ${!canEditHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
+                                                    disabled={!canEditHours}
                                                 />
                                                 <input
                                                     type="number"
                                                     value={editingWorker.pausaMinuti}
                                                     onChange={(e) => setEditingWorker({...editingWorker, pausaMinuti: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm ${!canEditHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
                                                     placeholder={t.break}
+                                                    disabled={!canEditHours}
                                                 />
                                                 <input
                                                     type="text"
@@ -1673,49 +2243,57 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                             alt={t.responsibleSignature}
                             className="border-2 border-green-500 rounded-lg mb-3 p-2 bg-white max-w-md w-full" 
                         />
-                        <button
-                            onClick={deleteResponsabileSignature}
-                            disabled={loading}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base disabled:bg-gray-400"
-                        >
-                            {loading ? `⏳ ${t.loading}...` : `🗑️ ${t.deleteSignature}`}
-                        </button>
+                        {canSignSheet && (
+                            <button
+                                onClick={deleteResponsabileSignature}
+                                disabled={loading}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm sm:text-base disabled:bg-gray-400"
+                            >
+                                {loading ? `⏳ ${t.loading}...` : `🗑️ ${t.deleteSignature}`}
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div>
-                        <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
-                            {/* 🐛 FIX: Canvas con key per forzare re-render */}
-                            <canvas 
-                                key={typeof canvasKey !== 'undefined' ? canvasKey : 0}
-                                ref={respCanvasRef} 
-                                width={800} 
-                                height={300} 
-                                className="signature-canvas"
-                                style={{ 
-                                    touchAction: 'none',
-                                    width: '100%',
-                                    height: 'auto',
-                                    maxHeight: '150px',
-                                    aspectRatio: '8/3',
-                                    display: 'block'
-                                }}
-                            />
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                                onClick={saveResponsabileSignature}
-                                disabled={loading}
-                                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 text-sm sm:text-base"
-                            >
-                                {loading ? `⏳ ${t.loading}...` : `✓ ${t.saveSignature}`}
-                            </button>
-                            <button
-                                onClick={clearSignature}
-                                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold text-sm sm:text-base"
-                            >
-                                🗑️ {t.clear}
-                            </button>
-                        </div>
+                        {canSignSheet ? (
+                            <>
+                                <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
+                                    {/* 🐛 FIX: Canvas con key per forzare re-render */}
+                                    <canvas 
+                                        key={typeof canvasKey !== 'undefined' ? canvasKey : 0}
+                                        ref={respCanvasRef} 
+                                        width={800} 
+                                        height={300} 
+                                        className="signature-canvas"
+                                        style={{ 
+                                            touchAction: 'none',
+                                            width: '100%',
+                                            height: 'auto',
+                                            maxHeight: '150px',
+                                            aspectRatio: '8/3',
+                                            display: 'block'
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        onClick={saveResponsabileSignature}
+                                        disabled={loading}
+                                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 text-sm sm:text-base"
+                                    >
+                                        {loading ? `⏳ ${t.loading}...` : `✓ ${t.saveSignature}`}
+                                    </button>
+                                    <button
+                                        onClick={clearSignature}
+                                        className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold text-sm sm:text-base"
+                                    >
+                                        🗑️ {t.clear}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-gray-500 italic">{t.noPermission || 'Non hai i permessi per aggiungere una firma'}</p>
+                        )}
                     </div>
                 )}
             </div>
@@ -1733,13 +2311,15 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                             </p>
                         </div>
                         <div className="flex gap-2">
-                            <button
-                                onClick={generatePartialPDF}
-                                disabled={loading || selectedWorkers.length === 0}
-                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm sm:text-base transition-colors disabled:bg-gray-400 shadow-lg"
-                            >
-                                {loading ? `⏳ ${t.loading}...` : `📄 ${t.generatePDF || 'Genera PDF'}`}
-                            </button>
+                            {window.hasRoleAccess(currentUser, 'sheets.generatePdf') && (
+                                <button
+                                    onClick={generatePartialPDF}
+                                    disabled={loading || selectedWorkers.length === 0}
+                                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm sm:text-base transition-colors disabled:bg-gray-400 shadow-lg"
+                                >
+                                    {loading ? `⏳ ${t.loading}...` : `📄 ${t.generatePDF || 'Genera PDF'}`}
+                                </button>
+                            )}
                             <button
                                 onClick={() => {
                                     setPartialPDFMode(false);
@@ -1753,14 +2333,16 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     </>
                 ) : (
                     <>
-                        <button
-                            onClick={completeSheet}
-                            disabled={!currentSheet.firmaResponsabile || loading}
-                            className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-base sm:text-lg transition-colors disabled:bg-gray-400 shadow-lg"
-                        >
-                            {loading ? `⏳ ${t.loading}...` : `✅ ${t.completePDF}`}
-                        </button>
-                        {currentSheet.lavoratori && currentSheet.lavoratori.length > 0 && (
+                        {window.hasRoleAccess(currentUser, 'sheets.generatePdf') && (
+                            <button
+                                onClick={completeSheet}
+                                disabled={loading}
+                                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-base sm:text-lg transition-colors disabled:bg-gray-400 shadow-lg"
+                            >
+                                {loading ? `⏳ ${t.loading}...` : `✅ ${t.completePDF}`}
+                            </button>
+                        )}
+                        {currentSheet.lavoratori && currentSheet.lavoratori.length > 0 && window.hasRoleAccess(currentUser, 'sheets.generatePdf') && (
                             <button
                                 onClick={() => setPartialPDFMode(true)}
                                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm sm:text-base transition-colors shadow-lg"
@@ -1771,11 +2353,16 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     </>
                 )}
             </div>
-        {/* Widget Meteo per la località del foglio */}
-        {currentSheet?.localita && (
-                                <div className="my-2">
-                                    <WeatherWidget location={currentSheet.localita} darkMode={darkMode} />
-                                </div>
+        
+        {/* 🍞 Toast Notification Locale */}
+        {toast.visible && (
+            <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-semibold text-sm sm:text-base transition-all ${
+                toast.type === 'success' ? 'bg-green-600' : 
+                toast.type === 'error' ? 'bg-red-600' : 
+                'bg-blue-600'
+            }`}>
+                {toast.message}
+            </div>
         )}
         </div>
     );

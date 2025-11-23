@@ -1,5 +1,6 @@
-// Service Worker - v4.0 PWA con Offline Support
-const CACHE_NAME = 'registro-ore-v4.0';
+// Service Worker - Report Ore Facchini - v4.3.5-force-reload
+// Build: 20251119-1235
+const CACHE_NAME = 'report-ore-facchini-v4.3.5-force-reload';
 const urlsToCache = [
     '/Report_Ore_Facchini/',
     '/Report_Ore_Facchini/index.html',
@@ -39,21 +40,10 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch - Network First, fallback to Cache
+// Fetch - BYPASS CACHE FOR DEBUGGING
 self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                const responseClone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseClone);
-                });
-                return response;
-            })
-            .catch(() => {
-                return caches.match(event.request);
-            })
-    );
+    // SEMPRE Network, MAI cache - solo per debug
+    event.respondWith(fetch(event.request));
 });
 
 // Background Sync
