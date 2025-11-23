@@ -1300,40 +1300,8 @@ const App = () => {
             }`}>
                 <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
                     <div className="flex justify-between items-center">
-                        {/* Desktop Navigation - MODERNIZZATO */}
-                        <nav className="hidden lg:flex items-center gap-2">
-                            {[
-                                { view: 'dashboard', icon: '📊', label: t.dashboard, feature: 'dashboard.view' },
-                                { view: 'list', icon: '📋', label: t.sheets, feature: 'sheets.view' },
-                                { view: 'calendar', icon: '📆', label: t.calendar || 'Calendario', feature: 'calendar.view' },
-                                { view: 'workerstats', icon: '👷', label: t.onCallWorkers || 'Lavoratori On-Call', feature: 'onCall.view' },
-                                { view: 'users', icon: '👥', label: t.userManagement || 'Gestione Utenti', feature: 'users.view' },
-                                { view: 'blacklist', icon: '🚫', label: t.blacklist, feature: 'blacklist.view' },
-                                { view: 'reports', icon: '📈', label: t.reports, feature: 'reports.view' },
-                                { view: 'settings', icon: '⚙️', label: t.settings, feature: 'settings.view' },
-                                { view: 'Profile', icon: '👤', label: t.profile || 'Profilo', feature: 'profile.viewOwn' }
-                            ].filter(item => window.hasRoleAccess(currentUser, item.feature)).map(item => (
-                                <button
-                                    key={item.view}
-                                    onClick={() => setCurrentView(item.view)}
-                                    className={`px-3 py-2 rounded-lg transition-all duration-300 text-sm font-medium ${
-                                        currentView === item.view 
-                                            ? darkMode
-                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50 scale-105'
-                                                : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-300/50 scale-105'
-                                            : darkMode
-                                                ? 'text-gray-300 hover:bg-white/10 hover:text-white'
-                                                : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700'
-                                    }`}
-                                >
-                                    <span className="mr-1">{item.icon}</span>
-                                    {item.label}
-                                </button>
-                            ))}
-                        </nav>
-
-                        {/* Actions - MODERNIZZATE */}
-                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                        {/* Left Side - Language & Theme (Mobile + Desktop) */}
+                        <div className="flex items-center gap-1 sm:gap-2">
                             {/* Language Selector - GLASSMORPHISM */}
                             <select
                                 value={language}
@@ -1373,6 +1341,67 @@ const App = () => {
                             >
                                 <span className="text-xl">{darkMode ? '☀️' : '🌙'}</span>
                             </button>
+                        </div>
+
+                        {/* Desktop Navigation - MODERNIZZATO */}
+                        <nav className="hidden lg:flex items-center gap-2">
+                            {[
+                                { view: 'dashboard', icon: '📊', label: t.dashboard, feature: 'dashboard.view' },
+                                { view: 'list', icon: '📋', label: t.sheets, feature: 'sheets.view' },
+                                { view: 'calendar', icon: '📆', label: t.calendar || 'Calendario', feature: 'calendar.view' },
+                                { view: 'workerstats', icon: '👷', label: t.onCallWorkers || 'Lavoratori On-Call', feature: 'onCall.view' },
+                                { view: 'users', icon: '👥', label: t.userManagement || 'Gestione Utenti', feature: 'users.view' },
+                                { view: 'blacklist', icon: '🚫', label: t.blacklist, feature: 'blacklist.view' },
+                                { view: 'reports', icon: '📈', label: t.reports, feature: 'reports.view' },
+                                { view: 'settings', icon: '⚙️', label: t.settings, feature: 'settings.view' }
+                            ].filter(item => window.hasRoleAccess(currentUser, item.feature)).map(item => (
+                                <button
+                                    key={item.view}
+                                    onClick={() => setCurrentView(item.view)}
+                                    className={`px-3 py-2 rounded-lg transition-all duration-300 text-sm font-medium ${
+                                        currentView === item.view 
+                                            ? darkMode
+                                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50 scale-105'
+                                                : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-300/50 scale-105'
+                                            : darkMode
+                                                ? 'text-gray-300 hover:bg-white/10 hover:text-white'
+                                                : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700'
+                                    }`}
+                                >
+                                    <span className="mr-1">{item.icon}</span>
+                                    {item.label}
+                                </button>
+                            ))}
+                        </nav>
+
+                        {/* Right Side - Avatar & Logout */}
+                        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                            {/* User Avatar - Mobile & Desktop */}
+                            <button
+                                onClick={() => setCurrentView('Profile')}
+                                className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full transition-all duration-300 transform hover:scale-110 ${
+                                    currentView === 'Profile'
+                                        ? darkMode
+                                            ? 'ring-2 ring-indigo-500 shadow-lg shadow-indigo-500/50'
+                                            : 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-400/50'
+                                        : 'hover:ring-2 hover:ring-indigo-400/50'
+                                }`}
+                                title={t.profile || 'Profilo'}
+                            >
+                                {currentUser?.avatarURL ? (
+                                    <img 
+                                        src={currentUser.avatarURL} 
+                                        alt={t.profile || 'Profilo'}
+                                        className="w-full h-full rounded-full object-cover"
+                                    />
+                                ) : (
+                                    <div className={`w-full h-full rounded-full flex items-center justify-center text-lg font-bold ${
+                                        darkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'
+                                    }`}>
+                                        {currentUser?.firstName?.[0]?.toUpperCase() || '👤'}
+                                    </div>
+                                )}
+                            </button>
 
                             {/* Logout Button */}
                             <button
@@ -1392,8 +1421,6 @@ const App = () => {
                             >
                                 <span className="text-xl">🚪</span>
                             </button>
-
-                            {/* RadioPlayer ora solo nel Dashboard widget */}
                         </div>
                     </div>
 
@@ -1510,7 +1537,6 @@ const App = () => {
                     }`}>
                         <div className="p-2 grid grid-cols-3 gap-2">
                             {[
-                                { view: 'Profile', icon: '👤', label: t.profile || 'Profilo', feature: 'profile.viewOwn' },
                                 { view: 'users', icon: '👥', label: t.userManagement || 'Utenti', feature: 'users.view' },
                                 { view: 'blacklist', icon: '🚫', label: t.blacklist || 'Blacklist', feature: 'blacklist.view' },
                                 { view: 'calendar', icon: '📆', label: t.calendar || 'Calendario', feature: 'calendar.view' },
