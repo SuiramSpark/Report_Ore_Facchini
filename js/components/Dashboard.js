@@ -955,13 +955,13 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                    {/* Completed / Total (overall) */}
+                    {/* Completed / Total (overall - tutti i fogli non archiviati) */}
                     <div className={`col-span-2`}> 
-                        <div className={`flex justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`} title={`${stats.overallCompletedSheets} / ${stats.overallTotalSheets}`}>
-                            <span>{t.completedSheets}</span>
-                            <span className="font-semibold">{stats.overallCompletedSheets} / {stats.overallTotalSheets}</span>
+                        <div className={`flex justify-between items-baseline text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`} title={`${stats.overallCompletedSheets} completati / ${stats.overallTotalSheets} totali (esclusi archiviati)`}>
+                            <span>{t.completedSheets} <span className="opacity-70 text-xs ml-1">({t.total || 'totali'})</span></span>
+                            <span className="font-semibold whitespace-nowrap">{stats.overallCompletedSheets} / {stats.overallTotalSheets}</span>
                         </div>
-                        <div className={`w-full rounded-full h-2 overflow-hidden ${
+                        <div className={`w-full rounded-full h-2 overflow-hidden mt-1 ${
                             darkMode ? 'bg-gray-700' : 'bg-gray-200'
                         }`}>
                             <div
@@ -970,14 +970,14 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                                         ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
                                         : 'bg-gradient-to-r from-green-500 to-emerald-500'
                                 }`}
-                                style={{ width: `${stats.efficiency}%` }}
+                                style={{ width: `${stats.overallTotalSheets > 0 ? Math.round((stats.overallCompletedSheets / stats.overallTotalSheets) * 100) : 0}%` }}
                             ></div>
                         </div>
                     </div>
 
-                    {/* Extra small widget: Unique workers */}
+                    {/* Lavoratori unici (tutti i fogli, non solo periodo) */}
                     <div className={`text-center p-3 rounded-lg shadow-sm border ${darkMode ? 'border-indigo-700' : 'border-transparent'}`}>
-                        <div className={`p-2 rounded-lg ${darkMode ? 'bg-gradient-to-br from-indigo-700 to-indigo-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-indigo-300 text-white'}`} title={`${stats.activeWorkers} ${t.uniqueWorkers || 'Lavoratori unici'}`}>
+                        <div className={`p-2 rounded-lg ${darkMode ? 'bg-gradient-to-br from-indigo-700 to-indigo-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-indigo-300 text-white'}`} title={`${stats.activeWorkers} ${t.uniqueWorkers || 'Lavoratori unici'} (tutti i fogli)`}>
                             <div className="text-lg font-bold">{stats.activeWorkers}</div>
                             <div className="text-xs opacity-90 mt-1">{t.uniqueWorkers}</div>
                         </div>
