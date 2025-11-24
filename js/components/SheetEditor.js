@@ -90,6 +90,9 @@ const SheetEditor = ({
     const [bulkEditData, setBulkEditData] = React.useState({ pausaMinuti: '', oraIn: '', oraOut: '' });
     const [editingWorker, setEditingWorker] = React.useState(null);
     const [showAddWorkerForm, setShowAddWorkerForm] = React.useState(false);
+    const [showSelectUserWorker, setShowSelectUserWorker] = React.useState(false); // 🆕 Modale selezione da Gestione Utenti
+    const [availableUsers, setAvailableUsers] = React.useState([]); // 🆕 Lista utenti disponibili
+    const [selectedUserId, setSelectedUserId] = React.useState(''); // 🆕 Utente selezionato
     const [newWorker, setNewWorker] = React.useState({
         nome: '',
         cognome: '',
@@ -107,6 +110,8 @@ const SheetEditor = ({
     const [showOptionalFieldsAdd, setShowOptionalFieldsAdd] = React.useState(false);
     const addWorkerCanvasRef = React.useRef(null);
     const [addWorkerSignaturePad, setAddWorkerSignaturePad] = React.useState(null);
+    const editWorkerCanvasRef = React.useRef(null); // 🆕 Canvas firma per editing worker
+    const [editWorkerSignaturePad, setEditWorkerSignaturePad] = React.useState(null); // 🆕 SignaturePad per editing
     const [showActivityDropdown, setShowActivityDropdown] = React.useState(false);
     const [showCompanyDropdown, setShowCompanyDropdown] = React.useState(false);
     const [showSupervisorDropdown, setShowSupervisorDropdown] = React.useState(false);
@@ -117,15 +122,8 @@ const SheetEditor = ({
     const inputClass = darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-700';
 
-    // 🔐 CONTROLLO ACCESSO: Worker NON può accedere
-    React.useEffect(() => {
-        if (currentUser && currentUser.role === 'worker') {
-            showToastLocal('🚫 Accesso negato - Solo visualizzazione propri fogli', 'error');
-            if (typeof onBack === 'function') {
-                setTimeout(() => onBack(), 1500);
-            }
-        }
-    }, [currentUser]);
+    // ✅ RIMOSSO: Workers ora possono modificare le proprie ore
+    // Il controllo di accesso è fatto sui singoli campi tramite canEditWorker
 
     // 🔐 PERMESSI BASATI SU RUOLI
     const userRole = currentUser?.role;
@@ -147,8 +145,8 @@ const SheetEditor = ({
     const canEditAddress = isAdmin || isManager || isResponsabile;
     const canEditEstimatedHours = isAdmin || isManager || isResponsabile;
     
-    // Activity: tutti possono modificare (incluso worker)
-    const canEditActivityType = isAdmin || isManager || isResponsabile || isWorker;
+    // Activity: SOLO admin/manager/responsabile (workers NON possono modificare)
+    const canEditActivityType = isAdmin || isManager || isResponsabile;
     
     // Hours: worker può modificare solo le proprie
     const canEditHours = isAdmin || isManager || isResponsabile || isWorker;
@@ -159,8 +157,9 @@ const SheetEditor = ({
     // 🔐 READ-ONLY per Datore (legacy, ora gestito da permessi)
     const isReadOnly = currentUser && currentUser.role === 'datore';
 
-    // Se Worker, mostra messaggio e blocca rendering
-    if (currentUser && currentUser.role === 'worker') {
+    // ✅ RIMOSSO: Workers ora possono modificare le proprie ore
+    // Il controllo è fatto sui singoli campi (canEditSheet, canEditWorker, etc.)
+    if (false) {
         return React.createElement('div', { 
             className: `${cardClass} rounded-xl shadow-lg p-8 text-center`
         },
@@ -257,7 +256,7 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 1; // 🎯 Ridotto a 1 per firma più sottile e professionale
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             
@@ -351,6 +350,42 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                 setAddWorkerSignaturePad(canvas); // Store canvas reference
             }
         }, [showOptionalFieldsAdd, addWorkerSignaturePad]);
+        
+        // 🆕 Initialize SignaturePad for Edit Worker form
+        React.useEffect(() => {
+            if (editingWorker && editWorkerCanvasRef.current && !editWorkerSignaturePad) {
+                const canvas = editWorkerCanvasRef.current;
+                initCanvas(canvas);
+                canvas.clearCanvas = () => clearCanvas(canvas);
+                canvas.isCanvasBlank = () => isCanvasBlank(canvas);
+                setEditWorkerSignaturePad(canvas);
+            }
+            // Reset quando chiude modal
+            if (!editingWorker && editWorkerSignaturePad) {
+                setEditWorkerSignaturePad(null);
+            }
+        }, [editingWorker, editWorkerSignaturePad]);
+    
+    // 🆕 Carica lista utenti disponibili da Gestione Utenti
+    React.useEffect(() => {
+        if (db && showSelectUserWorker) {
+            db.collection('users')
+                .where('isPermanent', '==', true)
+                .where('role', 'in', ['worker', 'responsabile'])
+                .get()
+                .then(snapshot => {
+                    const usersList = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    setAvailableUsers(usersList);
+                })
+                .catch(err => {
+                    console.error('Errore caricamento utenti:', err);
+                    setAvailableUsers([]);
+                });
+        }
+    }, [db, showSelectUserWorker]);
 
     // Close dropdowns when clicking outside
     React.useEffect(() => {
@@ -794,6 +829,75 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
 
         setLoading(false);
     };
+    
+    // 🆕 Aggiungi worker selezionato da Gestione Utenti
+    const addUserWorker = async () => {
+        if (!selectedUserId) {
+            showToastLocal(`❌ Seleziona un utente`, 'error');
+            return;
+        }
+        
+        const selectedUser = availableUsers.find(u => u.id === selectedUserId);
+        if (!selectedUser) {
+            showToastLocal(`❌ Utente non trovato`, 'error');
+            return;
+        }
+        
+        // Verifica se l'utente è già presente nel foglio
+        const alreadyAdded = currentSheet.lavoratori?.some(w => w.userId === selectedUserId);
+        if (alreadyAdded) {
+            showToastLocal(`⚠️ ${selectedUser.firstName} ${selectedUser.lastName} è già presente nel foglio`, 'warning');
+            return;
+        }
+        
+        setLoading(true);
+        
+        // Crea worker con riferimento all'utente
+        const workerToAdd = {
+            id: Date.now().toString(),
+            userId: selectedUserId, // 🆕 Riferimento all'utente di Gestione Utenti
+            nome: selectedUser.firstName,
+            cognome: selectedUser.lastName,
+            oraIn: '',
+            oraOut: '',
+            pausaMinuti: 0,
+            oreTotali: '0:00',
+            codiceFiscale: selectedUser.codiceFiscale || '',
+            numeroIdentita: selectedUser.numeroIdentita || '',
+            telefono: selectedUser.phone || '',
+            email: selectedUser.email || '',
+            indirizzo: selectedUser.indirizzo || '',
+            dataNascita: selectedUser.dataNascita || '',
+            firma: '',
+            ritardoIngressoAutorizzato: false,
+            noteRitardoIngresso: '',
+            uscitaAnticipoAutorizzata: false,
+            noteUscitaAnticipo: ''
+        };
+        
+        const updatedLavoratori = [...(currentSheet.lavoratori || []), workerToAdd];
+        
+        try {
+            await db.collection('timesheets').doc(currentSheet.id).update({
+                lavoratori: updatedLavoratori
+            });
+            
+            setCurrentSheet(prev => ({ ...prev, lavoratori: updatedLavoratori }));
+            setShowSelectUserWorker(false);
+            setSelectedUserId('');
+            
+            if (addAuditLog) {
+                await addAuditLog('WORKER_ADD', `Aggiunto da Gestione Utenti: ${workerToAdd.nome} ${workerToAdd.cognome}`);
+            }
+            
+            showToastLocal(`✅ ${workerToAdd.nome} ${workerToAdd.cognome} aggiunto al foglio!`, 'success');
+        } catch (error) {
+            console.error(error);
+            showToastLocal(`❌ ${t.errorSaving}`, 'error');
+        }
+        
+        setLoading(false);
+    };
 
     const bulkUpdateWorkers = async () => {
         if (selectedWorkers.length === 0) {
@@ -1070,13 +1174,15 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 )}
                             </div>
                         ) : (
-                            <div className={`px-3 py-2 rounded-lg border ${inputClass} bg-gray-100 text-sm`}>
-                                <span className="text-gray-600">
-                                    {currentSheet.companies?.map(cId => {
-                                        const c = companies?.find(comp => comp.id === cId);
-                                        return c ? (c.name || c.nome) : null;
-                                    }).filter(Boolean).join(', ') || t.company}
-                                </span>
+                            <div className={`px-3 py-2 rounded-lg border ${
+                                darkMode 
+                                    ? 'bg-gray-700 border-gray-600 text-gray-300' 
+                                    : 'bg-gray-50 border-gray-300 text-gray-700'
+                            } text-sm opacity-75 cursor-not-allowed`}>
+                                {currentSheet.companies?.map(cId => {
+                                    const c = companies?.find(comp => comp.id === cId);
+                                    return c ? (c.name || c.nome) : null;
+                                }).filter(Boolean).join(', ') || t.company}
                             </div>
                         )}
                     </div>
@@ -1094,8 +1200,12 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 className={`w-full px-3 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-sm`}
                             />
                         ) : (
-                            <div className={`px-3 py-2 rounded-lg border ${inputClass} bg-gray-100 text-sm`}>
-                                <span className="text-gray-600">{currentSheet.data || t.date}</span>
+                            <div className={`px-3 py-2 rounded-lg border ${
+                                darkMode 
+                                    ? 'bg-gray-700 border-gray-600 text-gray-300' 
+                                    : 'bg-gray-50 border-gray-300 text-gray-700'
+                            } text-sm opacity-75 cursor-not-allowed`}>
+                                {currentSheet.data || t.date}
                             </div>
                         )}
                     </div>
@@ -1205,13 +1315,15 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 )}
                             </div>
                         ) : (
-                            <div className={`px-3 py-2 rounded-lg border ${inputClass} bg-gray-100 text-sm`}>
-                                <span className="text-gray-600">
-                                    {currentSheet.supervisors?.map(userId => {
-                                        const u = users.find(user => user.id === userId);
-                                        return u ? `${u.firstName} ${u.lastName}` : null;
-                                    }).filter(Boolean).join(', ') || t.responsible}
-                                </span>
+                            <div className={`px-3 py-2 rounded-lg border ${
+                                darkMode 
+                                    ? 'bg-gray-700 border-gray-600 text-gray-300' 
+                                    : 'bg-gray-50 border-gray-300 text-gray-700'
+                            } text-sm opacity-75 cursor-not-allowed`}>
+                                {currentSheet.supervisors?.map(userId => {
+                                    const u = users.find(user => user.id === userId);
+                                    return u ? `${u.firstName} ${u.lastName}` : null;
+                                }).filter(Boolean).join(', ') || t.responsible}
                             </div>
                         )}
                     </div>
@@ -1384,8 +1496,12 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 )}
                             </div>
                         ) : (
-                            <div className={`px-4 py-3 rounded-lg border ${inputClass} bg-gray-100 flex items-center justify-between`}>
-                                <span className="text-gray-600">
+                            <div className={`px-4 py-3 rounded-lg border ${
+                                darkMode 
+                                    ? 'bg-gray-700 border-gray-600 text-gray-300' 
+                                    : 'bg-gray-50 border-gray-300 text-gray-700'
+                            } flex items-center justify-between opacity-75 cursor-not-allowed`}>
+                                <span>
                                     {currentSheet.indirizzoEvento || t.locationAddress || 'Indirizzo'}
                                 </span>
                                 {currentSheet.indirizzoEvento && (
@@ -1426,33 +1542,37 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                         >
                                             <span>{activity.emoji}</span>
                                             <span>{activity.nome}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const updated = (currentSheet.tipoAttivita || []).filter(id => id !== activityId);
-                                                    setCurrentSheet({...currentSheet, tipoAttivita: updated});
-                                                }}
-                                                className="ml-1 hover:bg-black/20 rounded-full w-4 h-4 flex items-center justify-center"
-                                            >
-                                                ✕
-                                            </button>
+                                            {/* Pulsante X: SOLO per admin/manager/responsabile */}
+                                            {canEditActivityType && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const updated = (currentSheet.tipoAttivita || []).filter(id => id !== activityId);
+                                                        setCurrentSheet({...currentSheet, tipoAttivita: updated});
+                                                    }}
+                                                    className="ml-1 hover:bg-black/20 rounded-full w-4 h-4 flex items-center justify-center"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </span>
                                     );
                                 })}
                             </div>
                         )}
                         
-                        {/* Dropdown selector */}
-                        <div className="relative activity-dropdown-container">
-                            <button
-                                type="button"
-                                onClick={() => setShowActivityDropdown(!showActivityDropdown)}
-                                className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-left flex items-center justify-between`}
-                            >
-                                <span className="text-gray-400">{t.selectActivities || 'Seleziona attività...'}</span>
-                                <span className="text-gray-400">▼</span>
-                            </button>
-                            {showActivityDropdown && (
+                        {/* Dropdown selector - SOLO per admin/manager/responsabile */}
+                        {canEditActivityType ? (
+                            <div className="relative activity-dropdown-container">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowActivityDropdown(!showActivityDropdown)}
+                                    className={`w-full px-4 py-3 rounded-lg border ${inputClass} focus:ring-2 focus:ring-indigo-500 text-left flex items-center justify-between`}
+                                >
+                                    <span className="text-gray-400">{t.selectActivities || 'Seleziona attività...'}</span>
+                                    <span className="text-gray-400">▼</span>
+                                </button>
+                                {showActivityDropdown && (
                                 <div className={`absolute z-50 w-full mt-1 ${cardClass} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} rounded-lg shadow-lg max-h-60 overflow-y-auto`}>
                                     {appSettings.tipiAttivita && appSettings.tipiAttivita.length > 0 ? (
                                         appSettings.tipiAttivita.map(activity => {
@@ -1487,6 +1607,21 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 </div>
                             )}
                         </div>
+                        ) : (
+                            <div className={`px-4 py-3 rounded-lg border ${
+                                darkMode 
+                                    ? 'bg-gray-700 border-gray-600 text-gray-400' 
+                                    : 'bg-gray-50 border-gray-300 text-gray-600'
+                            } opacity-75 text-sm cursor-not-allowed`}>
+                                {currentSheet.tipoAttivita && currentSheet.tipoAttivita.length > 0 
+                                    ? currentSheet.tipoAttivita.map(activityId => {
+                                        const activity = appSettings.tipiAttivita?.find(a => a.id === activityId);
+                                        return activity ? `${activity.emoji} ${activity.nome}` : null;
+                                    }).filter(Boolean).join(', ')
+                                    : (t.selectActivities || 'Nessuna attività selezionata')
+                                }
+                            </div>
+                        )}
                     </div>
                     
                     {/* ⏰ NUOVO CAMPO: Orari Stimati (opzionali) */}
@@ -1575,15 +1710,28 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     rows="3"
                 />
 
+                {/* Pulsanti separati: Workers solo Note, Admin/Manager/Responsabile solo Salva Foglio */}
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3">
-                    {!isReadOnly && canEditSheet && (
+                    {isWorker && !canEditSheet ? (
+                        /* Worker: SOLO pulsante Salva Note */
                         <button
                             onClick={saveSheet}
                             disabled={loading}
-                            className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
                         >
-                            {loading ? `⏳ ${t.loading}...` : `💾 ${t.saveSheet}`}
+                            {loading ? `⏳ ${t.loading}...` : `📝 ${t.saveNotes || 'Salva Note'}`}
                         </button>
+                    ) : (
+                        /* Admin/Manager/Responsabile: Salva Foglio */
+                        !isReadOnly && canEditSheet && (
+                            <button
+                                onClick={saveSheet}
+                                disabled={loading}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors disabled:bg-gray-400 text-sm sm:text-base"
+                            >
+                                {loading ? `⏳ ${t.loading}...` : `💾 ${t.saveSheet}`}
+                            </button>
+                        )
                     )}
                     
                     {/* 🐛 FIX BUG #1: Nuovo handler per genera link */}
@@ -1655,19 +1803,34 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {/* 🔧 FIX: Pulsante Aggiungi Lavoratore */}
                         {canAddWorkers && (
-                            <button
-                                onClick={() => setShowAddWorkerForm(!showAddWorkerForm)}
-                                className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
-                                    showAddWorkerForm 
-                                        ? 'bg-green-600 text-white' 
-                                        : 'bg-green-600 hover:bg-green-700 text-white'
-                                }`}
-                            >
-                                {showAddWorkerForm ? `✕ ${t.cancel}` : `➕ ${t.addWorker}`}
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => setShowAddWorkerForm(!showAddWorkerForm)}
+                                    className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                                        showAddWorkerForm 
+                                            ? 'bg-green-600 text-white' 
+                                            : 'bg-green-600 hover:bg-green-700 text-white'
+                                    }`}
+                                >
+                                    {showAddWorkerForm ? `✕ ${t.cancel}` : `➕ ${t.addWorker}`}
+                                </button>
+                                
+                                {/* 🆕 Pulsante Aggiungi da Gestione Utenti */}
+                                <button
+                                    onClick={() => setShowSelectUserWorker(!showSelectUserWorker)}
+                                    className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
+                                        showSelectUserWorker 
+                                            ? 'bg-blue-600 text-white' 
+                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    }`}
+                                >
+                                    {showSelectUserWorker ? `✕ ${t.cancel}` : `👥 Aggiungi da Utenti`}
+                                </button>
+                            </>  
                         )}
                         
-                        {currentSheet.lavoratori?.length > 0 && (
+                        {/* Modifica Multipla: SOLO per admin/manager/responsabile */}
+                        {currentSheet.lavoratori?.length > 0 && canEditWorker && (
                             <button
                                 onClick={() => setBulkEditMode(!bulkEditMode)}
                                 className={`w-full sm:w-auto px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
@@ -1775,13 +1938,17 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                     onChange={(e) => setNewWorker({...newWorker, indirizzo: e.target.value})}
                                     className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
                                 />
-                                <input
-                                    type="date"
-                                    placeholder={t.birthDate || 'Data di nascita'}
-                                    value={newWorker.dataNascita}
-                                    onChange={(e) => setNewWorker({...newWorker, dataNascita: e.target.value})}
-                                    className={`px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
-                                />
+                                <div>
+                                    <label className={`block mb-1 text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                        🎂 {t.birthDate || 'Data di nascita'} (gg/mm/aaaa)
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={newWorker.dataNascita}
+                                        onChange={(e) => setNewWorker({...newWorker, dataNascita: e.target.value})}
+                                        className={`w-full px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-green-500`}
+                                    />
+                                </div>
                             </div>
                         )}
                         
@@ -1834,6 +2001,70 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                         </div>
                     </div>
                 )}
+                
+                {/* 🆕 Modale Selezione Utente da Gestione Utenti */}
+                {showSelectUserWorker && (
+                    <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-blue-900/20 border-2 border-blue-600' : 'bg-blue-50 border-2 border-blue-300'}`}>
+                        <h4 className="font-bold mb-3 text-base sm:text-lg">👥 Aggiungi da Gestione Utenti</h4>
+                        
+                        {availableUsers.length === 0 ? (
+                            <p className={`text-sm ${textClass} mb-3`}>
+                                ⚠️ Nessun utente disponibile in Gestione Utenti
+                            </p>
+                        ) : (
+                            <>
+                                <select
+                                    value={selectedUserId}
+                                    onChange={(e) => setSelectedUserId(e.target.value)}
+                                    className={`w-full px-4 py-2 rounded-lg border ${inputClass} focus:ring-2 focus:ring-blue-500 mb-3`}
+                                >
+                                    <option value="">-- Seleziona un utente --</option>
+                                    {availableUsers.map(user => (
+                                        <option key={user.id} value={user.id}>
+                                            {user.firstName} {user.lastName} ({user.role === 'worker' ? 'Lavoratore' : 'Responsabile'})
+                                        </option>
+                                    ))}
+                                </select>
+                                
+                                {selectedUserId && (() => {
+                                    const user = availableUsers.find(u => u.id === selectedUserId);
+                                    if (!user) return null;
+                                    
+                                    return (
+                                        <div className={`p-3 rounded-lg mb-3 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                                            <p className="text-sm font-semibold mb-2">📋 Informazioni Utente:</p>
+                                            <div className="text-xs space-y-1">
+                                                {user.email && <p>📧 {user.email}</p>}
+                                                {user.phone && <p>📱 {user.phone}</p>}
+                                                {user.codiceFiscale && <p>🆔 CF: {user.codiceFiscale}</p>}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </>
+                        )}
+                        
+                        <div className="flex gap-2">
+                            <button
+                                onClick={addUserWorker}
+                                disabled={loading || !selectedUserId}
+                                className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {loading ? `⏳ ${t.loading}...` : `✓ Aggiungi Utente`}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowSelectUserWorker(false);
+                                    setSelectedUserId('');
+                                }}
+                                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold"
+                            >
+                                {t.cancel}
+                            </button>
+                        </div>
+                    </div>
+                )}
+                
                 {bulkEditMode && (
                     <div className={`p-4 rounded-lg mb-4 ${darkMode ? 'bg-indigo-900/30' : 'bg-indigo-50'}`}>
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -1908,89 +2139,107 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                 >
                                     {isEditing ? (
                                         <div className="space-y-3">
+                                            {/* Nome/Cognome: SOLO admin/manager/responsabile possono modificare */}
+                                            {canEditWorker && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={editingWorker.nome}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, nome: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.name}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={editingWorker.cognome}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, cognome: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.surname}
+                                                    />
+                                                </div>
+                                            )}
+                                            
+                                            {/* Ore/Pausa: Tutti (inclusi workers per i propri dati) */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={editingWorker.nome}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, nome: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.name}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editingWorker.cognome}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, cognome: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.surname}
-                                                />
                                                 <input
                                                     type="time"
                                                     value={editingWorker.oraIn}
                                                     onChange={(e) => setEditingWorker({...editingWorker, oraIn: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm ${!canEditHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
-                                                    disabled={!canEditHours}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.timeIn}
                                                 />
                                                 <input
                                                     type="time"
                                                     value={editingWorker.oraOut}
                                                     onChange={(e) => setEditingWorker({...editingWorker, oraOut: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm ${!canEditHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
-                                                    disabled={!canEditHours}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                    placeholder={t.timeOut}
                                                 />
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                 <input
                                                     type="number"
                                                     value={editingWorker.pausaMinuti}
                                                     onChange={(e) => setEditingWorker({...editingWorker, pausaMinuti: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm ${!canEditHours ? 'opacity-50 cursor-not-allowed bg-gray-200 dark:bg-gray-800' : ''}`}
+                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
                                                     placeholder={t.break}
-                                                    disabled={!canEditHours}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editingWorker.codiceFiscale || ''}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, codiceFiscale: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.fiscalCode}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editingWorker.numeroIdentita || ''}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, numeroIdentita: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.idNumber}
-                                                />
-                                                <input
-                                                    type="tel"
-                                                    value={editingWorker.telefono || ''}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, telefono: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.phone}
-                                                />
-                                                <input
-                                                    type="email"
-                                                    value={editingWorker.email || ''}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, email: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.email}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editingWorker.indirizzo || ''}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, indirizzo: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.address}
-                                                />
-                                                <input
-                                                    type="date"
-                                                    value={editingWorker.dataNascita || ''}
-                                                    onChange={(e) => setEditingWorker({...editingWorker, dataNascita: e.target.value})}
-                                                    className={`px-3 py-2 rounded border ${inputClass} text-sm`}
-                                                    placeholder={t.birthDate}
                                                 />
                                             </div>
                                             
-                                            {/* Sezione Autorizzazioni Orari */}
-                                            {(currentSheet.orarioStimatoDa || currentSheet.orarioStimatoA) && (
+                                            {/* Campi personali: SOLO admin/manager/responsabile */}
+                                            {canEditWorker && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={editingWorker.codiceFiscale || ''}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, codiceFiscale: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.fiscalCode}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={editingWorker.numeroIdentita || ''}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, numeroIdentita: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.idNumber}
+                                                    />
+                                                    <input
+                                                        type="tel"
+                                                        value={editingWorker.telefono || ''}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, telefono: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.phone}
+                                                    />
+                                                    <input
+                                                        type="email"
+                                                        value={editingWorker.email || ''}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, email: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.email}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={editingWorker.indirizzo || ''}
+                                                        onChange={(e) => setEditingWorker({...editingWorker, indirizzo: e.target.value})}
+                                                        className={`px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        placeholder={t.address}
+                                                    />
+                                                    <div>
+                                                        <label className={`block mb-1 text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                            🎂 {t.birthDate || 'Data di nascita'} (gg/mm/aaaa)
+                                                        </label>
+                                                        <input
+                                                            type="date"
+                                                            value={editingWorker.dataNascita || ''}
+                                                            onChange={(e) => setEditingWorker({...editingWorker, dataNascita: e.target.value})}
+                                                            className={`w-full px-3 py-2 rounded border ${inputClass} text-sm`}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Sezione Autorizzazioni Orari - SOLO admin/manager/responsabile */}
+                                            {canEditWorker && (currentSheet.orarioStimatoDa || currentSheet.orarioStimatoA) && (
                                                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                                                     <h4 className="text-sm font-semibold mb-3 text-blue-900 dark:text-blue-100">
                                                         🕐 {t.scheduleAuthorizations}
@@ -2041,6 +2290,77 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                     </div>
                                                 </div>
                                             )}
+                                            
+                                            {/* Firma: Tutti possono modificare (workers la propria, admin/manager tutti) */}
+                                            <div className="mt-4">
+                                                <label className={`block mb-2 font-medium text-sm ${textClass}`}>
+                                                    ✍️ {t.signature || 'Firma'}
+                                                </label>
+                                                {editingWorker.firma ? (
+                                                    <div>
+                                                        <img 
+                                                            src={editingWorker.firma} 
+                                                            alt="Firma" 
+                                                            className="h-20 border-2 border-green-500 rounded-lg bg-white mb-2 p-1" 
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingWorker({...editingWorker, firma: ''});
+                                                                if (editWorkerCanvasRef.current && editWorkerCanvasRef.current.clearCanvas) {
+                                                                    editWorkerCanvasRef.current.clearCanvas();
+                                                                }
+                                                            }}
+                                                            className="text-xs text-red-600 hover:text-red-700 font-semibold"
+                                                        >
+                                                            🗑️ {t.clearSignature || 'Cancella firma'}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <div className={`border-2 rounded-lg p-2 mb-2 ${
+                                                            darkMode ? 'border-blue-500 bg-gray-800' : 'border-blue-500 bg-white'
+                                                        }`}>
+                                                            <canvas
+                                                                ref={editWorkerCanvasRef}
+                                                                className="w-full"
+                                                                style={{ 
+                                                                    touchAction: 'none', 
+                                                                    height: '150px',
+                                                                    display: 'block'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (editWorkerCanvasRef.current && editWorkerCanvasRef.current.isCanvasBlank && !editWorkerCanvasRef.current.isCanvasBlank()) {
+                                                                        const firma = editWorkerCanvasRef.current.toDataURL('image/png');
+                                                                        setEditingWorker({...editingWorker, firma});
+                                                                    } else {
+                                                                        showToastLocal('⚠️ Canvas vuoto', 'warning');
+                                                                    }
+                                                                }}
+                                                                className="flex-1 px-3 py-2 bg-green-600 text-white rounded font-semibold text-xs hover:bg-green-700"
+                                                            >
+                                                                ✓ {t.saveSignature || 'Salva Firma'}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (editWorkerCanvasRef.current && editWorkerCanvasRef.current.clearCanvas) {
+                                                                        editWorkerCanvasRef.current.clearCanvas();
+                                                                    }
+                                                                }}
+                                                                className="flex-1 px-3 py-2 bg-gray-500 text-white rounded font-semibold text-xs hover:bg-gray-600"
+                                                            >
+                                                                🗑️ {t.clear || 'Cancella'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                             
                                             <div className="flex flex-col sm:flex-row gap-2">
                                                 <button
@@ -2142,8 +2462,8 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                     />
                                                 )}
                                                 
-                                                {/* Toggle autorizzazioni inline */}
-                                                {(currentSheet.orarioStimatoDa || currentSheet.orarioStimatoA) && (
+                                                {/* Toggle autorizzazioni inline - SOLO per admin/manager/responsabile */}
+                                                {canEditWorker && (currentSheet.orarioStimatoDa || currentSheet.orarioStimatoA) && (
                                                     (() => {
                                                         const delayDiff = calculateTimeDifference(worker.oraIn, currentSheet.orarioStimatoDa);
                                                         const earlyDiff = calculateTimeDifference(worker.oraOut, currentSheet.orarioStimatoA);
@@ -2193,31 +2513,51 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                                                 )}
                                             </div>
                                             
-                                            <div className="flex flex-col gap-2">
-                                                <button
-                                                    onClick={() => setEditingWorker(worker)}
-                                                    className="px-3 py-2 bg-blue-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-blue-700"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                {!isInBlacklist && addToBlacklist && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const reason = prompt(`${t.reason}:`);
-                                                            if (reason) addToBlacklist(worker, reason);
-                                                        }}
-                                                        className="px-3 py-2 bg-orange-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-orange-700"
-                                                    >
-                                                        🚫
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => deleteWorker(worker.id)}
-                                                    className="px-3 py-2 bg-red-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-red-700"
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
+                                            {/* Pulsanti Modifica/Elimina/Blacklist */}
+                                            {/* Admin/Manager/Responsabile: tutti i pulsanti */}
+                                            {/* Workers: SOLO pulsante modifica per i PROPRI dati */}
+                                            {(() => {
+                                                const isOwnWorker = isWorker && currentUser && (
+                                                    worker.userId === currentUser.id || 
+                                                    worker.id === currentUser.id
+                                                );
+                                                const canModify = canEditWorker || isOwnWorker;
+                                                
+                                                if (canModify) {
+                                                    return (
+                                                        <div className="flex flex-col gap-2">
+                                                            <button
+                                                                onClick={() => setEditingWorker(worker)}
+                                                                className="px-3 py-2 bg-blue-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-blue-700"
+                                                            >
+                                                                ✏️
+                                                            </button>
+                                                            {canEditWorker && (
+                                                                <>
+                                                                    {!isInBlacklist && addToBlacklist && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const reason = prompt(`${t.reason}:`);
+                                                                                if (reason) addToBlacklist(worker, reason);
+                                                                            }}
+                                                                            className="px-3 py-2 bg-orange-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-orange-700"
+                                                                        >
+                                                                            🚫
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => deleteWorker(worker.id)}
+                                                                        className="px-3 py-2 bg-red-600 text-white rounded text-xs sm:text-sm font-semibold hover:bg-red-700"
+                                                                    >
+                                                                        🗑️
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
                                     )}
                                 </div>
@@ -2257,6 +2597,9 @@ const calculateHours = (oraIn, oraOut, pausaMinuti = 0) => {
                     <div>
                         {canSignSheet ? (
                             <>
+                                <p className={`text-sm mb-3 ${darkMode ? 'text-yellow-300' : 'text-yellow-700'} font-semibold`}>
+                                    ⚠️ Firma obbligatoria per completare il foglio
+                                </p>
                                 <div className="border-2 border-indigo-500 rounded-lg p-2 bg-white mb-3">
                                     {/* 🐛 FIX: Canvas con key per forzare re-render */}
                                     <canvas 

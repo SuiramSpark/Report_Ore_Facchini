@@ -23,6 +23,16 @@ const GOOGLE_GEOCODING_KEY = 'gzHZD0ATlItrSQNMnTdihgzBFTb6FwSs';
 // Example: const TOMORROW_API_KEY = 'gzHZD0ATlItrSQNMnTdihgzBFTb6FwSs';
 const TOMORROW_API_KEY = 'gzHZD0ATlItrSQNMnTdihgzBFTb6FwSs';
 
+// 📧 EmailJS Configuration - Password Recovery System
+const EMAILJS_CONFIG = {
+    serviceId: 'service_1jhq7ri',
+    templateId: 'template_711ldjo', // Password reset template
+    welcomeTemplateId: 'template_0f4xhjf', // Welcome email template
+    publicKey: 'CKA097p1d3E1X6HqH',
+    // Token expiry time in hours
+    tokenExpiryHours: 24
+};
+
 function initializeFirebase() {
     try {
         if (!firebase.apps.length) {

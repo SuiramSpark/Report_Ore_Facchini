@@ -7,7 +7,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
     const [showCreateModal, setShowCreateModal] = React.useState(false);
     const [selectedUser, setSelectedUser] = React.useState(null);
     const [showRolePermissions, setShowRolePermissions] = React.useState(false);
-    const t = window.translations || {};
+    const t = new Proxy({}, { get: (target, prop) => window.t ? window.t(prop) : prop });
 
     // Load all PERMANENT users from Firestore
     React.useEffect(() => {
@@ -162,7 +162,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                         getRoleBadge(user.role),
                         user.suspended && React.createElement('span', {
                             className: 'px-2 py-1 rounded text-xs font-semibold bg-red-500 text-white flex items-center gap-1'
-                        }, '⛔ SOSPESO')
+                        }, `⛔ ${t.suspended || 'SOSPESO'}`)
                     )
                 )
             ),
@@ -286,7 +286,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                     firstName: formData.firstName,
                     lastName: formData.lastName,
                     email: formData.email,
-                    password: formData.password,
+                    password: formData.password, // Password in chiaro (per admin)
                     phone: formData.phone || '',
                     role: formData.role, // ✅ SOLO RUOLO, nessun permesso!
                     isPermanent: true,
@@ -311,7 +311,26 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                     );
                 }
 
-                showToast('✅ ' + (t.userCreated || 'Utente creato con successo!'), 'success');
+                // Send welcome email if requested and email is provided
+                if (formData.sendWelcomeEmail && formData.email && formData.email.trim()) {
+                    try {
+                        await window.sendWelcomeEmail({
+                            userEmail: formData.email,
+                            userName: `${formData.firstName} ${formData.lastName}`.trim(),
+                            userRole: formData.role,
+                            tempPassword: formData.password,
+                            createdBy: creatorName
+                        });
+                        
+                        showToast('✅ ' + (t.userCreated || 'Utente creato') + ' - Email di benvenuto inviata!', 'success');
+                    } catch (emailError) {
+                        console.error('Errore invio email:', emailError);
+                        showToast('✅ Utente creato, ma errore invio email: ' + emailError.message, 'warning');
+                    }
+                } else {
+                    showToast('✅ ' + (t.userCreated || 'Utente creato con successo!'), 'success');
+                }
+
                 setShowCreateModal(false);
                 await loadUsers();
             } catch (error) {
@@ -384,7 +403,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                         React.createElement('input', {
                             type: 'text',
                             required: true,
-                            placeholder: 'esempio@dominio.com',
+                            placeholder: t.emailPlaceholder || 'esempio@dominio.com',
                             value: formData.email,
                             onChange: (e) => setFormData({ ...formData, email: e.target.value }),
                             className: `w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`
@@ -472,6 +491,28 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                                 onClick: () => setShowConfirmPassword(!showConfirmPassword),
                                 className: `absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200`
                             }, showConfirmPassword ? '👁️' : '👁️‍🗨️')
+                        )
+                    ),
+
+                    // Send Welcome Email Checkbox
+                    React.createElement('div', {
+                        className: `flex items-center p-3 rounded-lg ${darkMode ? 'bg-blue-900/20 border border-blue-700' : 'bg-blue-50 border border-blue-200'}`
+                    },
+                        React.createElement('input', {
+                            type: 'checkbox',
+                            id: 'sendWelcomeEmail',
+                            checked: formData.sendWelcomeEmail || false,
+                            onChange: (e) => setFormData({ ...formData, sendWelcomeEmail: e.target.checked }),
+                            className: 'w-5 h-5 rounded cursor-pointer'
+                        }),
+                        React.createElement('label', {
+                            htmlFor: 'sendWelcomeEmail',
+                            className: `ml-3 cursor-pointer ${darkMode ? 'text-gray-300' : 'text-gray-700'}`
+                        },
+                            React.createElement('span', { className: 'font-medium' }, `📧 ${t.sendWelcomeEmail || 'Invia email di benvenuto'}`),
+                            React.createElement('p', {
+                                className: `text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`
+                            }, t.sendWelcomeEmailDesc || 'L\'utente riceverà un\'email con le credenziali di accesso')
                         )
                     ),
 
@@ -703,23 +744,13 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
             const categories = featureCategories[currentLang] || featureCategories['it'];
             const roleLabels = roleNames[currentLang] || roleNames['it'];
 
-            // Traduzioni header
-            const headerTexts = {
-                it: {
-                    title: '🔐 Confronto Permessi per Ruolo',
-                    subtitle: 'Confronta le funzionalità disponibili per ciascun ruolo',
-                    back: '← Indietro',
-                    featureColumn: 'Funzionalità'
-                },
-                en: {
-                    title: '🔐 Role Permissions Comparison',
-                    subtitle: 'Compare features available for each role',
-                    back: '← Back',
-                    featureColumn: 'Feature'
-                }
+            // Traduzioni header usando window.t
+            const texts = {
+                title: `🔐 ${t.compareRolesTitle || 'Confronto Permessi tra Ruoli'}`,
+                subtitle: t.compareRolesSubtitle || 'Confronta le funzionalità disponibili per ciascun ruolo',
+                back: `← ${t.back || 'Indietro'}`,
+                featureColumn: t.feature || 'Funzionalità'
             };
-
-            const texts = headerTexts[currentLang] || headerTexts['it'];
 
             return React.createElement('div', {
                 className: 'h-full flex flex-col'
@@ -911,7 +942,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                         }, users.filter(u => u.role === 'admin').length),
                         React.createElement('div', {
                             className: `text-xs ${darkMode ? 'text-purple-400' : 'text-purple-700'}`
-                        }, '👑 ' + (t.admin || 'Admin'))
+                        }, `👑 ${t.admin || 'Admin'}`)
                     )
                 ),
                 // Manager Count
@@ -926,7 +957,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                         }, users.filter(u => u.role === 'manager').length),
                         React.createElement('div', {
                             className: `text-xs ${darkMode ? 'text-green-400' : 'text-green-700'}`
-                        }, '📋 ' + (t.manager || 'Manager'))
+                        }, `📋 ${t.manager || 'Manager'}`)
                     )
                 ),
                 // Responsabile Count
@@ -956,7 +987,7 @@ window.UserManagement = function({ db, storage, currentUserRole, currentUserId, 
                         }, users.filter(u => u.role === 'worker').length),
                         React.createElement('div', {
                             className: `text-xs ${darkMode ? 'text-indigo-400' : 'text-indigo-700'}`
-                        }, '👷 ' + (t.worker || 'Worker'))
+                        }, `👷 ${t.worker || 'Worker'}`)
                     )
                 )
             ),

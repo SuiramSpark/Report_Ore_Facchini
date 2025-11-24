@@ -4,7 +4,7 @@
  * Versione semplificata senza permessi admin
  */
 
-window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
+window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout, addAuditLog }) {
     const [user, setUser] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState('info');
@@ -22,7 +22,7 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
         confirmPassword: ''
     });
     
-    const t = window.translations || {};
+    const t = new Proxy({}, { get: (target, prop) => window.t ? window.t(prop) : prop });
     const cardClass = darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900';
     const textClass = darkMode ? 'text-gray-300' : 'text-gray-600';
     const inputClass = darkMode 
@@ -128,27 +128,17 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
             const userDoc = await db.collection('users').doc(userId).get();
             const userData = userDoc.data();
             
-            // Verifica password corrente con bcrypt (backward compatible)
-            let passwordMatch = false;
-            if (userData.password && userData.password.startsWith('$2')) {
-                // Bcrypt hash
-                passwordMatch = window.bcrypt.compareSync(passwordData.currentPassword, userData.password);
-            } else {
-                // Plain text (backward compatibility)
-                passwordMatch = userData.password === passwordData.currentPassword;
-            }
+            // ✅ Verifica password corrente (in chiaro)
+            const passwordMatch = userData.password === passwordData.currentPassword;
             
             if (!passwordMatch) {
                 showToast('❌ Password attuale errata', 'error');
                 return;
             }
             
-            // Hash nuova password con bcrypt
-            const hashedPassword = window.bcrypt.hashSync(passwordData.newPassword, 10);
-            
-            // Aggiorna password in Firestore
+            // ✅ SALVA PASSWORD IN CHIARO (gestita manualmente dall'admin via database)
             await db.collection('users').doc(userId).update({
-                password: hashedPassword,
+                password: passwordData.newPassword, // Password in chiaro
                 passwordChangedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -186,6 +176,11 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
                     avatarURL: result.url,
                     avatarUpdatedAt: new Date().toISOString()
                 });
+                
+                // Audit log
+                if (addAuditLog) {
+                    await addAuditLog('PROFILE_AVATAR_UPDATE', `Avatar cambiato - ${user.firstName} ${user.lastName}`);
+                }
                 
                 showToast('✅ Avatar aggiornato', 'success');
                 await loadUserData();
@@ -283,9 +278,9 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
     // RENDER TABS
     const renderTabs = () => {
         const tabs = [
-            { id: 'info', label: 'Il Mio Profilo', icon: '👤' },
-            { id: 'documents', label: 'I Miei Documenti', icon: '📄' },
-            { id: 'password', label: 'Sicurezza', icon: '🔒' }
+            { id: 'info', label: t.myProfile || 'Il Mio Profilo', icon: '👤' },
+            { id: 'documents', label: t.myDocuments || 'I Miei Documenti', icon: '📄' },
+            { id: 'password', label: t.security || 'Sicurezza', icon: '🔒' }
         ];
         
         return React.createElement('div', {
@@ -321,7 +316,7 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
                         }, !user.avatarURL && (user.firstName?.[0] || 'U')),
                         React.createElement('label', {
                             className: 'absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-3 cursor-pointer hover:bg-blue-600 transition-colors shadow-lg',
-                            title: 'Cambia Avatar'
+                            title: t.changeAvatar || 'Cambia Avatar'
                         },
                             React.createElement('input', {
                                 type: 'file',
@@ -347,7 +342,7 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
                             }, (t[user.role] || user.role).toUpperCase()),
                             user.isPermanent && React.createElement('span', {
                                 className: 'px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800'
-                            }, '✓ Utente Fisso')
+                            }, `✓ ${t.permanentUser || 'Utente Fisso'}`)
                         )
                     )
                 )
@@ -607,7 +602,7 @@ window.WorkerProfile = function({ userId, db, storage, darkMode, onLogout }) {
             // Header
             React.createElement('div', { className: 'mb-6' },
                 React.createElement('h1', { className: 'text-3xl font-bold' }, 
-                    '👤 Il Mio Profilo'
+                    `👤 ${t.myProfile || 'Il Mio Profilo'}`
                 )
             ),
             

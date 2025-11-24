@@ -96,6 +96,8 @@ const UserProfile = ({ userId, workerName, currentUserRole, onClose, onUserMadeP
     // Editable profile logic
     // Password change logic
     const handleChangePassword = async () => {
+        console.log('🔑 Cambio password - userId:', userId, 'currentUser:', user);
+        
         if (!canEditProfile()) {
             showToast('❌ Non hai permessi per cambiare la password', 'error');
             return;
@@ -110,22 +112,39 @@ const UserProfile = ({ userId, workerName, currentUserRole, onClose, onUserMadeP
         }
         setPwLoading(true);
         try {
-            // Hash password (usa sempre base64 se bcryptjs non è disponibile)
-            let hashed = '';
-            if (window.bcrypt && typeof window.bcrypt.hashSync === 'function') {
-                try {
-                    hashed = window.bcrypt.hashSync(pwData.newPassword, 10);
-                } catch (e) {
-                    hashed = btoa(pwData.newPassword);
+            // Se userId è 'admin', trova il vero documento tramite email
+            let realUserId = userId;
+            if (userId === 'admin' && user && user.email) {
+                console.log('🔍 Admin detected - searching real userId by email:', user.email);
+                const usersSnapshot = await db.collection('users')
+                    .where('email', '==', user.email)
+                    .limit(1)
+                    .get();
+                
+                if (!usersSnapshot.empty) {
+                    realUserId = usersSnapshot.docs[0].id;
+                    console.log('✅ Found real userId:', realUserId);
+                } else {
+                    showToast('❌ Account utente non trovato nel database', 'error');
+                    setPwLoading(false);
+                    return;
                 }
-            } else {
-                hashed = btoa(pwData.newPassword);
             }
-            await db.collection('users').doc(userId).update({ password: hashed });
+            
+            console.log('💾 Salvataggio password per userId:', realUserId, 'nuova password:', pwData.newPassword);
+            
+            // Salva password in chiaro (per permettere modifica manuale da admin)
+            await db.collection('users').doc(realUserId).update({ 
+                password: pwData.newPassword,
+                updatedAt: new Date().toISOString()
+            });
+            
+            console.log('✅ Password salvata con successo!');
             showToast('✅ Password aggiornata', 'success');
             setPwMode(false);
             setPwData({ oldPassword: '', newPassword: '', confirmPassword: '' });
         } catch (error) {
+            console.error('❌ Errore salvataggio password:', error);
             showToast('❌ Errore cambio password: ' + (error.message || error), 'error');
         } finally {
             setPwLoading(false);

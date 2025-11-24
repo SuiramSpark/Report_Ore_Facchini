@@ -3,7 +3,7 @@
  * Profilo completo full-screen per utenti permanenti con tutte le funzionalità admin
  */
 
-window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId, onBack, onClose, db, storage, darkMode, language }) {
+window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId, onBack, onClose, db, storage, darkMode, language, addAuditLog }) {
     const [user, setUser] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState('info');
@@ -33,7 +33,7 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
     const [allSheets, setAllSheets] = React.useState([]);
     const [statsLoading, setStatsLoading] = React.useState(false);
     
-    const t = window.translations || {};
+    const t = new Proxy({}, { get: (target, prop) => window.t ? window.t(prop) : prop });
     const isAdmin = currentUserRole === 'admin';
     const isManager = currentUserRole === 'manager';
     const canEdit = isAdmin || isManager;
@@ -179,6 +179,11 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
                 updatedBy: currentUserId
             });
             
+            // Audit log
+            if (addAuditLog) {
+                await addAuditLog('PROFILE_INFO_UPDATE', `Info profilo aggiornate - ${formData.firstName} ${formData.lastName} [${formData.role}]`);
+            }
+            
             showToast('✅ ' + (t.profileUpdated || 'Profilo aggiornato'), 'success');
             setEditMode(false);
             await loadUserData();
@@ -207,24 +212,20 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
         }
         
         try {
-            // Hash password con bcryptjs se disponibile, altrimenti base64
-            let hashedPassword = '';
-            if (window.bcrypt && typeof window.bcrypt.hashSync === 'function') {
-                try {
-                    hashedPassword = window.bcrypt.hashSync(passwordData.newPassword, 10);
-                } catch (e) {
-                    hashedPassword = btoa(passwordData.newPassword);
-                }
-            } else {
-                hashedPassword = btoa(passwordData.newPassword);
-            }
-            // Aggiorna password in Firestore
+            // ✅ SALVA PASSWORD IN CHIARO (gestita manualmente dall'admin via database)
             await db.collection('users').doc(userId).update({
-                password: hashedPassword,
+                password: passwordData.newPassword, // Password in chiaro
                 passwordChangedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 passwordChangedBy: currentUserId,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+            
+            // Audit log
+            if (addAuditLog) {
+                const userName = `${formData.firstName || 'User'} ${formData.lastName || ''}`;
+                await addAuditLog('PASSWORD_CHANGE', `Password modificata - ${userName.trim()}`);
+            }
+            
             showToast('✅ ' + (t.passwordChanged || 'Password modificata con successo!'), 'success');
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         } catch (error) {
@@ -272,12 +273,12 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
         
         // Valida tipo e dimensione
         if (!file.type.startsWith('image/')) {
-            showToast('❌ Formato non valido. Usa JPG, PNG o GIF', 'error');
+            showToast('❌ ' + (t.invalidFormat || 'Formato non valido. Usa JPG, PNG o GIF'), 'error');
             return;
         }
         
         if (file.size > 5 * 1024 * 1024) {
-            showToast('❌ File troppo grande. Massimo 5MB', 'error');
+            showToast('❌ ' + (t.fileTooLarge || 'File troppo grande. Massimo 5MB'), 'error');
             return;
         }
         
@@ -541,7 +542,7 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
         }
         
         if (canChangePermissions) {
-            tabs.push({ id: 'permissions', label: 'Ruolo & Accessi', icon: '🎭' });
+            tabs.push({ id: 'permissions', label: t.roleAndPermissions || 'Ruolo & Accessi', icon: '🎭' });
         }
         
         if (canSuspend || canDelete) {
@@ -1017,8 +1018,8 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
                 ]
             },
             'manager': {
-                name: 'Manager',
-                description: 'Gestione completa con alcune restrizioni',
+                name: t.roleManager || 'Manager',
+                description: t.fullManagement || 'Gestione completa con alcune restrizioni',
                 color: 'blue',
                 capabilities: [
                     '✅ Dashboard completa',
@@ -1098,7 +1099,7 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
                 
                 // Cambio ruolo (solo admin)
                 canChangePermissions && React.createElement('div', { className: 'mt-4' },
-                    React.createElement('label', { className: 'block text-sm font-semibold mb-2' }, '🔄 Cambia Ruolo'),
+                    React.createElement('label', { className: 'block text-sm font-semibold mb-2' }, `🔄 ${t.changeRole || 'Cambia Ruolo'}`),
                     React.createElement('select', {
                         value: userRole,
                         onChange: async (e) => {
@@ -1157,7 +1158,7 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
             
             // Lista capacità
             React.createElement('div', { className: `${cardClass} rounded-lg shadow-md p-6` },
-                React.createElement('h4', { className: 'text-lg font-bold mb-4' }, '📋 Capacità & Restrizioni'),
+                React.createElement('h4', { className: 'text-lg font-bold mb-4' }, `📋 ${t.capabilitiesRestrictions || 'Capacità & Restrizioni'}`),
                 React.createElement('div', { className: 'space-y-2' },
                     ...roleInfo.capabilities.map((cap, idx) => 
                         React.createElement('div', { 
@@ -1185,10 +1186,10 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
                 user.suspended ? React.createElement('div', null,
                     React.createElement('div', { className: 'mb-4 p-4 bg-red-50 border border-red-200 rounded-lg' },
                         React.createElement('p', { className: 'text-red-800 font-medium mb-2' }, 
-                            '🚫 Utente attualmente sospeso'
+                            `🚫 ${t.userCurrentlySuspended || 'Utente attualmente sospeso'}`
                         ),
                         React.createElement('p', { className: 'text-sm text-red-600' }, 
-                            `Motivo: ${user.suspensionReason || '-'}`
+                            `${t.reason || 'Motivo'}: ${user.suspensionReason || '-'}`
                         )
                     ),
                     React.createElement('button', {
@@ -1199,7 +1200,7 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
                     React.createElement('textarea', {
                         value: suspensionReason,
                         onChange: (e) => setSuspensionReason(e.target.value),
-                        placeholder: t.suspensionReason || 'Motivo della sospensione...',
+                        placeholder: t.suspensionReasonPlaceholder || 'Motivo della sospensione...',
                         className: `w-full px-3 py-2 border rounded-lg mb-4 ${inputClass}`,
                         rows: 3
                     }),
@@ -1218,10 +1219,10 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
                 ),
                 React.createElement('div', { className: 'mb-4 p-4 bg-red-50 border border-red-200 rounded-lg' },
                     React.createElement('p', { className: 'text-red-800 font-medium mb-2' }, 
-                        'ATTENZIONE: Questa azione è IRREVERSIBILE!'
+                        t.deleteUserWarning || 'ATTENZIONE: Questa azione è IRREVERSIBILE!'
                     ),
                     React.createElement('p', { className: 'text-sm text-red-600' }, 
-                        'Verranno eliminati: profilo utente, tutti i documenti, avatar e dati associati.'
+                        t.deleteUserConfirmation || 'Verranno eliminati: profilo utente, tutti i documenti, avatar e dati associati.'
                     )
                 ),
                 React.createElement('label', { className: 'block text-sm font-medium mb-2' },
@@ -1281,7 +1282,7 @@ window.PermanentUserProfile = function({ userId, currentUserRole, currentUserId,
             },
                 // Header
                 React.createElement('div', { className: 'flex justify-between items-center mb-4' },
-                    React.createElement('h3', { className: 'text-xl font-bold' }, '🖼️ Avatar'),
+                    React.createElement('h3', { className: 'text-xl font-bold' }, `🖼️ ${t.avatar || 'Avatar'}`),
                     React.createElement('button', {
                         onClick: () => setShowAvatarPopup(false),
                         className: 'text-2xl hover:text-red-500 transition-colors'

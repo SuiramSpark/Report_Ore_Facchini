@@ -49,18 +49,10 @@ service cloud.firestore {
       allow update: if true; // Permette increment() atomico
     }
 
-    // 🔐 Settings - ADMIN AUTH (password hash)
+    // 🔐 Settings - ADMIN AUTH (password in chiaro)
     // Lettura: pubblica (necessaria per login)
     // Scrittura: SOLO tramite app (nessun utente esterno può modificare)
     match /settings/adminAuth {
-      allow read: if true;
-      allow write: if true; // Cambia a 'false' in produzione per massima sicurezza
-    }
-
-    // 🔐 Settings - SECURITY QUESTIONS (domande di sicurezza)
-    // Lettura: pubblica (necessaria per recovery password)
-    // Scrittura: SOLO tramite app (nessun utente esterno può modificare)
-    match /settings/securityQuestions {
       allow read: if true;
       allow write: if true; // Cambia a 'false' in produzione per massima sicurezza
     }

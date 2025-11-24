@@ -234,10 +234,28 @@ const WorkerStats = ({
                 }
             } else {
                 // Crea nuovo utente
+                // Chiedi se vuole aggiungere email e inviare benvenuto
+                const wantsEmail = confirm(
+                    `📧 Vuoi aggiungere un'email per ${selectedWorker} e inviare le credenziali di accesso?\n\n` +
+                    `Se confermi, potrai inserire l'email e verrà inviata automaticamente una mail di benvenuto.`
+                );
+                
+                let userEmail = '';
+                let tempPassword = '';
+                
+                if (wantsEmail) {
+                    userEmail = prompt('📧 Inserisci l\'email:', '');
+                    if (userEmail && userEmail.trim()) {
+                        // Genera password temporanea
+                        tempPassword = 'Worker' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                    }
+                }
+                
                 await db.collection('users').doc(userId).set({
                     firstName: firstName || '',
                     lastName: lastName || '',
-                    email: '',
+                    email: userEmail || '',
+                    password: tempPassword || '',
                     phone: '',
                     role: 'worker',
                     isPermanent: true,
@@ -248,7 +266,26 @@ const WorkerStats = ({
                     uploadCounter: { count: 0, resetDate: new Date() }
                 });
                 
-                alert('✅ ' + (t.userMadePermanent || `${selectedWorker} è ora un utente fisso!`));
+                // Invia email di benvenuto se richiesto
+                if (userEmail && userEmail.trim() && tempPassword) {
+                    try {
+                        await window.sendWelcomeEmail({
+                            userEmail: userEmail,
+                            userName: selectedWorker,
+                            userRole: 'worker',
+                            tempPassword: tempPassword,
+                            createdBy: currentUser?.firstName && currentUser?.lastName 
+                                ? `${currentUser.firstName} ${currentUser.lastName}`
+                                : 'Admin'
+                        });
+                        alert('✅ ' + (t.userMadePermanent || `${selectedWorker} è ora un utente fisso!`) + '\n📧 Email di benvenuto inviata!');
+                    } catch (emailError) {
+                        console.error('Errore invio email:', emailError);
+                        alert('✅ Utente creato, ma errore invio email: ' + emailError.message);
+                    }
+                } else {
+                    alert('✅ ' + (t.userMadePermanent || `${selectedWorker} è ora un utente fisso!`));
+                }
             }
             
             // Chiudi il dettaglio e torna alla lista
@@ -586,7 +623,7 @@ const WorkerStats = ({
                         React.createElement('div', { className: `${cardClass} rounded-xl shadow-lg p-6` },
                             React.createElement('h2', {
                                 className: `text-2xl font-bold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
-                            }, '📊 Statistiche Globali Lavoratori')
+                            }, `📊 ${t.globalWorkerStats}`)
                         ),
 
                         // === KPI CARDS ===
@@ -629,7 +666,7 @@ const WorkerStats = ({
                             return React.createElement(TopItemsBarChart, {
                                 data: topWorkers,
                                 darkMode,
-                                title: '🏆 Top 10 Lavoratori per Ore Totali'
+                                title: `🏆 ${t.topWorkersHours}`
                             });
                         })(),
 
@@ -649,7 +686,7 @@ const WorkerStats = ({
                             return React.createElement(TopItemsBarChart, {
                                 data: topCompanies,
                                 darkMode,
-                                title: '🏢 Top Aziende per Ore Lavorate'
+                                title: `🏢 ${t.topCompaniesHours}`
                             });
                         })(),
 
@@ -669,7 +706,7 @@ const WorkerStats = ({
                             return React.createElement(DistributionPieChart, {
                                 data: companyDistribution,
                                 darkMode,
-                                title: '🎯 Distribuzione Ore per Azienda (Top 6)'
+                                title: `🎯 ${t.companyDistributionTop6}`
                             });
                         })(),
 
@@ -683,7 +720,7 @@ const WorkerStats = ({
                                 React.createElement('div', { className: 'text-6xl mb-4' }, '🎨'),
                                 React.createElement('h3', {
                                     className: `text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
-                                }, 'Nessun Tipo di Attività Registrato'),
+                                }, t.noActivityRegistered),
                                 React.createElement('p', {
                                     className: `${textClass} mb-4`
                                 }, t.noActivityTypesAssigned || 'I fogli ore non hanno tipi di attività assegnati.'),
@@ -716,7 +753,7 @@ const WorkerStats = ({
                             return React.createElement(TopItemsBarChart, {
                                 data: activityBarData,
                                 darkMode,
-                                title: '🎨 Ore per Tipo di Attività (Top 10)'
+                                title: `🎨 ${t.activityHoursTop10}`
                             });
                         })(),
 
@@ -758,7 +795,7 @@ const WorkerStats = ({
                             return React.createElement('div', { className: `${cardClass} rounded-xl shadow-lg p-6` },
                                 React.createElement('h3', {
                                     className: `text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
-                                }, '🎨 Dettaglio Tipi di Attività'),
+                                }, `🎨 ${t.activityDetailTitle}`),
                                 
                                 React.createElement('div', { className: 'overflow-x-auto' },
                                     React.createElement('table', { className: 'w-full' },
@@ -767,10 +804,10 @@ const WorkerStats = ({
                                                 className: `border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`
                                             },
                                                 React.createElement('th', { className: `text-left p-3 ${textClass}` }, '#'),
-                                                React.createElement('th', { className: `text-left p-3 ${textClass}` }, 'Tipo Attività'),
-                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'Ore Totali'),
-                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, '% del Totale'),
-                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, 'N° Lavoratori')
+                                                React.createElement('th', { className: `text-left p-3 ${textClass}` }, t.activityType),
+                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, t.totalHoursLabel),
+                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, t.percentageOfTotal),
+                                                React.createElement('th', { className: `text-right p-3 ${textClass}` }, t.numberOfWorkers)
                                             )
                                         ),
                                         React.createElement('tbody', {},
@@ -824,7 +861,7 @@ const WorkerStats = ({
                             return React.createElement(DailyHoursLineChart, {
                                 data: monthlyData,
                                 darkMode,
-                                title: '📈 Andamento Ore Mensili (Ultimi 6 Mesi)'
+                                title: `📈 ${t.monthlyTrend}`
                             });
                         })(),
 
@@ -848,7 +885,7 @@ const WorkerStats = ({
                             return React.createElement(CumulativeAreaChart, {
                                 data: cumulativeData,
                                 darkMode,
-                                title: '📊 Ore Cumulative (Ultimi 6 Mesi)'
+                                title: `📊 ${t.cumulativeHours}`
                             });
                         })(),
 
@@ -856,7 +893,7 @@ const WorkerStats = ({
                         React.createElement('div', { className: `${cardClass} rounded-xl shadow-lg p-6` },
                             React.createElement('h3', {
                                 className: `text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`
-                            }, '🏆 Top 15 Lavoratori'),
+                            }, `🏆 ${t.topWorkersTable}`),
                             
                             React.createElement('div', { className: 'overflow-x-auto' },
                                 React.createElement('table', { className: 'w-full' },

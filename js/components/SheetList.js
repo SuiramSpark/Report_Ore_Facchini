@@ -66,11 +66,14 @@ const SheetList = ({ sheets = [], onSelectSheet = () => {}, onDeleteSheet = () =
             if (userRole === 'admin' || userRole === 'manager' || userRole === 'responsabile') {
                 // Nessun filtro, vedono tutti i fogli
             } else if (userRole === 'worker') {
-                // Worker: vede SOLO fogli dove appare come lavoratore
-                const workerFullName = normalizeWorkerName(currentUser.name || '', currentUser.surname || '');
+                // Worker: vede SOLO fogli dove appare come lavoratore (by name OR by userId)
+                const workerFullName = normalizeWorkerName(currentUser.firstName || currentUser.name || '', currentUser.lastName || currentUser.surname || '');
                 arr = arr.filter(s => {
                     if (!s.lavoratori || !Array.isArray(s.lavoratori)) return false;
                     return s.lavoratori.some(lav => {
+                        // 🆕 Controlla sia per nome che per userId (workers da Gestione Utenti)
+                        if (lav.userId && lav.userId === currentUser.id) return true;
+                        if (lav.id === currentUser.id) return true;
                         const lavName = normalizeWorkerName(lav.nome || '', lav.cognome || '');
                         return lavName === workerFullName;
                     });

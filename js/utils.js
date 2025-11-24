@@ -303,6 +303,63 @@ window.exportToCSV = (sheets, filename = 'registro_ore.csv') => {
 };
 
 // ========================================
+// EMAIL SENDING UTILITIES - EmailJS
+// ========================================
+
+/**
+ * Send welcome email to new user with credentials
+ * @param {Object} params - Email parameters
+ * @param {string} params.userEmail - User's email address
+ * @param {string} params.userName - User's full name
+ * @param {string} params.userRole - User's role (admin, manager, worker, etc.)
+ * @param {string} params.tempPassword - Temporary password
+ * @param {string} params.createdBy - Name of admin who created account
+ * @returns {Promise} EmailJS send promise
+ */
+window.sendWelcomeEmail = async (params) => {
+    const { userEmail, userName, userRole, tempPassword, createdBy } = params;
+    
+    if (typeof emailjs === 'undefined') {
+        throw new Error('EmailJS library not loaded');
+    }
+    
+    if (!EMAILJS_CONFIG.welcomeTemplateId || EMAILJS_CONFIG.welcomeTemplateId === 'template_XXXXXXX') {
+        throw new Error('Welcome template ID not configured. Please set EMAILJS_CONFIG.welcomeTemplateId in config.js');
+    }
+    
+    const roleNames = {
+        admin: '👑 Admin',
+        manager: '👔 Manager',
+        responsabile: '👷 Responsabile',
+        worker: '👤 Worker'
+    };
+    
+    const emailParams = {
+        email: userEmail, // ⚠️ IMPORTANTE: deve corrispondere a {{email}} nel template EmailJS
+        user_name: userName,
+        username: userEmail, // Per il display nell'email
+        password: tempPassword,
+        roleName: roleNames[userRole] || userRole,
+        appLink: window.location.origin + window.location.pathname
+    };
+    
+    try {
+        console.log('📧 Invio welcome email con parametri:', emailParams);
+        const response = await emailjs.send(
+            EMAILJS_CONFIG.serviceId,
+            EMAILJS_CONFIG.welcomeTemplateId,
+            emailParams,
+            EMAILJS_CONFIG.publicKey
+        );
+        console.log('✅ Welcome email sent successfully:', response);
+        return response;
+    } catch (error) {
+        console.error('❌ Error sending welcome email:', error);
+        throw error;
+    }
+};
+
+// ========================================
 // SMART SIGNATURE COLOR INVERSION FOR PDF
 // ========================================
 

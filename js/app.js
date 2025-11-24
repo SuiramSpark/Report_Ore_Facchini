@@ -14,7 +14,6 @@ const App = () => {
     const [rememberMe, setRememberMe] = useState(true); // ✅ Ricordami checkbox (default true)
     const [showPassword, setShowPassword] = useState(false); // 👁️ Toggle visibilità password
     const [showPasswordError, setShowPasswordError] = useState(false);
-    const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
     const [showUserProfile, setShowUserProfile] = useState(false);
     const [selectedUserId, setSelectedUserId] = useState(null);
     const [selectedWorkerName, setSelectedWorkerName] = useState(null); // Nome del lavoratore
@@ -36,12 +35,7 @@ const App = () => {
         }
     }, [currentUser]);
     
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [recoveryError, setRecoveryError] = useState('');
     const [adminPasswordHash, setAdminPasswordHash] = useState(null); // Caricato da Firebase invece di hardcoded
-    const [recoveryData, setRecoveryData] = useState(null); // Domande di sicurezza caricate da Firebase
-    const [loadingRecovery, setLoadingRecovery] = useState(true); // Loading per recupero password
     
     // ⚠️ DEPRECATO: Questo hash non viene più usato, viene caricato da Firebase
     // const ADMIN_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // "admin123"
@@ -127,6 +121,17 @@ const App = () => {
         setDb(firebaseDb);
         setStorage(firebaseStorage);
         
+        // 🔐 Configura Firebase Auth Persistence SUBITO (prima di caricare sessioni)
+        if (firebase.auth) {
+            firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+                .then(() => {
+                    console.log('✅ Firebase Auth Persistence: LOCAL (rimane loggato anche dopo chiusura browser)');
+                })
+                .catch(error => {
+                    console.error('❌ Errore configurazione Firebase persistence:', error);
+                });
+        }
+        
         // Load preferences
         const savedDarkMode = localStorage.getItem('darkMode') === 'true';
         const savedLanguage = localStorage.getItem('language') || 'it';
@@ -177,20 +182,31 @@ const App = () => {
             setMode('worker');
             setSheetId(urlSheet);
             setIsAuthenticated(true); // Worker mode non richiede password
+            setLoading(false);
         } else {
             console.log('👤 Verifica sessione salvata...');
+            
+            // 🔍 DEBUG: Controlla cosa c'è in storage PRIMA di tutto
+            console.log('📦 localStorage.userSession:', localStorage.getItem('userSession'));
+            console.log('📦 sessionStorage.userSession:', sessionStorage.getItem('userSession'));
+            console.log('📦 localStorage.adminAuth:', localStorage.getItem('adminAuth'));
+            console.log('📦 sessionStorage.adminAuth:', sessionStorage.getItem('adminAuth'));
             
             // Check for saved user session (workers/datore/manager) - localStorage OR sessionStorage
             const savedUserSession = localStorage.getItem('userSession') || sessionStorage.getItem('userSession');
             if (savedUserSession) {
+                console.log('✅ Sessione trovata! Ripristino in corso...', savedUserSession);
                 try {
                     const { userId, role, timestamp } = JSON.parse(savedUserSession);
                     const now = Date.now();
                     const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 giorni invece di 24 ore
                     
+                    console.log('🕐 Timestamp sessione:', new Date(timestamp).toLocaleString('it-IT'));
+                    console.log('🕐 Scadenza:', new Date(timestamp + thirtyDays).toLocaleString('it-IT'));
+                    
                     if (now - timestamp < thirtyDays) {
-                        // Reload user data from Firestore
-                        db.collection('users').doc(userId).get()
+                        // Reload user data from Firestore - usa firebaseDb che è già disponibile
+                        firebaseDb.collection('users').doc(userId).get()
                             .then(doc => {
                                 if (doc.exists) {
                                     const userData = doc.data();
@@ -199,6 +215,7 @@ const App = () => {
                                     if (userData.suspended) {
                                         console.log('⚠️ Sessione utente sospesa:', userId);
                                         localStorage.removeItem('userSession');
+                                        setLoading(false);
                                         return;
                                     }
                                     
@@ -209,6 +226,7 @@ const App = () => {
                                         console.warn('🚫 Worker-link non può accedere all\'app, solo al form');
                                         localStorage.removeItem('userSession');
                                         setLoginError('Account worker-link può solo compilare il form, non accedere all\'app');
+                                        setLoading(false);
                                         return;
                                     }
                                     
@@ -224,70 +242,71 @@ const App = () => {
                                     
                                     console.log('✅ Sessione utente ripristinata:', role);
                                     console.log('🔍 DEBUG USER DATA:', { id: userId, role: userData.role, email: userData.email });
+                                    setLoading(false); // ✅ Nascondi loading DOPO aver caricato l'utente
                                 } else {
+                                    console.log('❌ Utente non trovato in Firestore:', userId);
                                     localStorage.removeItem('userSession');
+                                    sessionStorage.removeItem('userSession');
+                                    setLoading(false);
                                 }
                             })
                             .catch(err => {
                                 console.error('❌ Errore ripristino sessione utente:', err);
                                 localStorage.removeItem('userSession');
+                                sessionStorage.removeItem('userSession');
+                                setLoading(false);
                             });
                     } else {
+                        console.log('⏰ Sessione scaduta (più di 30 giorni)');
                         localStorage.removeItem('userSession');
+                        sessionStorage.removeItem('userSession');
                         console.log('⏰ Sessione utente scaduta (30 giorni)');
+                        setLoading(false);
                     }
                 } catch (e) {
+                    console.error('❌ Errore parsing sessione:', e);
                     localStorage.removeItem('userSession');
+                    sessionStorage.removeItem('userSession');
+                    setLoading(false);
                 }
-            }
-            
-            // Check for admin session (fallback) - localStorage OR sessionStorage
-            const savedAuth = localStorage.getItem('adminAuth') || sessionStorage.getItem('adminAuth');
-            if (savedAuth && !savedUserSession) {
-                try {
-                    const { timestamp } = JSON.parse(savedAuth);
-                    const now = Date.now();
-                    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-                    if (now - timestamp < thirtyDays) {
-                        // ✅ Admin legacy - solo ruolo, nessun permesso
-                        const adminUser = {
-                            role: 'admin',
-                            id: 'admin',
-                            email: 'admin@reportore.app',
-                            firstName: 'Admin',
-                            lastName: 'System'
-                        };
-                        setCurrentUser(adminUser);
-                        setIsAuthenticated(true);
-                        setCurrentView('dashboard');
-                        console.log('✅ Sessione admin ripristinata (role-based)');
-                    } else {
+            } else {
+                // No user session - check for admin session (fallback)
+                const savedAuth = localStorage.getItem('adminAuth') || sessionStorage.getItem('adminAuth');
+                if (savedAuth) {
+                    try {
+                        const { timestamp } = JSON.parse(savedAuth);
+                        const now = Date.now();
+                        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+                        if (now - timestamp < thirtyDays) {
+                            // ✅ Admin legacy - solo ruolo, nessun permesso
+                            const adminUser = {
+                                role: 'admin',
+                                id: 'admin',
+                                email: 'admin@reportore.app',
+                                firstName: 'Admin',
+                                lastName: 'System'
+                            };
+                            setCurrentUser(adminUser);
+                            setIsAuthenticated(true);
+                            setCurrentView('dashboard');
+                            console.log('✅ Sessione admin ripristinata (role-based)');
+                        } else {
+                            localStorage.removeItem('adminAuth');
+                            console.log('⏰ Sessione admin scaduta (30 giorni)');
+                        }
+                    } catch (e) {
                         localStorage.removeItem('adminAuth');
-                        console.log('⏰ Sessione admin scaduta (30 giorni)');
                     }
-                } catch (e) {
-                    localStorage.removeItem('adminAuth');
+                } else {
+                    console.log('❌ Nessuna sessione salvata trovata');
                 }
+                // In tutti i casi (admin trovato, admin scaduto, o nessuna sessione), nascondi loading
+                setLoading(false);
             }
         }
-        
-        setLoading(false);
     }, []);
 
-    // � Carica domande di sicurezza per recupero password
-    useEffect(() => {
-        if (!db || !showPasswordRecovery) return;
-        
-        setLoadingRecovery(true);
-        db.collection('settings').doc('securityQuestions').get()
-            .then(doc => {
-                if (doc.exists) {
-                    setRecoveryData(doc.data());
-                }
-                setLoadingRecovery(false);
-            })
-            .catch(() => setLoadingRecovery(false));
-    }, [db, showPasswordRecovery]);
+    // ❌ RIMOSSO: Sistema di reset password - La password viene cambiata manualmente dal database
 
     // 🔒 UNIFIED LOGIN SYSTEM - Auto-detect Admin/Manager/Datore/Worker
     const handleUnifiedLogin = async () => {
@@ -321,8 +340,32 @@ const App = () => {
                 const userDoc = usersSnapshot.docs[0];
                 const userData = userDoc.data();
                 
-                // Verifica password in chiaro (semplice confronto stringhe)
-                const passwordMatch = passwordInput === userData.password;
+                // Verifica se la password è in base64 (finisce con = o ha lunghezza multipla di 4)
+                let dbPassword = userData.password;
+                const isBase64 = dbPassword && (dbPassword.endsWith('==') || dbPassword.endsWith('=') || (dbPassword.length % 4 === 0 && /^[A-Za-z0-9+/=]+$/.test(dbPassword)));
+                
+                if (isBase64) {
+                    try {
+                        const decoded = atob(dbPassword);
+                        dbPassword = decoded;
+                        console.log('🔓 Password decodificata da base64');
+                    } catch (e) {
+                        console.log('❌ Errore decodifica base64, uso password originale');
+                    }
+                } else {
+                    console.log('📝 Password in chiaro');
+                }
+                
+                console.log('🔍 LOGIN DEBUG:');
+                console.log('  - Email:', email);
+                console.log('  - UserId:', userDoc.id);
+                console.log('  - Password inserita:', passwordInput);
+                console.log('  - Password nel DB:', userData.password);
+                console.log('  - Password finale:', dbPassword);
+                console.log('  - Confronto:', passwordInput === dbPassword);
+                
+                // Verifica password (confronto diretto)
+                const passwordMatch = passwordInput === dbPassword;
                 
                 if (!passwordMatch) {
                     setShowPasswordError(true);
@@ -365,20 +408,26 @@ const App = () => {
                 
                 // Save session to localStorage (solo se "Ricordami" è attivo)
                 if (rememberMe) {
-                    localStorage.setItem('userSession', JSON.stringify({
+                    const sessionData = {
                         userId: user.id,
                         role: user.role,
                         timestamp: Date.now()
-                    }));
-                    console.log('💾 Sessione salvata (30 giorni)');
+                    };
+                    localStorage.setItem('userSession', JSON.stringify(sessionData));
+                    console.log('💾 Sessione salvata in localStorage (30 giorni)');
+                    console.log('📦 Dati salvati:', sessionData);
+                    console.log('✅ Verifica salvataggio:', localStorage.getItem('userSession'));
                 } else {
                     // Sessione solo per questa scheda
-                    sessionStorage.setItem('userSession', JSON.stringify({
+                    const sessionData = {
                         userId: user.id,
                         role: user.role,
                         timestamp: Date.now()
-                    }));
-                    console.log('💾 Sessione temporanea (solo questa scheda)');
+                    };
+                    sessionStorage.setItem('userSession', JSON.stringify(sessionData));
+                    console.log('💾 Sessione salvata in sessionStorage (solo questa scheda)');
+                    console.log('📦 Dati salvati:', sessionData);
+                    console.log('✅ Verifica salvataggio:', sessionStorage.getItem('userSession'));
                 }
                 
                 console.log('✅ Login utente riuscito:', {
@@ -471,66 +520,7 @@ const App = () => {
         }
     };
 
-    // 🔐 Password Recovery - Verifica risposte sicurezza
-    const handlePasswordRecovery = async () => {
-        if (!db) {
-            setRecoveryError('Database non disponibile');
-            return;
-        }
-
-        try {
-            // Carica domande di sicurezza da Firebase
-            const securityDoc = await db.collection('settings').doc('securityQuestions').get();
-            
-            if (!securityDoc.exists || !securityDoc.data().answer1) {
-                setRecoveryError(t.noRecoverySet || 'Nessun sistema di recupero configurato! Vai in Impostazioni per configurarlo.');
-                return;
-            }
-
-            const securityData = securityDoc.data();
-
-            // Valida risposte (confronto diretto, case-insensitive)
-            const answer1Match = securityAnswers.answer1.toLowerCase().trim() === securityData.answer1.toLowerCase().trim();
-            const answer2Match = securityAnswers.answer2.toLowerCase().trim() === securityData.answer2.toLowerCase().trim();
-
-            if (!answer1Match || !answer2Match) {
-                setRecoveryError(t.wrongSecurityAnswers || 'Risposte errate! Riprova.');
-                return;
-            }
-
-            // Risposte corrette - salva nuova password in chiaro
-            if (newPassword !== confirmPassword) {
-                setRecoveryError(t.passwordMismatch || 'Le password non coincidono!');
-                return;
-            }
-
-            if (newPassword.length < 6) {
-                setRecoveryError(t.passwordTooShort || 'Password troppo corta (min 6 caratteri)');
-                return;
-            }
-
-            // Salva nuova password in chiaro in Firebase
-            await db.collection('settings').doc('adminAuth').set({
-                password: newPassword,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedVia: 'passwordRecovery'
-            }, { merge: true });
-
-            // Aggiorna stato locale
-            setAdminPasswordHash(newPassword);
-
-            showToast('✅ Password reimpostata con successo!', 'success');
-            setShowPasswordRecovery(false);
-            setSecurityAnswers({ answer1: '', answer2: '' });
-            setNewPassword('');
-            setConfirmPassword('');
-            setRecoveryError('');
-
-        } catch (error) {
-            console.error('Errore recovery password:', error);
-            setRecoveryError(t.recoveryError || 'Errore durante il recupero password');
-        }
-    };
+    // ❌ RIMOSSO: Sistema di reset password
 
     // Save preferences
     useEffect(() => {
@@ -1136,12 +1126,11 @@ const App = () => {
 
     // 🔒 SCHERMATA LOGIN
     if (!isAuthenticated) {
-        const PasswordResetComp = window.PasswordReset || (() => <div>PasswordReset non caricato</div>);
-
-        // Schermata login unificata
+        // Schermata login unificata con transizione moderna
         return (
             <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900' : 'bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50'}`}>
-                <div className={`max-w-md w-full mx-4 p-8 rounded-2xl shadow-2xl ${darkMode ? 'bg-gray-800/90 backdrop-blur-lg border border-indigo-500/20' : 'bg-white/90 backdrop-blur-lg border border-indigo-200'}`}>
+                <div className={`max-w-md w-full mx-4 p-8 rounded-2xl shadow-2xl transition-all duration-500 ${darkMode ? 'bg-gray-800/90 backdrop-blur-lg border border-indigo-500/20' : 'bg-white/90 backdrop-blur-lg border border-indigo-200'}`}>
+                    
                     {/* Logo/Title */}
                     <div className="text-center mb-8">
                         <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -1229,7 +1218,9 @@ const App = () => {
                             <div className="animate-shake bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-3 rounded-lg text-sm">
                                 ❌ Credenziali non valide! Verifica email e password.
                             </div>
-                        )}                        <button
+                        )}
+
+                        <button
                             type="submit"
                             className={`w-full py-3 rounded-lg font-semibold transition-all transform hover:scale-105 ${
                                 darkMode
@@ -1239,17 +1230,6 @@ const App = () => {
                         >
                             🔓 {t.login || 'Accedi'}
                         </button>
-
-                        {/* Password dimenticata? */}
-                        <div className="text-center">
-                            <button
-                                type="button"
-                                onClick={() => setShowPasswordRecovery(true)}
-                                className={`text-sm font-medium ${darkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-500'} transition-colors`}
-                            >
-                                🔑 {t.forgotPassword || 'Password dimenticata?'}
-                            </button>
-                        </div>
                     </form>
 
                     {/* Dark Mode Toggle */}
@@ -1270,19 +1250,6 @@ const App = () => {
                         💡 Admin: lascia email vuota | Utenti: inserisci email e password
                     </p>
                 </div>
-
-                {/* Password Reset Modal */}
-                {showPasswordRecovery && (
-                    <PasswordResetComp
-                        db={db}
-                        darkMode={darkMode}
-                        onClose={() => setShowPasswordRecovery(false)}
-                        onSuccess={() => {
-                            setShowPasswordRecovery(false);
-                            showToast('✅ Password reimpostata! Ora puoi effettuare il login', 'success');
-                        }}
-                    />
-                )}
             </div>
         );
     }
@@ -1573,25 +1540,9 @@ const App = () => {
                         currentUser={currentUser}
                         sheets={(() => {
                             if (!currentUser || !sheets) return [];
-                            // Admin/Manager/Responsabile: vedono tutti i fogli
-                            if (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'responsabile') {
-                                return sheets;
-                            }
-                            // Worker: vede solo fogli dove è presente
-                            if (currentUser.role === 'worker') {
-                                // Mostra solo fogli dove l'utente è responsabile o tra i lavoratori
-                                return sheets.filter(sheet => {
-                                    // Responsabile
-                                    if (sheet.responsabileId && currentUser.id && sheet.responsabileId === currentUser.id) return true;
-                                    // Tra i lavoratori
-                                    if (Array.isArray(sheet.lavoratori)) {
-                                        return sheet.lavoratori.some(w => w.id === currentUser.id);
-                                    }
-                                    return false;
-                                });
-                            }
-                            // Nessun permesso: nessun foglio
-                            return [];
+                            // ✅ TUTTI (admin/manager/responsabile/worker) vedono TUTTI i fogli in Dashboard
+                            // Workers possono vedere statistiche complete ma modificare solo i propri fogli
+                            return sheets;
                         })()} 
                         darkMode={darkMode} 
                         language={language} 
@@ -1786,7 +1737,8 @@ const App = () => {
                     darkMode: darkMode,
                     language: language,
                     onBack: () => setCurrentView(getFirstAvailableView(currentUser)),
-                    isOwnProfile: true
+                    isOwnProfile: true,
+                    addAuditLog: addAuditLog
                 })}
             </main>
             
@@ -1803,7 +1755,8 @@ const App = () => {
                 db: db,
                 storage: storage,
                 darkMode: darkMode,
-                language: language
+                language: language,
+                addAuditLog: addAuditLog
             })}
         </div>
     );

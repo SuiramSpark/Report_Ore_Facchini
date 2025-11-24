@@ -135,7 +135,7 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
         chartMap[label] = (chartMap[label] || 0) + sheetHours;
 
         // Company stats
-    const azienda = sheet.titoloAzienda || (t.unknown || 'Sconosciuta');
+        const azienda = sheet.titoloAzienda || 'N/D';
         companyMap[azienda] = (companyMap[azienda] || 0) + sheetHours;
 
         // Worker stats and hourly distribution (and per-day breakdown)
@@ -190,10 +190,19 @@ function calculateAdvancedStats(sheets = [], period = 'week', weekStart = 1) {
             hours: Math.round(hours * 100) / 100 // Round to 2 decimals
         }));
 
+    // ✅ FILTRO: Rimuovi "Sconosciuta" e "N/D" dalle aziende
     const topCompanies = Object.entries(companyMap)
+        .filter(([name]) => {
+            const lowerName = name.toLowerCase();
+            return lowerName !== 'sconosciuta' && 
+                   lowerName !== 'n/d' && 
+                   lowerName !== 'nd' &&
+                   lowerName !== 'unknown' &&
+                   name.trim() !== '';
+        })
         .map(([name, hours]) => ({ name, hours: Math.round(hours * 100) / 100 }))
         .sort((a, b) => b.hours - a.hours)
-        .slice(0, 5);
+        .slice(0, 6); // Aumentato a 6 per compensare i filtrati
 
     const topWorkers = Object.entries(workerMap)
         .map(([key, data]) => ({ name: data.displayName || key, hours: Math.round((data.total || 0) * 100) / 100 }))
@@ -295,22 +304,15 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
     };
     
     // Dashboard permissions (role-based)
-    const canViewDashboard = window.hasRoleAccess(currentUser, 'dashboard.view');
-    const canViewStats = canViewDashboard; // Se può vedere dashboard, può vedere statistiche
-    const canViewCharts = canViewDashboard; // Se può vedere dashboard, può vedere grafici
+    // ✅ WORKERS possono vedere dashboard con i loro fogli
+    const canViewDashboard = currentUser ? true : false;
+    const canViewStats = canViewDashboard;
+    const canViewCharts = canViewDashboard;
     
     console.log('🔍 Dashboard Access:', { canViewDashboard, role: currentUser?.role });
     
-    // Se non ha accesso alla dashboard, redirect al profilo
-    if (!canViewDashboard) {
-        console.log('⛔ Accesso Dashboard negato - redirect a Profilo');
-        // Auto-redirect al profilo (sempre accessibile)
-        React.useEffect(() => {
-            if (onNavigate) {
-                onNavigate('profile');
-            }
-        }, []);
-        
+    // ✅ RIMOSSO: Workers ora hanno accesso alla dashboard
+    if (!currentUser) {
         return React.createElement('div', { 
             className: `flex items-center justify-center h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}` 
         },
@@ -1375,10 +1377,21 @@ const Dashboard = ({ sheets, darkMode, language = 'it', weekStart = 1, onNavigat
                     hours: d.hours || 0
                 }));
                 
-                const topCompaniesData = stats.topCompanies.slice(0, 5).map(c => ({
-                    name: c.name,
-                    value: parseFloat(c.hours.toFixed(1))
-                }));
+                // ✅ Filtra N/D anche qui prima di passare al grafico
+                const topCompaniesData = stats.topCompanies
+                    .filter(c => {
+                        const lowerName = (c.name || '').toLowerCase();
+                        return lowerName !== 'sconosciuta' && 
+                               lowerName !== 'n/d' && 
+                               lowerName !== 'nd' &&
+                               lowerName !== 'unknown' &&
+                               c.name && c.name.trim() !== '';
+                    })
+                    .slice(0, 6)
+                    .map(c => ({
+                        name: c.name,
+                        value: parseFloat(c.hours.toFixed(1))
+                    }));
                 
                 const topWorkersData = stats.topWorkers.slice(0, 5).map(w => ({
                     name: w.name,
